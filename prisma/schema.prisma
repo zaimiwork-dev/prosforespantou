@@ -1,0 +1,55 @@
+  generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// --- MODELS ---
+
+model Store {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @unique 
+  logoUrl     String?    
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  leaflets    Leaflet[]  
+  discounts   Discount[] 
+}
+
+model Leaflet {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String?    
+  validFrom   DateTime   
+  validUntil  DateTime   
+  pageImages  String[]   
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  storeId     String     @db.Uuid
+  store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  discounts   Discount[] 
+}
+
+model Discount {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productName      String    
+  category         String    
+  originalPrice    Float?    
+  discountedPrice  Float     
+  discountPercent  Float?    
+  validFrom        DateTime  
+  validUntil       DateTime  
+  imageUrl         String?   
+  description      String?   
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  storeId          String    @db.Uuid
+  store            Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  leafletId        String?   @db.Uuid
+  leaflet          Leaflet?  @relation(fields: [leafletId], references: [id], onDelete: SetNull)
+}
