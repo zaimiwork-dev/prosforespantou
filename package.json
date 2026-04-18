@@ -6,27 +6,40 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.6.0",
-    "@supabase/supabase-js": "^2.101.1",
+    "@sentry/nextjs": "^10.49.0",
+    "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
+    "embla-carousel-react": "^8.6.0",
+    "jose": "^6.2.2",
     "next": "16.2.2",
     "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sharp": "^0.34.5",
     "zod": "^3.22.4",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "@types/pg": "^8.20.0",
+    "@vitest/ui": "^4.1.4",
     "autoprefixer": "^10.4.27",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
+    "playwright": "^1.59.1",
+    "playwright-extra": "^4.3.6",
     "postcss": "^8.5.8",
     "prisma": "^7.6.0",
-    "tailwindcss": "^4.2.2"
-  }
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "tailwindcss": "^4.2.2",
+    "vitest": "^4.1.4"
+  },
+  "type": "module"
 }

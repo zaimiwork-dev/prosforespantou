@@ -6,9 +6,9 @@ import { z } from "zod";
  */
 export const aiExtractionSchema = z.object({
   productName: z.string().min(1, "Product name is required"),
-  discountedPrice: z.number().describe("The final price after discount"),
-  originalPrice: z.number().optional().nullable().describe("The original price before discount"),
-  category: z.string().describe("The product category (e.g., Γαλακτοκομικά)"),
+  discountedPrice: z.coerce.number().describe("The final price after discount"),
+  originalPrice: z.coerce.number().optional().nullable().describe("The original price before discount"),
+  category: z.string().optional().nullable().describe("The product category (e.g., Γαλακτοκομικά)"),
   boundingBox: z.object({
     x: z.number(),
     y: z.number(),
@@ -17,7 +17,9 @@ export const aiExtractionSchema = z.object({
   }).optional().nullable().describe("Normalized coordinates (0-1000) for the product image"),
   supermarket: z.string().optional().describe("The supermarket ID (e.g., ab, lidl)"),
   description: z.string().optional().nullable(),
-  discountPercent: z.number().optional().nullable(),
+  discountPercent: z.coerce.number().optional().nullable(),
+  validFrom: z.string().optional().nullable().describe("The start date of the offer (ISO or human readable)"),
+  validUntil: z.string().optional().nullable().describe("The end date of the offer (ISO or human readable)"),
 });
 
 /**

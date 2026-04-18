@@ -1,0 +1,68 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import prisma from "@/lib/prisma";
+import { SUPERMARKETS } from "@/lib/constants";
+import SupermarketClient from "@/components/SupermarketClient";
+
+export async function generateStaticParams() {
+  return SUPERMARKETS.map((sm) => ({ id: sm.id }));
+}
+
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const sm = SUPERMARKETS.find((s) => s.id === id);
+  if (!sm) return { title: "Supermarket" };
+  return {
+    title: `Προσφορές ${sm.name}`,
+    description: `Δες όλες τις ενεργές προσφορές του ${sm.name} σε ένα μέρος.`,
+    alternates: {
+      canonical: `/supermarket/${id}`,
+    },
+  };
+}
+
+export default async function SupermarketPage({ params }) {
+  const { id } = await params;
+  const sm = SUPERMARKETS.find((s) => s.id === id);
+  if (!sm) notFound();
+
+  const now = new Date();
+  const [deals, leaflet] = await Promise.all([
+    prisma.discount.findMany({
+      where: {
+        supermarket: id,
+        isActive: true,
+        validUntil: { gt: now },
+      },
+      include: { store: true, leaflet: true, product: true },
+      orderBy: [{ discountPercent: "desc" }, { validUntil: "asc" }],
+      take: 200,
+    }),
+    prisma.leaflet.findFirst({
+      where: {
+        store: { name: sm.name },
+        validUntil: { gt: now },
+      },
+      orderBy: { validFrom: "desc" },
+    }),
+  ]);
+
+  const serializedDeals = deals.map((d) => ({
+    ...d,
+    validFrom: d.validFrom?.toISOString?.() ?? d.validFrom,
+    validUntil: d.validUntil?.toISOString?.() ?? d.validUntil,
+    createdAt: d.createdAt?.toISOString?.() ?? d.createdAt,
+    updatedAt: d.updatedAt?.toISOString?.() ?? d.updatedAt,
+  }));
+
+  const serializedLeaflet = leaflet
+    ? {
+        id: leaflet.id,
+        title: leaflet.title,
+        validFrom: leaflet.validFrom?.toISOString?.() ?? leaflet.validFrom,
+        validUntil: leaflet.validUntil?.toISOString?.() ?? leaflet.validUntil,
+      }
+    : null;
+
+  return <SupermarketClient sm={sm} initialDeals={serializedDeals} leaflet={serializedLeaflet} />;
+}

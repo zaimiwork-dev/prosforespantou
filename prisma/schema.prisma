@@ -1,4 +1,3 @@
-  // Prisma schema file - Vercel Fix
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,50 +6,100 @@ datasource db {
   provider  = "postgresql"
 }
 
-// --- MODELS ---
-
 model Store {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String     @unique 
-  logoUrl     String?    
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String     @unique
+  logoUrl   String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  discounts Discount[]
+  leaflets  Leaflet[]
+  products  Product[]
 
-  leaflets    Leaflet[]  
-  discounts   Discount[] 
+  @@map("stores")
+}
+
+model Product {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  imageUrl    String?    @map("image_url")
+  barcode     String?
+  woltId      String?    @unique @map("wolt_id")
+  supermarket String?    // The slug like "ab", "lidl"
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  storeId     String     @db.Uuid @map("store_id")
+  store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  discounts   Discount[]
+  priceSnapshots PriceSnapshot[]
+
+  @@index([storeId])
+  @@index([supermarket])
+  @@index([updatedAt])
+  @@map("products")
+}
+
+model PriceSnapshot {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId       String   @db.Uuid @map("product_id")
+  supermarket     String
+  price           Float
+  isDiscounted    Boolean  @default(false) @map("is_discounted")
+  recordedAt      DateTime @default(now()) @map("recorded_at")
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, recordedAt])
+  @@map("price_snapshots")
 }
 
 model Leaflet {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title       String?    
-  validFrom   DateTime   
-  validUntil  DateTime   
-  pageImages  String[]   
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title      String?
+  validFrom  DateTime
+  validUntil DateTime
+  pageImages String[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  storeId    String     @db.Uuid
+  discounts  Discount[]
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  storeId     String     @db.Uuid
-  store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  discounts   Discount[] 
+  @@index([storeId])
+  @@index([validUntil])
+  @@map("leaflets")
 }
 
 model Discount {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  productName      String    
-  category         String    
-  originalPrice    Float?    
-  discountedPrice  Float     
-  discountPercent  Float?    
-  validFrom        DateTime  
-  validUntil       DateTime  
-  imageUrl         String?   
-  description      String?   
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productName     String   @map("product_name")
+  category        String
+  originalPrice   Float?   @map("original_price")
+  discountedPrice Float    @map("discounted_price")
+  discountPercent Float?   @map("discount_percent")
+  validFrom       DateTime @map("valid_from")
+  validUntil      DateTime @map("valid_until")
+  imageUrl        String?  @map("image_url")
+  description     String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  storeId         String   @db.Uuid @map("store_id")
+  leafletId       String?  @db.Uuid @map("leaflet_id")
+  isActive        Boolean  @default(true) @map("is_active")
+  supermarket     String?  // The slug like "ab", "lidl"
+  productId       String?  @db.Uuid @map("product_id")
+  product         Product? @relation(fields: [productId], references: [id])
+  leaflet         Leaflet? @relation(fields: [leafletId], references: [id])
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  storeId          String    @db.Uuid
-  store            Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  
-  leafletId        String?   @db.Uuid
-  leaflet          Leaflet?  @relation(fields: [leafletId], references: [id], onDelete: SetNull)
+  @@index([storeId])
+  @@index([productId])
+  @@index([leafletId])
+  @@index([supermarket])
+  @@index([category])
+  @@index([validUntil])
+  @@index([isActive, validUntil])
+  @@index([isActive, supermarket, validUntil])
+  @@index([isActive, category, validUntil])
+  @@map("discounts")
 }

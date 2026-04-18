@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/scrape-wolt?sm=ab&url=YOUR_AB_WOLT_JSON_URL",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-wolt?sm=masoutis&url=YOUR_MASOUTIS_WOLT_JSON_URL",
+      "schedule": "20 6 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-lidl",
+      "schedule": "0 7 * * 4"
+    }
+  ]
+}
