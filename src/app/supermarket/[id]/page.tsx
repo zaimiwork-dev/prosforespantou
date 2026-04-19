@@ -4,9 +4,7 @@ import prisma from "@/lib/prisma";
 import { SUPERMARKETS } from "@/lib/constants";
 import SupermarketClient from "@/components/SupermarketClient";
 
-export async function generateStaticParams() {
-  return SUPERMARKETS.map((sm) => ({ id: sm.id }));
-}
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
