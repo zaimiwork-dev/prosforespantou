@@ -1,10 +1,15 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { DiscountCard } from './DiscountCard';
 import { Icon } from './Icons';
+import { useShoppingListStore } from '@/lib/store';
 
 export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHref }) {
+  const cartItems = useShoppingListStore((s) => s.items);
+  const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
+
   if (!deals || deals.length === 0) return null;
 
   return (
@@ -23,7 +28,7 @@ export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHr
 
       <div className="featured-scroll">
         {deals.map((d) => (
-          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} />
+          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} />
         ))}
       </div>
     </section>

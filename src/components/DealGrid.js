@@ -1,7 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import { DiscountCard } from './DiscountCard';
 import { Icon } from './Icons';
+import { useShoppingListStore } from '@/lib/store';
 
 function Skeleton() {
   return (
@@ -29,6 +31,9 @@ export function DealGrid({
   emptyText,
   onClearFilters,
 }) {
+  const cartItems = useShoppingListStore((s) => s.items);
+  const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
+
   const isEmpty = !loading && deals.length === 0;
 
   if (isEmpty) {
@@ -50,7 +55,7 @@ export function DealGrid({
     <>
       <div className="products-grid">
         {deals.map((d) => (
-          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} />
+          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} />
         ))}
         {loading && Array(8).fill(0).map((_, i) => <Skeleton key={i} />)}
       </div>
