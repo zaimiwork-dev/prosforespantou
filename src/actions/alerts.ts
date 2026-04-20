@@ -12,23 +12,31 @@ const alertSchema = z.object({
 });
 
 export async function getAlerts(token: string) {
-  try {
-    const sub = await prisma.subscriber.findUnique({
-      where: { confirmToken: token },
-      include: { alerts: { orderBy: { createdAt: 'desc' } } }
-    });
-    if (!sub) return { success: false, error: 'Unauthorized' };
-    if (!sub.confirmedAt) return { success: false, error: 'Email not confirmed', unconfirmed: true };
+  return await Sentry.withServerActionInstrumentation('getAlerts', { recordResponse: true }, async () => {
+    try {
+      const sub = await prisma.subscriber.findUnique({
+        where: { confirmToken: token },
+        include: { alerts: { orderBy: { createdAt: 'desc' } } }
+      });
+      if (!sub) return { success: false, error: 'Unauthorized' };
+      if (!sub.confirmedAt) return { success: false, error: 'Email not confirmed', unconfirmed: true };
 
-    return { success: true, alerts: sub.alerts };
-  } catch (error) {
-    Sentry.captureException(error);
-    return { success: false, error: 'Internal server error' };
-  }
+      // Convert Decimal to number for the client
+      const alerts = sub.alerts.map(a => ({
+        ...a,
+        maxPrice: a.maxPrice ? Number(a.maxPrice) : null,
+      }));
+
+      return { success: true, alerts };
+    } catch (error) {
+      Sentry.captureException(error);
+      return { success: false, error: 'Internal server error' };
+    }
+  });
 }
 
 export async function createAlert(input: unknown) {
-  return await Sentry.withServerActionInstrumentation('createAlert', { recordResponse: false }, async () => {
+  return await Sentry.withServerActionInstrumentation('createAlert', { recordResponse: true }, async () => {
     try {
       const parsed = alertSchema.safeParse(input);
       if (!parsed.success) return { success: false, error: 'Invalid input' };
@@ -48,7 +56,7 @@ export async function createAlert(input: unknown) {
         }
       });
 
-      return { success: true, alert };
+      return { success: true, alert: { ...alert, maxPrice: alert.maxPrice ? Number(alert.maxPrice) : null } };
     } catch (error) {
       Sentry.captureException(error);
       return { success: false, error: 'Internal server error' };
@@ -57,19 +65,21 @@ export async function createAlert(input: unknown) {
 }
 
 export async function deleteAlert(token: string, alertId: string) {
-  try {
-    const sub = await prisma.subscriber.findUnique({
-      where: { confirmToken: token }
-    });
-    if (!sub) return { success: false, error: 'Unauthorized' };
+  return await Sentry.withServerActionInstrumentation('deleteAlert', { recordResponse: true }, async () => {
+    try {
+      const sub = await prisma.subscriber.findUnique({
+        where: { confirmToken: token }
+      });
+      if (!sub) return { success: false, error: 'Unauthorized' };
 
-    await prisma.alert.delete({
-      where: { id: alertId, subscriberId: sub.id }
-    });
+      await prisma.alert.delete({
+        where: { id: alertId, subscriberId: sub.id }
+      });
 
-    return { success: true };
-  } catch (error) {
-    Sentry.captureException(error);
-    return { success: false, error: 'Internal server error' };
-  }
+      return { success: true };
+    } catch (error) {
+      Sentry.captureException(error);
+      return { success: false, error: 'Internal server error' };
+    }
+  });
 }
