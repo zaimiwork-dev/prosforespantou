@@ -31,7 +31,7 @@ export default function DealsClient({ initial }) {
   const [offset, setOffset] = useState(initial.deals.length);
   const [hasMore, setHasMore] = useState(initial.deals.length < initial.total);
 
-  const [activeSM, setActiveSM] = useState(initial.supermarket || "all");
+  const [selectedSMs, setSelectedSMs] = useState(() => initial.supermarkets || []);
   const [activeCategory, setActiveCategory] = useState(initial.category || "all");
   const [sortBy, setSortBy] = useState(initial.sort || "expiring");
 
@@ -52,10 +52,10 @@ export default function DealsClient({ initial }) {
         const { deals, total } = await getActiveDeals(
           PAGE_SIZE,
           currentOffset,
-          activeSM,
+          "all",
           activeCategory,
           sortBy,
-          activeSM === "all" ? preferredStores : undefined
+          selectedSMs.length > 0 ? selectedSMs : preferredStores
         );
         setTotalCount(total);
         setHasMore(currentOffset + deals.length < total);
@@ -67,9 +67,10 @@ export default function DealsClient({ initial }) {
       setLoading(false);
       setLoadingMore(false);
     },
-    [activeSM, activeCategory, sortBy, offset, preferredStores]
+    [selectedSMs, activeCategory, sortBy, offset, preferredStores]
   );
 
+  const selectedSMsKey = selectedSMs.join(",");
   useEffect(() => {
     if (skipNextReloadRef.current) {
       skipNextReloadRef.current = false;
@@ -77,33 +78,44 @@ export default function DealsClient({ initial }) {
     }
     load(true);
     const url = new URL(window.location);
-    if (activeSM !== "all") url.searchParams.set("supermarket", activeSM); else url.searchParams.delete("supermarket");
+    if (selectedSMs.length > 0) url.searchParams.set("supermarket", selectedSMs.join(",")); else url.searchParams.delete("supermarket");
     if (activeCategory !== "all") url.searchParams.set("category", activeCategory); else url.searchParams.delete("category");
     if (sortBy !== "expiring") url.searchParams.set("sort", sortBy); else url.searchParams.delete("sort");
     window.history.replaceState({}, "", url);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSM, activeCategory, sortBy, preferredStores]);
+  }, [selectedSMsKey, activeCategory, sortBy, preferredStores]);
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !loading && !loadingMore) load(false);
   }, [hasMore, loading, loadingMore, load]);
 
   const handleClearFilters = () => {
-    setActiveSM("all");
+    setSelectedSMs([]);
     setActiveCategory("all");
     setSortBy("expiring");
   };
 
-  const hasActiveFilters = activeSM !== "all" || activeCategory !== "all";
+  const toggleSM = (id) => {
+    setSelectedSMs((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const hasActiveFilters = selectedSMs.length > 0 || activeCategory !== "all";
 
   const title = useMemo(() => {
     const c = CATEGORIES.find((x) => x.id === activeCategory);
-    const sm = SUPERMARKETS.find((x) => x.id === activeSM);
-    if (c && activeCategory !== "all" && sm) return `${c.label} · ${sm.name}`;
+    const smObjs = SUPERMARKETS.filter((s) => selectedSMs.includes(s.id));
+    let smLabel = "";
+    if (smObjs.length === 1) smLabel = smObjs[0].name;
+    else if (smObjs.length > 1 && smObjs.length <= 3) smLabel = smObjs.map((s) => s.name).join(" + ");
+    else if (smObjs.length > 3) smLabel = `${smObjs.length} σούπερ μάρκετ`;
+
+    if (c && activeCategory !== "all" && smLabel) return `${c.label} · ${smLabel}`;
     if (c && activeCategory !== "all") return c.label;
-    if (sm) return `Προσφορές ${sm.name}`;
+    if (smLabel) return `Προσφορές ${smLabel}`;
     return "Όλες οι προσφορές";
-  }, [activeCategory, activeSM]);
+  }, [activeCategory, selectedSMs]);
 
   const categoryItems = CATEGORIES.filter((c) => c.id !== "all");
 
@@ -127,34 +139,41 @@ export default function DealsClient({ initial }) {
             <h1>{title}</h1>
             <div className="count">
               {totalCount.toLocaleString("el-GR")} προσφορές
-              {preferredStores.length > 0 && activeSM === "all" && (
+              {preferredStores.length > 0 && selectedSMs.length === 0 && (
                 <> · από {preferredStores.length} αγαπημένα καταστήματα</>
               )}
             </div>
           </header>
 
-          <div className="filter-bar">
+          <div className="sm-bar" role="group" aria-label="Σούπερ μάρκετ">
             <button
               type="button"
-              className={`chip${activeSM === "all" ? " active" : ""}`}
-              onClick={() => setActiveSM("all")}
+              className={`sm-chip sm-chip-all${selectedSMs.length === 0 ? " active" : ""}`}
+              onClick={() => setSelectedSMs([])}
+              aria-pressed={selectedSMs.length === 0}
             >
-              Όλα τα σούπερ μάρκετ
+              <span className="sm-chip-all-icon" aria-hidden="true">★</span>
+              <span className="sm-chip-label">Όλα</span>
             </button>
-            {SUPERMARKETS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`chip${activeSM === s.id ? " active" : ""}`}
-                onClick={() => setActiveSM(s.id)}
-              >
-                <span className="dot" style={{ background: s.color }} />
-                {s.name}
-              </button>
-            ))}
+            {SUPERMARKETS.map((s) => {
+              const active = selectedSMs.includes(s.id);
+              return (
+                <SupermarketChip
+                  key={s.id}
+                  sm={s}
+                  active={active}
+                  onClick={() => toggleSM(s.id)}
+                />
+              );
+            })}
+          </div>
+          {selectedSMs.length > 1 && (
+            <div className="sm-multi-hint">
+              <Icon.Check size={14} /> Προβολή προσφορών από {selectedSMs.length} σούπερ μάρκετ
+            </div>
+          )}
 
-            <span className="divider" aria-hidden="true" />
-
+          <div className="filter-bar">
             <button
               type="button"
               className={`chip${activeCategory === "all" ? " active" : ""}`}
@@ -188,7 +207,7 @@ export default function DealsClient({ initial }) {
             </label>
           </div>
 
-          {preferredStores.length > 0 && activeSM === "all" && (
+          {preferredStores.length > 0 && selectedSMs.length === 0 && (
             <div className="pref-banner">
               <span>Φιλτράρεται από τα αγαπημένα σου καταστήματα.</span>
               <button type="button" className="link" onClick={clearPreferred}>
@@ -217,5 +236,47 @@ export default function DealsClient({ initial }) {
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       <PreferredStoresSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
+  );
+}
+
+function SupermarketChip({ sm, active, onClick }) {
+  const [imgErr, setImgErr] = useState(false);
+  const style = active
+    ? { background: sm.color, borderColor: sm.color, color: "#fff" }
+    : { borderColor: active ? sm.color : undefined };
+
+  return (
+    <button
+      type="button"
+      className={`sm-chip${active ? " active" : ""}`}
+      onClick={onClick}
+      style={style}
+      aria-pressed={active}
+      aria-label={sm.name}
+    >
+      <span className="sm-chip-logo" style={{ background: active ? "#fff" : sm.bg }}>
+        {!imgErr ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/logos/${sm.logo || `${sm.id}.png`}`}
+            alt=""
+            onError={() => setImgErr(true)}
+          />
+        ) : (
+          <span
+            className="sm-chip-fallback"
+            style={{ color: active ? sm.color : sm.color }}
+          >
+            {sm.short}
+          </span>
+        )}
+      </span>
+      <span className="sm-chip-label">{sm.name}</span>
+      {active && (
+        <span className="sm-chip-check" aria-hidden="true">
+          <Icon.Check size={12} />
+        </span>
+      )}
+    </button>
   );
 }

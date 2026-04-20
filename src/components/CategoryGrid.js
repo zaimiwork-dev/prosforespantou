@@ -12,7 +12,6 @@ export function CategoryGrid({ activeCategory, onSelect, counts = {}, asLinks = 
       <div className="section-head">
         <div>
           <h2>{asLinks ? "Ανά κατηγορία" : "Κατηγορίες"}</h2>
-          <div className="sub">Τι θες να αγοράσεις σήμερα;</div>
         </div>
         {!asLinks && activeCategory !== "all" && (
           <button type="button" onClick={() => onSelect("all")} className="link" style={{ cursor: "pointer", background: "none", border: 0 }}>

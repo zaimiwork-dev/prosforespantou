@@ -3,6 +3,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { SUPERMARKETS } from "@/lib/constants";
 import SupermarketClient from "@/components/SupermarketClient";
+import { pruneExpiredDatelessLeaflets } from "@/actions/admin/leaflet-actions";
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,8 @@ export default async function SupermarketPage({ params }) {
   const sm = SUPERMARKETS.find((s) => s.id === id);
   if (!sm) notFound();
 
+  await pruneExpiredDatelessLeaflets();
+
   const now = new Date();
   const [deals, leaflet] = await Promise.all([
     prisma.discount.findMany({
@@ -39,7 +42,7 @@ export default async function SupermarketPage({ params }) {
     prisma.leaflet.findFirst({
       where: {
         store: { name: sm.name },
-        validUntil: { gt: now },
+        OR: [{ validUntil: null }, { validUntil: { gt: now } }],
       },
       orderBy: { validFrom: "desc" },
     }),
@@ -57,8 +60,9 @@ export default async function SupermarketPage({ params }) {
     ? {
         id: leaflet.id,
         title: leaflet.title,
-        validFrom: leaflet.validFrom?.toISOString?.() ?? leaflet.validFrom,
-        validUntil: leaflet.validUntil?.toISOString?.() ?? leaflet.validUntil,
+        pdfUrl: leaflet.pdfUrl,
+        validFrom: leaflet.validFrom?.toISOString?.() ?? null,
+        validUntil: leaflet.validUntil?.toISOString?.() ?? null,
       }
     : null;
 

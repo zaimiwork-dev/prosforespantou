@@ -328,23 +328,23 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 
 .chains-row {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
-@media (max-width: 1100px) { .chains-row { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+@media (max-width: 900px)  { .chains-row { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 @media (max-width: 560px)  { .chains-row { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 
 .chain-tile {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 16px 14px;
+  padding: 22px 18px;
   display: flex; flex-direction: column;
-  align-items: flex-start; gap: 8px;
+  align-items: center; gap: 12px;
   cursor: pointer;
   transition: border-color .15s, transform .15s, box-shadow .15s;
-  text-align: left;
-  min-height: 110px;
+  text-align: center;
+  min-height: 210px;
   width: 100%;
   color: inherit;
   text-decoration: none;
@@ -360,16 +360,22 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   color: var(--brand-ink);
 }
 .chain-tile .chain-logo {
-  width: 34px; height: 34px; border-radius: 8px;
+  width: 110px; height: 110px; border-radius: 16px;
   display: grid; place-items: center;
-  font-weight: 800; font-size: 13px;
+  font-weight: 800; font-size: 28px;
   letter-spacing: -0.02em; flex: none;
+  overflow: hidden;
+}
+.chain-tile .chain-logo img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 0;
 }
 .chain-tile .chain-name {
-  font-size: 13.5px; font-weight: 600; line-height: 1.2;
+  font-size: 15px; font-weight: 700; line-height: 1.2;
 }
 .chain-tile .chain-count {
-  font-size: 11px; color: var(--ink-3);
+  font-size: 12px; color: var(--ink-3);
   margin-top: auto;
   font-variant-numeric: tabular-nums;
 }
@@ -640,6 +646,104 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   letter-spacing: -0.01em;
 }
 .listing-head .count { color: var(--ink-3); font-size: 14px; }
+
+/* Supermarket selector — bold, logo-forward, multi-selectable */
+.sm-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px 0 14px;
+}
+.sm-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 8px;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s, transform .08s;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+}
+.sm-chip:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.sm-chip.active { color: #fff; font-weight: 700; }
+.sm-chip-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--surface-2);
+}
+.sm-chip-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
+.sm-chip-fallback {
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+.sm-chip-label { white-space: nowrap; }
+.sm-chip-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  margin-left: 2px;
+}
+.sm-chip-all {
+  padding: 8px 18px;
+}
+.sm-chip-all-icon {
+  font-size: 16px;
+  color: var(--brand);
+}
+.sm-chip-all.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.sm-chip-all.active .sm-chip-all-icon { color: var(--bg); }
+
+.sm-multi-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--brand) 12%, transparent);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .sm-chip {
+    padding: 6px 12px 6px 6px;
+    font-size: 13px;
+    gap: 8px;
+  }
+  .sm-chip-logo { width: 30px; height: 30px; }
+  .sm-chip-label {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 
 .filter-bar {
   display: flex; align-items: center; gap: 8px;

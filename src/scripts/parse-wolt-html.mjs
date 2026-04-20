@@ -61,6 +61,12 @@ async function parse() {
       console.log(`❌ No price for: ${name} (Text: "${discountedPriceText}")`);
     }
     
+    // Extract Wolt item URL + itemid from the card's anchor
+    const hrefRaw = $el.find('a[href*="itemid-"]').attr('href') || $el.closest('a[href*="itemid-"]').attr('href') || '';
+    const itemidMatch = hrefRaw.match(/itemid-([a-f0-9]{24})/i);
+    const woltItemId = itemidMatch ? itemidMatch[1] : null;
+    const woltUrl = hrefRaw ? (hrefRaw.startsWith('http') ? hrefRaw : `https://wolt.com${hrefRaw}`) : null;
+
     const imgEl = $el.find('img[data-test-id="ImageCentricProductCard.ProductImage"]');
     const srcset = imgEl.attr('srcset');
     let imageUrl = imgEl.attr('src') || (srcset ? srcset.split(',').pop().trim().split(' ')[0] : '');
@@ -82,22 +88,38 @@ async function parse() {
     const displayUnit = unitPrice || (priceUnit ? `τιμή ανά ${priceUnit}` : '');
     const description = [infoText, displayUnit].filter(Boolean).join(' • ') || name;
 
-    if (name && !seen.has(name)) {
-      seen.add(name);
-      products.push({
-        name,
-        description,
-        discountedPrice,
-        originalPrice,
-        category,
-        images: [{ url: imageUrl }],
-        // FIXED: Deterministic ID prevents duplicates and multiple dashes
-        id: `wolt-${smId}-${name.substring(0, 50).replace(/[^a-z0-9\u0370-\u03FF]/gi, '-').toLowerCase().replace(/-+/g, '-')}`
-      });
+    // Catalog mode: require image + Wolt itemid.
+    const hasImage = imageUrl && imageUrl.startsWith('http');
+    if (!name || !woltItemId || seen.has(woltItemId)) return;
+    if (!hasImage) {
+      console.log(`⏭️  Skipped (no image): ${name}`);
+      return;
     }
+
+    seen.add(woltItemId);
+    products.push({
+      name,
+      description,
+      category,
+      images: [{ url: imageUrl }],
+      woltItemId,
+      woltUrl,
+      id: `${smId}:${woltItemId}`,
+    });
   });
 
   console.log(`✅ Extracted ${products.length} products.`);
+
+  // Append URL map to library_data/wolt_urls.json for the description-fetcher
+  if (products.length > 0) {
+    const urlsPath = DATA_DIR + 'wolt_urls.json';
+    const urlMap = fs.existsSync(urlsPath) ? JSON.parse(fs.readFileSync(urlsPath, 'utf8')) : {};
+    for (const p of products) {
+      if (p.woltUrl) urlMap[p.id] = p.woltUrl;
+    }
+    fs.writeFileSync(urlsPath, JSON.stringify(urlMap, null, 2));
+    console.log(`🗺️  URL map now has ${Object.keys(urlMap).length} entries.`);
+  }
 
   if (products.length > 0) {
     console.log('📤 Syncing to local database directly...');
@@ -121,13 +143,10 @@ async function parse() {
     if (!store) store = await prisma.store.create({ data: { name: targetStoreName } });
 
     let count = 0;
-    const now = new Date();
-    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     for (const product of products) {
       try {
-        // 1. Upsert Product
-        const dbProduct = await prisma.product.upsert({
+        await prisma.product.upsert({
           where: { woltId: product.id },
           update: {
             name: product.name,
@@ -144,43 +163,6 @@ async function parse() {
             storeId: store.id,
           }
         });
-
-        // 2. Handle Discount
-        if (product.discountedPrice !== null) {
-          const existing = await prisma.discount.findFirst({
-            where: { productId: dbProduct.id, isActive: true }
-          });
-
-          if (!existing) {
-            await prisma.discount.create({
-              data: {
-                productName: dbProduct.name,
-                category: category,
-                discountedPrice: product.discountedPrice,
-                originalPrice: product.originalPrice,
-                description: product.description,
-                validFrom: now,
-                validUntil: nextWeek,
-                storeId: store.id,
-                supermarket: smId,
-                productId: dbProduct.id,
-                isActive: true
-              }
-            });
-          } else {
-            await prisma.discount.update({
-              where: { id: existing.id },
-              data: {
-                category: category,
-                discountedPrice: product.discountedPrice,
-                originalPrice: product.originalPrice,
-                description: product.description,
-                validUntil: nextWeek,
-                updatedAt: new Date()
-              }
-            });
-          }
-        }
         count++;
       } catch (err) {
         console.error(`❌ Failed ${product.name}:`, err.message);
