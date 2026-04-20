@@ -20,6 +20,47 @@ const SM_MAPPING: Record<string, string> = {
   galaxias: 'Γαλαξίας',
 };
 
+const normalizeString = (s: string) => 
+  s.toLowerCase()
+   .normalize('NFD')
+   .replace(/\p{Diacritic}/gu, '')
+   .trim();
+
+async function fireAlertsFor(discount: any) {
+  const name = normalizeString(discount.productName);
+  const alerts = await prisma.alert.findMany({
+    where: { 
+      isActive: true, 
+      subscriber: { 
+        confirmedAt: { not: null }, 
+        unsubscribedAt: null 
+      } 
+    },
+    include: { subscriber: true },
+  });
+
+  const matched = alerts.filter((a) => {
+    if (!name.includes(normalizeString(a.keyword))) return false;
+    if (a.supermarkets.length && !a.supermarkets.includes(discount.supermarket)) return false;
+    if (a.category && a.category !== discount.category) return false;
+    if (a.maxPrice && Number(discount.discountedPrice) > Number(a.maxPrice)) return false;
+    
+    const now = Date.now();
+    const recently = a.lastTriggeredAt && (now - a.lastTriggeredAt.getTime()) < 6 * 3600000;
+    if (recently) return false;
+    
+    return true;
+  });
+
+  for (const a of matched) {
+    // console.log(`Alert triggered for ${a.subscriber.email}: ${discount.productName}`);
+    await prisma.alert.update({ 
+      where: { id: a.id }, 
+      data: { lastTriggeredAt: new Date() } 
+    });
+  }
+}
+
 export async function createDiscount(input: unknown) {
   return await Sentry.withServerActionInstrumentation('createDiscount', { recordResponse: true }, async () => {
     try {
@@ -85,6 +126,8 @@ export async function createDiscount(input: unknown) {
           featuredLabel: data.featuredLabel,
         },
       });
+
+      fireAlertsFor(created).catch(() => {});
 
       revalidateTag('deals:default', 'max');
       return { success: true, id: created.id };

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Icon } from './Icons';
 
-export function SiteHeader({ onAdminTrigger, cartCount = 0, onCartOpen, onSettingsOpen }) {
+export function SiteHeader({ onAdminTrigger = () => {}, cartCount = 0, onCartOpen = () => {}, onSettingsOpen = () => {} }) {
   return (
     <header className="topbar">
       <div className="container topbar-inner">
