@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
+import { redirect } from 'next/navigation';
 
 const schema = z.object({
   email: z.string().email().max(254),
@@ -17,7 +18,7 @@ export async function subscribe(input: unknown) {
 
       const email = parsed.data.email.toLowerCase().trim();
       const existing = await prisma.subscriber.findUnique({ where: { email } });
-      
+
       if (existing && existing.confirmedAt && !existing.unsubscribedAt) {
         return { success: true, alreadyConfirmed: true };
       }
@@ -36,9 +37,7 @@ export async function subscribe(input: unknown) {
         },
       });
 
-      // TODO: send confirmation email via Resend/Postmark/SES.
-      // Use sub.confirmToken in the confirm link.
-      // Do NOT send any marketing email until confirmedAt is set.
+      // TODO: send confirmation email via Resend/Postmark/SES using sub.confirmToken.
       console.log(`Confirmation URL: ${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/subscribe/confirm?token=${sub.confirmToken}`);
 
       return { success: true };
@@ -47,4 +46,34 @@ export async function subscribe(input: unknown) {
       return { success: false, error: 'Κάτι πήγε στραβά' };
     }
   });
+}
+
+export async function confirmSubscription(formData: FormData) {
+  const token = String(formData.get('token') ?? '');
+  if (!token) redirect('/subscribe/confirm');
+  try {
+    await prisma.subscriber.update({
+      where: { confirmToken: token },
+      data: { confirmedAt: new Date(), unsubscribedAt: null },
+    });
+  } catch (error) {
+    Sentry.captureException(error);
+    redirect(`/subscribe/confirm?token=${encodeURIComponent(token)}`);
+  }
+  redirect(`/subscribe/confirm?token=${encodeURIComponent(token)}&done=1`);
+}
+
+export async function unsubscribe(formData: FormData) {
+  const token = String(formData.get('token') ?? '');
+  if (!token) redirect('/subscribe/unsubscribe');
+  try {
+    await prisma.subscriber.update({
+      where: { unsubToken: token },
+      data: { unsubscribedAt: new Date() },
+    });
+  } catch (error) {
+    Sentry.captureException(error);
+    redirect(`/subscribe/unsubscribe?token=${encodeURIComponent(token)}`);
+  }
+  redirect(`/subscribe/unsubscribe?token=${encodeURIComponent(token)}&done=1`);
 }

@@ -3,12 +3,14 @@ import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 
+const MAX_ALERTS_PER_USER = 50;
+
 const alertSchema = z.object({
   token: z.string().uuid(),
-  keyword: z.string().min(2).max(64),
-  supermarkets: z.array(z.string()).optional(),
-  category: z.string().optional(),
-  maxPrice: z.number().optional().nullable(),
+  keyword: z.string().trim().min(2).max(64),
+  supermarkets: z.array(z.string().max(32)).max(20).optional(),
+  category: z.string().max(64).optional(),
+  maxPrice: z.number().positive().max(99999).optional().nullable(),
 });
 
 export async function getAlerts(token: string) {
@@ -45,6 +47,11 @@ export async function createAlert(input: unknown) {
         where: { confirmToken: parsed.data.token }
       });
       if (!sub || !sub.confirmedAt) return { success: false, error: 'Unauthorized' };
+
+      const existingCount = await prisma.alert.count({ where: { subscriberId: sub.id } });
+      if (existingCount >= MAX_ALERTS_PER_USER) {
+        return { success: false, error: `Έχεις φτάσει το όριο των ${MAX_ALERTS_PER_USER} ειδοποιήσεων.` };
+      }
 
       const alert = await prisma.alert.create({
         data: {
