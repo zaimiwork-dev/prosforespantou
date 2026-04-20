@@ -8,6 +8,7 @@ import { deleteDiscount } from "@/actions/admin/delete-discount";
 import { createDiscount } from "@/actions/admin/create-discount";
 import { createLeaflet, listLeaflets, deleteLeaflet } from "@/actions/admin/leaflet-actions";
 import { getStats } from "@/actions/admin/get-stats";
+import { getSubscribers } from "@/actions/admin/get-subscribers";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 
 const emptyLeafletForm = {
@@ -100,6 +101,8 @@ export function AdminPanel({ onBack }) {
   const [leafletSaving, setLeafletSaving] = useState(false);
   const [stats, setStats] = useState({ last30: [], last7: [] });
   const [statsLoading, setStatsLoading] = useState(false);
+  const [subs, setSubs] = useState({ counts: { total: 0, confirmed: 0, pending: 0, unsubscribed: 0 }, list: [] });
+  const [subsLoading, setSubsLoading] = useState(false);
 
   const showMsg = (text, type = "success") => {
     setMsg({ text, type });
@@ -151,9 +154,18 @@ export function AdminPanel({ onBack }) {
     setStatsLoading(false);
   };
 
+  const loadSubscribers = async () => {
+    setSubsLoading(true);
+    const res = await getSubscribers();
+    if (res.success) setSubs({ counts: res.counts, list: res.subscribers });
+    else showMsg(res.error || "Failed to load subscribers", "error");
+    setSubsLoading(false);
+  };
+
   useEffect(() => {
     if (tab === "leaf") loadLeaflets();
     if (tab === "stats") loadStats();
+    if (tab === "subs") loadSubscribers();
   }, [tab]);
 
   const saveLeaflet = async () => {
@@ -290,6 +302,78 @@ export function AdminPanel({ onBack }) {
     );
   };
 
+  const renderSubsTable = () => {
+    if (subsLoading) return <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση συνδρομητών...</div>;
+    
+    const exportCSV = () => {
+      const headers = ["Email", "Source", "Created", "Confirmed", "Unsubscribed"];
+      const rows = subs.list.map(s => [s.email, s.source || "", s.createdAt, s.confirmedAt || "", s.unsubscribedAt || ""]);
+      const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].map(e => e.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `subscribers_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    return (
+      <div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 15, marginBottom: 24 }}>
+          {[
+            ["Σύνολο", subs.counts.total],
+            ["Επιβεβαιωμένοι", subs.counts.confirmed],
+            ["Σε εκκρεμότητα", subs.counts.pending],
+            ["Απεγγραφές", subs.counts.unsubscribed]
+          ].map(([label, count]) => (
+            <div key={label} style={{ background: "#f8f9fa", padding: 16, borderRadius: 12, textAlign: "center", border: "1px solid #eee" }}>
+              <div style={lbl}>{label}</div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>{count}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Πρόσφατες εγγραφές</h3>
+          <button onClick={exportCSV} style={{ background: "#1c1e24", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+            📥 EXPORT CSV
+          </button>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead style={{ background: "#f8f9fa", textAlign: "left" }}>
+              <tr>
+                <th style={{ padding: 10 }}>Email</th>
+                <th style={{ padding: 10 }}>Πηγή</th>
+                <th style={{ padding: 10 }}>Ημ. Εγγραφής</th>
+                <th style={{ padding: 10 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subs.list.length === 0 && (
+                <tr><td colSpan={4} style={{ padding: 40, textAlign: "center", color: G.muted }}>Κανένας συνδρομητής.</td></tr>
+              )}
+              {subs.list.map(s => (
+                <tr key={s.email} style={{ borderTop: "1px solid #eee" }}>
+                  <td style={{ padding: 10, fontWeight: 600 }}>{s.email}</td>
+                  <td style={{ padding: 10 }}>{s.source || "—"}</td>
+                  <td style={{ padding: 10 }}>{s.createdAt.slice(0, 10)}</td>
+                  <td style={{ padding: 10 }}>
+                    {s.unsubscribedAt ? <span style={{ color: G.red, fontWeight: 700 }}>Unsubscribed</span> : 
+                     s.confirmedAt ? <span style={{ color: "#2d6a4f", fontWeight: 700 }}>Confirmed</span> : 
+                     <span style={{ color: "#e07b00", fontWeight: 700 }}>Pending</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ background: "#f8f9fa", minHeight: "100vh", padding: "24px 16px" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
@@ -303,7 +387,7 @@ export function AdminPanel({ onBack }) {
 
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: "1px solid #ddd", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#f8f9fa", borderRadius: 12, padding: 5, width: "fit-content", border: "1px solid #eee" }}>
-            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["stats", "📊 Αναλυτικά"], ["add", "➕ Νέα"]].map(([id, label]) => (
+            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["stats", "📊 Αναλυτικά"], ["subs", "📧 Συνδρομητές"], ["add", "➕ Νέα"]].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ background: tab === id ? "#1c1e24" : "transparent", color: tab === id ? "#fff" : "#707680", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 {label}
@@ -312,6 +396,8 @@ export function AdminPanel({ onBack }) {
           </div>
 
           {tab === "stats" && renderStatsTable()}
+
+          {tab === "subs" && renderSubsTable()}
 
           {tab === "leaf" && (
             <div>

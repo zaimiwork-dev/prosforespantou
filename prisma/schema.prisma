@@ -125,3 +125,17 @@ model ClickEvent {
   @@index([createdAt])
   @@map("click_events")
 }
+
+model Subscriber {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String    @unique
+  confirmedAt     DateTime? @map("confirmed_at")
+  confirmToken    String    @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("confirm_token")
+  unsubToken      String    @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("unsub_token")
+  source          String?   // "homepage_footer" | "shopping_list" | etc
+  preferredStores String[]  @map("preferred_stores") // supermarket slugs
+  createdAt       DateTime  @default(now()) @map("created_at")
+  unsubscribedAt  DateTime? @map("unsubscribed_at")
+
+  @@map("subscribers")
+}

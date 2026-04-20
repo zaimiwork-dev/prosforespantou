@@ -9,6 +9,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
 import { SortBar } from "@/components/SortBar";
 import { CategoryGrid } from "@/components/CategoryGrid";
+import { Footer } from "@/components/Footer";
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 
@@ -158,6 +159,8 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
           />
         </section>
       </main>
+
+      <Footer />
 
       {cart.length > 0 && (
         <button

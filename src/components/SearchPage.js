@@ -8,6 +8,7 @@ import { DealGrid } from "@/components/DealGrid";
 import { SearchDropdown } from "@/components/SearchDropdown";
 import { ProductModal } from "@/components/ProductModal";
 import { ShoppingList } from "@/components/ShoppingList";
+import { Footer } from "@/components/Footer";
 
 export function SearchPage({ query, deals }) {
   const router = useRouter();
@@ -95,6 +96,8 @@ export function SearchPage({ query, deals }) {
           onClearFilters={null}
         />
       </main>
+
+      <Footer />
 
       {cart.length > 0 && (
         <button

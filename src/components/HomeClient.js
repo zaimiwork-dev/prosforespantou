@@ -14,6 +14,7 @@ import { FeaturedCarousel } from "@/components/FeaturedCarousel";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { SupermarketTiles } from "@/components/SupermarketTiles";
 import { Icon } from "@/components/Icons";
+import { Footer } from "@/components/Footer";
 import { SUPERMARKETS } from "@/lib/constants";
 
 function PublicSite({ initial, onAdmin }) {
@@ -81,6 +82,8 @@ function PublicSite({ initial, onAdmin }) {
           />
         </div>
       </main>
+
+      <Footer />
 
       <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
