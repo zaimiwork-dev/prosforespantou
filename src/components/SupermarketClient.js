@@ -9,6 +9,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
 import { SortBar } from "@/components/SortBar";
 import { CategoryGrid } from "@/components/CategoryGrid";
+import { trackEvent } from '@/actions/track-event';
+import { getSessionId } from '@/lib/session-id';
 
 function sortDeals(deals, sortBy) {
   const copy = [...deals];
@@ -48,19 +50,19 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
 
       <section
         style={{
-          background: `linear-gradient(135deg, ${sm.color} 0%, ${sm.color}dd 100%)`,
-          color: "#fff",
+          background: `linear-gradient(135deg, color-mix(in srgb, ${sm.color} 22%, #ffffff) 0%, color-mix(in srgb, ${sm.color} 45%, #ffffff) 100%)`,
+          color: "#1c1e24",
           padding: "44px 20px 56px",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        <div style={{ position: "absolute", top: -60, right: -40, width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
+        <div style={{ position: "absolute", top: -60, right: -40, width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,0.35)" }} />
         <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <Link
             href="/"
             style={{
-              color: "rgba(255,255,255,0.9)",
+              color: "rgba(28,30,36,0.75)",
               textDecoration: "none",
               fontSize: 13,
               fontWeight: 700,
@@ -73,27 +75,59 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
             ← Πίσω στην αρχική
           </Link>
 
-          <h1 style={{ fontSize: "clamp(28px, 6vw, 42px)", fontWeight: 900, margin: "0 0 10px", letterSpacing: "-1px", lineHeight: 1.05 }}>
-            Προσφορές {sm.name}
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                width: 96,
+                height: 96,
+                background: "#fff",
+                borderRadius: 18,
+                display: "grid",
+                placeItems: "center",
+                overflow: "hidden",
+                flex: "none",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/logos/${sm.logo || `${sm.id}.png`}`}
+                alt={sm.name}
+                style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
+              />
+            </div>
+            <h1 style={{ fontSize: "clamp(28px, 6vw, 42px)", fontWeight: 900, margin: 0, letterSpacing: "-1px", lineHeight: 1.05 }}>
+              Προσφορές {sm.name}
+            </h1>
+          </div>
 
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, fontWeight: 700, opacity: 0.95 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, fontWeight: 700, color: "rgba(28,30,36,0.85)" }}>
             <span>💰 {initialDeals.length} ενεργές</span>
             {biggestDiscount > 0 && (
               <>
-                <span style={{ opacity: 0.4 }}>•</span>
+                <span style={{ opacity: 0.35 }}>•</span>
                 <span>🔥 έως -{biggestDiscount}%</span>
               </>
             )}
-            {leaflet && (
+            {leaflet && leaflet.pdfUrl && (
               <>
-                <span style={{ opacity: 0.4 }}>•</span>
-                <Link
-                  href={`/leaflet/${leaflet.id}`}
-                  style={{ color: "#fff", textDecoration: "underline", textUnderlineOffset: 3 }}
+                <span style={{ opacity: 0.35 }}>•</span>
+                <a
+                  href={leaflet.pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => {
+                    trackEvent({
+                      eventType: 'leaflet_click',
+                      supermarket: sm.id,
+                      leafletId: leaflet.id,
+                      sessionId: getSessionId(),
+                    }).catch(() => {});
+                  }}
+                  style={{ color: sm.color, textDecoration: "underline", textUnderlineOffset: 3 }}
                 >
                   📄 Δες το φυλλάδιο
-                </Link>
+                </a>
               </>
             )}
           </div>

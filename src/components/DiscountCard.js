@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
+import { trackEvent } from '@/actions/track-event';
+import { getSessionId } from '@/lib/session-id';
 
 function daysLeft(dateStr) {
   if (!dateStr) return null;
@@ -56,7 +58,16 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
       className="card"
       role="button"
       tabIndex={0}
-      onClick={() => onSelect(d)}
+      onClick={() => {
+        trackEvent({
+          eventType: 'deal_click',
+          supermarket: supermarketId,
+          discountId: d.id,
+          category: category,
+          sessionId: getSessionId(),
+        }).catch(() => {});
+        onSelect(d);
+      }}
       onKeyDown={(e) => { if (e.key === 'Enter') onSelect(d); }}
     >
       <div className="card-img">
@@ -104,7 +115,17 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
           <button
             type="button"
             className={`add-btn${inCart ? " added" : ""}`}
-            onClick={(e) => { e.stopPropagation(); onAdd(d); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              trackEvent({
+                eventType: 'list_add',
+                supermarket: supermarketId,
+                discountId: d.id,
+                category: category,
+                sessionId: getSessionId(),
+              }).catch(() => {});
+              onAdd(d);
+            }}
             aria-label={inCart ? "Στη λίστα" : "Προσθήκη στη λίστα"}
           >
             {inCart ? <Icon.Check size={16} /> : <Icon.Plus size={16} />}

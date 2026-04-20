@@ -56,8 +56,10 @@ model PriceSnapshot {
 model Leaflet {
   id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title      String?
-  validFrom  DateTime
-  validUntil DateTime
+  validFrom  DateTime?
+  validUntil DateTime?
+  pdfUrl     String?
+  autoDeleteDays Int?
   pageImages String[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
@@ -102,4 +104,21 @@ model Discount {
   @@index([isActive, supermarket, validUntil])
   @@index([isActive, category, validUntil])
   @@map("discounts")
+}
+
+model ClickEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventType   String   // "deal_click" | "leaflet_click" | "list_add"
+  supermarket String   // slug e.g. "lidl", "ab", "sklavenitis"
+  discountId  String?  @db.Uuid
+  leafletId   String?  @db.Uuid
+  category    String?
+  sessionId   String?  // anonymous client-generated UUID from localStorage
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([supermarket, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdAt])
+  @@map("click_events")
 }

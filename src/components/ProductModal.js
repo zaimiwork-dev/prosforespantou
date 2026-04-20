@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
+import { trackEvent } from '@/actions/track-event';
+import { getSessionId } from '@/lib/session-id';
 
 export function ProductModal({ product, onClose, onAdd }) {
   const [qty, setQty] = useState(1);
@@ -64,6 +66,13 @@ export function ProductModal({ product, onClose, onAdd }) {
   };
 
   const handleAdd = () => {
+    trackEvent({
+      eventType: 'list_add',
+      supermarket: supermarketId,
+      discountId: product.id,
+      category: category,
+      sessionId: getSessionId(),
+    }).catch(() => {});
     for (let i = 0; i < qty; i++) onAdd(product);
     onClose();
   };
