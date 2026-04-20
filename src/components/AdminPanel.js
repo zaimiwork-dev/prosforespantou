@@ -74,6 +74,9 @@ const emptyForm = {
   valid_until: "",
   image_url: "",
   is_active: true,
+  is_featured: false,
+  featured_until: "",
+  featured_label: "",
 };
 
 export function AdminPanel({ onBack }) {
@@ -91,6 +94,7 @@ export function AdminPanel({ onBack }) {
   const [libLoading, setLibLoading] = useState(false);
   const [msg, setMsg] = useState({ text: "", type: "" });
   const [search, setSearch] = useState("");
+  const [filterFeatured, setFilterFeatured] = useState(false);
   const [leaflets, setLeaflets] = useState([]);
   const [leafletForm, setLeafletForm] = useState(emptyLeafletForm);
   const [leafletSaving, setLeafletSaving] = useState(false);
@@ -106,7 +110,7 @@ export function AdminPanel({ onBack }) {
     setListLoading(true);
     try {
       const nextOffset = reset ? 0 : discountOffset;
-      const res = await listDiscounts({ limit: PAGE_SIZE, offset: nextOffset, search });
+      const res = await listDiscounts({ limit: PAGE_SIZE, offset: nextOffset, search, isFeatured: filterFeatured });
       setDiscountTotal(res.total || 0);
       const fetched = res.discounts || [];
       setDiscounts(reset ? fetched : (prev) => [...prev, ...fetched]);
@@ -128,10 +132,6 @@ export function AdminPanel({ onBack }) {
     }
     setLibLoading(false);
   };
-
-  useEffect(() => {
-    loadList(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (tab === "lib") loadLibrary();
@@ -187,6 +187,10 @@ export function AdminPanel({ onBack }) {
     if (res.success) { showMsg("Διαγράφηκε."); loadLeaflets(); }
     else showMsg(res.error || "Delete failed", "error");
   };
+
+  useEffect(() => {
+    loadList(true);
+  }, [filterFeatured]);
 
   useEffect(() => {
     const t = setTimeout(() => loadList(true), 250);
@@ -411,8 +415,12 @@ export function AdminPanel({ onBack }) {
 
           {tab === "list" && (
             <div>
-              <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 15, flexWrap: "wrap" }}>
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search active offers..." style={{ ...inp, maxWidth: 320 }} />
+                <label style={{ fontSize: 13, fontWeight: 700, color: G.muted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="checkbox" checked={filterFeatured} onChange={e => setFilterFeatured(e.target.checked)} />
+                  Μόνο προβεβλημένες
+                </label>
                 <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{discountTotal} total</div>
               </div>
               <div style={{ overflowX: "auto" }}>
@@ -476,6 +484,22 @@ export function AdminPanel({ onBack }) {
                 <div style={{ marginTop: 15 }}>
                   <label style={lbl}>Valid Until</label>
                   <input type="date" value={form.valid_until} onChange={e => setForm({...form, valid_until: e.target.value})} style={inp} />
+                </div>
+                <div style={{ marginTop: 15, background: "#f8f9fa", padding: 12, borderRadius: 10, border: "1px solid #eee" }}>
+                  <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 0 }}>
+                    <input type="checkbox" checked={form.is_featured} onChange={e => setForm({...form, is_featured: e.target.checked})} />
+                    Προβεβλημένη προσφορά
+                  </label>
+                  {form.is_featured && (
+                    <div style={{ marginTop: 12 }}>
+                      <label style={lbl}>Featured Until</label>
+                      <input type="date" value={form.featured_until} onChange={e => setForm({...form, featured_until: e.target.value})} style={inp} />
+                      <div style={{ marginTop: 10 }}>
+                        <label style={lbl}>Featured Label (προαιρετικό)</label>
+                        <input value={form.featured_label} onChange={e => setForm({...form, featured_label: e.target.value})} placeholder="π.χ. Χορηγούμενο" style={inp} />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button onClick={saveDiscount} disabled={saving} style={{ marginTop: 20, background: G.blue, color: "#fff", padding: "12px", width: "100%", borderRadius: 12, border: "none", fontWeight: 700 }}>{saving ? "Saving..." : "Save Offer"}</button>
               </div>

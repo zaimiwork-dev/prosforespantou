@@ -90,17 +90,30 @@ export async function getActiveDeals(
 const getTopDealsCached = unstable_cache(
   async (limit: number) => {
     const now = new Date();
+    const featured = await prisma.discount.findMany({
+      where: {
+        isActive: true,
+        isFeatured: true,
+        OR: [{ featuredUntil: null }, { featuredUntil: { gt: now } }],
+        validUntil: { gt: now },
+      },
+      include: { store: true, leaflet: true, product: true },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
+    });
+
     const deals = await prisma.discount.findMany({
       where: {
         isActive: true,
         validUntil: { gt: now },
         discountPercent: { gte: 20 },
+        id: { notIn: featured.map(f => f.id) }
       },
       include: { store: true, leaflet: true, product: true },
       orderBy: [{ discountPercent: 'desc' }, { validUntil: 'asc' }],
-      take: limit,
+      take: limit - featured.length,
     });
-    return deals;
+    return [...featured, ...deals];
   },
   ['deals:top'],
   { tags: ['deals:default'], revalidate: 300 }
@@ -119,16 +132,30 @@ const getEndingSoonCached = unstable_cache(
   async (limit: number) => {
     const now = new Date();
     const in3Days = new Date(now.getTime() + 3 * 86400000);
+
+    const featured = await prisma.discount.findMany({
+      where: {
+        isActive: true,
+        isFeatured: true,
+        OR: [{ featuredUntil: null }, { featuredUntil: { gt: now } }],
+        validUntil: { gt: now },
+      },
+      include: { store: true, leaflet: true, product: true },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
+    });
+
     const deals = await prisma.discount.findMany({
       where: {
         isActive: true,
         validUntil: { gt: now, lte: in3Days },
+        id: { notIn: featured.map(f => f.id) }
       },
       include: { store: true, leaflet: true, product: true },
       orderBy: { validUntil: 'asc' },
-      take: limit,
+      take: limit - featured.length,
     });
-    return deals;
+    return [...featured, ...deals];
   },
   ['deals:ending-soon'],
   { tags: ['deals:default'], revalidate: 300 }

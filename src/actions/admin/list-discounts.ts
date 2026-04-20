@@ -3,11 +3,12 @@
 import prisma from '@/lib/prisma';
 import { requireAdmin } from '@/lib/session';
 
-export async function listDiscounts({ limit = 100, offset = 0, supermarket = 'all', search = '' } = {}) {
+export async function listDiscounts({ limit = 100, offset = 0, supermarket = 'all', search = '', isFeatured = false } = {}) {
   await requireAdmin();
 
-  const where: Record<string, unknown> = {};
+  const where: any = {};
   if (supermarket !== 'all') where.supermarket = supermarket;
+  if (isFeatured) where.isFeatured = true;
   if (search.trim()) {
     where.productName = { contains: search.trim(), mode: 'insensitive' };
   }

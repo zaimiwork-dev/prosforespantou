@@ -90,6 +90,9 @@ model Discount {
   isActive        Boolean  @default(true) @map("is_active")
   supermarket     String?  // The slug like "ab", "lidl"
   productId       String?  @db.Uuid @map("product_id")
+  isFeatured      Boolean  @default(false) @map("is_featured")
+  featuredUntil   DateTime? @map("featured_until")
+  featuredLabel   String?  @map("featured_label")
   product         Product? @relation(fields: [productId], references: [id])
   leaflet         Leaflet? @relation(fields: [leafletId], references: [id])
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)

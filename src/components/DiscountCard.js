@@ -37,6 +37,9 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
     ? Math.round((1 - discountedPrice / originalPrice) * 100)
     : null);
 
+  const isFeatured = d.isFeatured;
+  const featuredLabel = d.featuredLabel ?? 'Χορηγούμενο';
+
   const displayName = d.product?.name || d.productName || d.product_name;
   let displayImage = d.product?.imageUrl || d.imageUrl || d.image_url;
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
@@ -71,6 +74,25 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
       onKeyDown={(e) => { if (e.key === 'Enter') onSelect(d); }}
     >
       <div className="card-img">
+        {isFeatured && (
+          <div style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            background: sm.color,
+            color: '#fff',
+            fontSize: 9,
+            fontWeight: 800,
+            padding: '2px 6px',
+            borderRadius: 4,
+            zIndex: 2,
+            textTransform: 'uppercase',
+            letterSpacing: '0.02em',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            {featuredLabel}
+          </div>
+        )}
         {pct > 0 && <div className="discount-badge">-{pct}%</div>}
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
 

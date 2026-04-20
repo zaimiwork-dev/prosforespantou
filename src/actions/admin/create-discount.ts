@@ -16,6 +16,8 @@ const SM_MAPPING: Record<string, string> = {
   bazaar: 'Bazaar',
   kritikos: 'Κρητικός',
   marketin: 'Market In',
+  discountmarkt: 'Discount Markt',
+  galaxias: 'Γαλαξίας',
 };
 
 export async function createDiscount(input: unknown) {
@@ -40,6 +42,29 @@ export async function createDiscount(input: unknown) {
         create: { name: storeName },
       });
 
+      const rawInput = input as { valid_from?: string | null; valid_until?: string | null };
+      const datesMissing = !rawInput.valid_from && !rawInput.valid_until;
+
+      let leafletId: string | null = null;
+      let validFrom = data.validFrom;
+      let validUntil = data.validUntil;
+
+      if (datesMissing) {
+        const now = new Date();
+        const activeLeaflet = await prisma.leaflet.findFirst({
+          where: {
+            storeId: store.id,
+            OR: [{ validUntil: null }, { validUntil: { gt: now } }],
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (activeLeaflet) {
+          leafletId = activeLeaflet.id;
+          if (activeLeaflet.validFrom) validFrom = activeLeaflet.validFrom;
+          if (activeLeaflet.validUntil) validUntil = activeLeaflet.validUntil;
+        }
+      }
+
       const created = await prisma.discount.create({
         data: {
           storeId: store.id,
@@ -50,10 +75,14 @@ export async function createDiscount(input: unknown) {
           discountedPrice: data.discountedPrice,
           discountPercent: data.discountPercent,
           description: data.description,
-          validFrom: data.validFrom,
-          validUntil: data.validUntil,
+          validFrom,
+          validUntil,
+          leafletId,
           imageUrl: data.imageUrl,
           isActive: data.isActive,
+          isFeatured: data.isFeatured,
+          featuredUntil: data.featuredUntil,
+          featuredLabel: data.featuredLabel,
         },
       });
 
