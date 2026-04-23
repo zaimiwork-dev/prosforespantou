@@ -33,6 +33,7 @@ model Product {
   store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
   discounts   Discount[]
   priceSnapshots PriceSnapshot[]
+  pendingMatches PendingMatch[]
 
   @@index([storeId])
   @@index([supermarket])
@@ -155,4 +156,18 @@ model Alert {
 
   @@index([isActive, keyword])
   @@map("alerts")
+}
+
+model PendingMatch {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rawName            String   @map("raw_name")
+  rawPrice           Float    @map("raw_price")
+  supermarket        String
+  aiConfidence       Float?   @map("ai_confidence") // 0.0 to 100.0
+  suggestedProductId String?  @db.Uuid @map("suggested_product_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  product            Product? @relation(fields: [suggestedProductId], references: [id], onDelete: SetNull)
+
+  @@index([supermarket])
+  @@map("pending_matches")
 }

@@ -16,6 +16,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'wolt-menu-images-cdn.wolt.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {

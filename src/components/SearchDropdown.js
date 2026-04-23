@@ -28,6 +28,79 @@ function greeklish(text) {
 const normalize = (s) =>
   (s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+const SYNONYMS = [
+  ['gouda', 'γουδα', 'γκουντα'],
+  ['bacon', 'μπεικον', 'μπεηκον'],
+  ['edam', 'ενταμ'],
+  ['cheddar', 'τσενταρ'],
+  ['kelloggs', 'κελογκς'],
+  ['quaker', 'κουακερ'],
+  ['pampers', 'παμπερς']
+];
+
+function expandSearch(query) {
+  if (!query) return [];
+  const raw = query.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const terms = new Set([raw]);
+  
+  const isLatin = /^[a-zA-Z\s]+$/.test(raw);
+  if (isLatin) {
+    const greek = greeklish(raw).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    terms.add(greek);
+    
+    if (raw.includes('x')) terms.add(greek.replace(/ξ/g, 'χ'));
+    if (raw.includes('h')) {
+       terms.add(greek.replace(/η/g, 'χ'));
+       terms.add(greek.replace(/η/g, 'ι'));
+    }
+    if (raw.includes('u')) terms.add(greek.replace(/ου/g, 'υ'));
+    if (raw.includes('y')) terms.add(greek.replace(/υ/g, 'ι'));
+    if (raw.includes('w')) terms.add(greek.replace(/ω/g, 'ο'));
+    if (raw.includes('b')) terms.add(greek.replace(/β/g, 'μπ'));
+    if (raw.includes('d')) terms.add(greek.replace(/δ/g, 'ντ'));
+    if (raw.includes('g')) terms.add(greek.replace(/γ/g, 'γκ'));
+    if (raw.includes('c')) terms.add(greek.replace(/ψ/g, 'κ').replace(/τσ/g, 'κ'));
+  } else {
+    const grToLat = {
+      'α':'a', 'β':'v', 'γ':'g', 'δ':'d', 'ε':'e', 'ζ':'z', 'η':'h', 'θ':'th',
+      'ι':'i', 'κ':'k', 'λ':'l', 'μ':'m', 'ν':'n', 'ξ':'x', 'ο':'o', 'π':'p',
+      'ρ':'r', 'σ':'s', 'ς':'s', 'τ':'t', 'υ':'y', 'φ':'f', 'χ':'x', 'ψ':'ps', 'ω':'o'
+    };
+    let latin = '';
+    for (let i=0; i<raw.length; i++) {
+      latin += grToLat[raw[i]] || raw[i];
+    }
+    terms.add(latin);
+    
+    if (raw.includes('χ')) {
+      terms.add(latin.replace(/x/g, 'h'));
+      terms.add(latin.replace(/x/g, 'ch'));
+    }
+    if (raw.includes('η')) terms.add(latin.replace(/h/g, 'i'));
+    if (raw.includes('υ')) {
+      terms.add(latin.replace(/y/g, 'u'));
+      terms.add(latin.replace(/y/g, 'i'));
+    }
+    if (raw.includes('ω')) terms.add(latin.replace(/o/g, 'w'));
+    if (raw.includes('β')) terms.add(latin.replace(/v/g, 'b'));
+  }
+
+  const expanded = new Set();
+  for (const term of terms) {
+    expanded.add(term);
+    for (const group of SYNONYMS) {
+      for (const syn of group) {
+        if (term.includes(syn)) {
+          for (const s of group) {
+             expanded.add(term.replace(syn, s));
+          }
+        }
+      }
+    }
+  }
+  return Array.from(expanded);
+}
+
 export function SearchDropdown({ query, deals, onSelect }) {
   const ref = useRef(null);
 
@@ -46,13 +119,15 @@ export function SearchDropdown({ query, deals, onSelect }) {
 
   if (!query || query.trim().length < 2) return null;
 
-  const raw = query.trim();
-  const isLatin = /^[a-zA-Z\s]+$/.test(raw);
-  const q = normalize(isLatin ? greeklish(raw) : raw);
+  const expandedTerms = expandSearch(query);
 
   const results = deals
-    .filter((d) => normalize(d.productName).includes(q))
-    .slice(0, 6);
+    .filter((d) => {
+       const name = normalize(d.productName);
+       const desc = normalize(d.description);
+       return expandedTerms.some(term => name.includes(term) || desc.includes(term));
+    })
+    .slice(0, 10);
 
   const sm = (id) => SUPERMARKETS.find((s) => s.id === id);
 
@@ -68,7 +143,8 @@ export function SearchDropdown({ query, deals, onSelect }) {
         borderRadius: 16,
         boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
         zIndex: 200,
-        overflow: "hidden",
+        overflowY: "auto",
+        maxHeight: "210px",
         border: "1px solid #ececf0",
       }}
     >

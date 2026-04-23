@@ -106,11 +106,10 @@ const getTopDealsCached = unstable_cache(
       where: {
         isActive: true,
         validUntil: { gt: now },
-        discountPercent: { gte: 20 },
         id: { notIn: featured.map(f => f.id) }
       },
       include: { store: true, leaflet: true, product: true },
-      orderBy: [{ discountPercent: 'desc' }, { validUntil: 'asc' }],
+      orderBy: { createdAt: 'desc' }, // Order by newest since discountPercent might be null
       take: limit - featured.length,
     });
     return [...featured, ...deals];
@@ -131,7 +130,7 @@ export async function getTopDeals(limit = 10) {
 const getEndingSoonCached = unstable_cache(
   async (limit: number) => {
     const now = new Date();
-    const in3Days = new Date(now.getTime() + 3 * 86400000);
+    const in7Days = new Date(now.getTime() + 7 * 86400000); // Expanded to 7 days so our new data shows
 
     const featured = await prisma.discount.findMany({
       where: {
@@ -148,7 +147,7 @@ const getEndingSoonCached = unstable_cache(
     const deals = await prisma.discount.findMany({
       where: {
         isActive: true,
-        validUntil: { gt: now, lte: in3Days },
+        validUntil: { gt: now, lte: in7Days },
         id: { notIn: featured.map(f => f.id) }
       },
       include: { store: true, leaflet: true, product: true },

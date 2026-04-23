@@ -13,6 +13,101 @@ import { Footer } from "@/components/Footer";
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 
+const GREEKLISH_MAP = {
+  th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ',
+  a: 'α', b: 'β', g: 'γ', d: 'δ', e: 'ε',
+  z: 'ζ', h: 'η', i: 'ι', k: 'κ', l: 'λ',
+  m: 'μ', n: 'ν', x: 'ξ', o: 'ο', p: 'π',
+  r: 'ρ', s: 'σ', t: 'τ', u: 'υ', y: 'υ',
+  f: 'φ', v: 'β', w: 'ω', q: 'κ',
+};
+
+function greeklishToGreek(text) {
+  const lower = text.toLowerCase();
+  let result = '';
+  let i = 0;
+  while (i < lower.length) {
+    const two = lower[i] + (lower[i + 1] || '');
+    if (GREEKLISH_MAP[two]) { result += GREEKLISH_MAP[two]; i += 2; }
+    else if (GREEKLISH_MAP[lower[i]]) { result += GREEKLISH_MAP[lower[i]]; i++; }
+    else { result += lower[i]; i++; }
+  }
+  return result;
+}
+
+const SYNONYMS = [
+  ['gouda', 'γουδα', 'γκουντα'],
+  ['bacon', 'μπεικον', 'μπεηκον'],
+  ['edam', 'ενταμ'],
+  ['cheddar', 'τσενταρ'],
+  ['kelloggs', 'κελογκς'],
+  ['quaker', 'κουακερ'],
+  ['pampers', 'παμπερς']
+];
+
+function expandSearch(query) {
+  if (!query) return [];
+  const raw = query.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const terms = new Set([raw]);
+  
+  const isLatin = /^[a-zA-Z\s]+$/.test(raw);
+  if (isLatin) {
+    const greek = greeklishToGreek(raw).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    terms.add(greek);
+    
+    if (raw.includes('x')) terms.add(greek.replace(/ξ/g, 'χ'));
+    if (raw.includes('h')) {
+       terms.add(greek.replace(/η/g, 'χ'));
+       terms.add(greek.replace(/η/g, 'ι'));
+    }
+    if (raw.includes('u')) terms.add(greek.replace(/ου/g, 'υ'));
+    if (raw.includes('y')) terms.add(greek.replace(/υ/g, 'ι'));
+    if (raw.includes('w')) terms.add(greek.replace(/ω/g, 'ο'));
+    if (raw.includes('b')) terms.add(greek.replace(/β/g, 'μπ'));
+    if (raw.includes('d')) terms.add(greek.replace(/δ/g, 'ντ'));
+    if (raw.includes('g')) terms.add(greek.replace(/γ/g, 'γκ'));
+    if (raw.includes('c')) terms.add(greek.replace(/ψ/g, 'κ').replace(/τσ/g, 'κ'));
+  } else {
+    const grToLat = {
+      'α':'a', 'β':'v', 'γ':'g', 'δ':'d', 'ε':'e', 'ζ':'z', 'η':'h', 'θ':'th',
+      'ι':'i', 'κ':'k', 'λ':'l', 'μ':'m', 'ν':'n', 'ξ':'x', 'ο':'o', 'π':'p',
+      'ρ':'r', 'σ':'s', 'ς':'s', 'τ':'t', 'υ':'y', 'φ':'f', 'χ':'x', 'ψ':'ps', 'ω':'o'
+    };
+    let latin = '';
+    for (let i=0; i<raw.length; i++) {
+      latin += grToLat[raw[i]] || raw[i];
+    }
+    terms.add(latin);
+    
+    if (raw.includes('χ')) {
+      terms.add(latin.replace(/x/g, 'h'));
+      terms.add(latin.replace(/x/g, 'ch'));
+    }
+    if (raw.includes('η')) terms.add(latin.replace(/h/g, 'i'));
+    if (raw.includes('υ')) {
+      terms.add(latin.replace(/y/g, 'u'));
+      terms.add(latin.replace(/y/g, 'i'));
+    }
+    if (raw.includes('ω')) terms.add(latin.replace(/o/g, 'w'));
+    if (raw.includes('β')) terms.add(latin.replace(/v/g, 'b'));
+  }
+
+  const expanded = new Set();
+  for (const term of terms) {
+    expanded.add(term);
+    for (const group of SYNONYMS) {
+      for (const syn of group) {
+        if (term.includes(syn)) {
+          for (const s of group) {
+             expanded.add(term.replace(syn, s));
+          }
+        }
+      }
+    }
+  }
+  return Array.from(expanded);
+}
+
 function sortDeals(deals, sortBy) {
   const copy = [...deals];
   if (sortBy === "discount") {
@@ -28,16 +123,28 @@ function sortDeals(deals, sortBy) {
 export default function SupermarketClient({ sm, initialDeals, leaflet }) {
   const [sortBy, setSortBy] = useState("discount");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { items: cart, addItem } = useShoppingListStore();
 
   const filtered = useMemo(() => {
-    const byCategory = activeCategory === "all"
+    let byCategory = activeCategory === "all"
       ? initialDeals
       : initialDeals.filter((d) => d.category === activeCategory);
+
+    if (searchQuery.trim().length >= 2) {
+      const expandedTerms = expandSearch(searchQuery);
+
+      byCategory = byCategory.filter(d => {
+         const name = d.productName ? d.productName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+         const desc = d.description ? d.description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+         return expandedTerms.some(term => name.includes(term) || desc.includes(term));
+      });
+    }
+
     return sortDeals(byCategory, sortBy);
-  }, [initialDeals, activeCategory, sortBy]);
+  }, [initialDeals, activeCategory, sortBy, searchQuery]);
 
   const biggestDiscount = useMemo(() => {
     return initialDeals.reduce((max, d) => Math.max(max, d.discountPercent ?? 0), 0);
@@ -103,11 +210,11 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
           </div>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, fontWeight: 700, color: "rgba(28,30,36,0.85)" }}>
-            <span>💰 {initialDeals.length} ενεργές</span>
+            <span>{initialDeals.length} ενεργές</span>
             {biggestDiscount > 0 && (
               <>
                 <span style={{ opacity: 0.35 }}>•</span>
-                <span>🔥 έως -{biggestDiscount}%</span>
+                <span>έως -{biggestDiscount}%</span>
               </>
             )}
             {leaflet && leaflet.pdfUrl && (
@@ -127,10 +234,35 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
                   }}
                   style={{ color: sm.color, textDecoration: "underline", textUnderlineOffset: 3 }}
                 >
-                  📄 Δες το φυλλάδιο
+                  Δες το φυλλάδιο
                 </a>
               </>
             )}
+          </div>
+
+          <div style={{ marginTop: 24, maxWidth: 600 }}>
+            <div style={{ position: "relative", width: "100%" }}>
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Αναζήτηση προσφορών ${sm.name}...`}
+                style={{
+                  width: "100%",
+                  padding: "14px 16px 14px 44px",
+                  borderRadius: 14,
+                  border: "none",
+                  background: "#fff",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  fontSize: 15,
+                  outline: "none",
+                  fontWeight: 500,
+                  color: "#1c1e24",
+                }}
+              />
+              <svg style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, color: "#8b929c" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
         </div>
       </section>
