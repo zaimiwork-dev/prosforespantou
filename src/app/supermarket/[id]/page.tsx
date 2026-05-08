@@ -37,7 +37,6 @@ export default async function SupermarketPage({ params }) {
       },
       include: { store: true, leaflet: true, product: true },
       orderBy: [{ discountPercent: "desc" }, { validUntil: "asc" }],
-      take: 200,
     }),
     prisma.leaflet.findFirst({
       where: {

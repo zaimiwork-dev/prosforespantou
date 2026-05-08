@@ -40,6 +40,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const isFeatured = d.isFeatured;
   const featuredLabel = d.featuredLabel ?? 'Χορηγούμενο';
 
+  // Sources are attached by lib/group-deals.js when the same product has
+  // active rows in multiple pipelines (web + leaflet). Falls back to the
+  // single-row source when the helper hasn't been run.
+  const sources = d.sources && d.sources.length > 0 ? d.sources : (d.source ? [d.source] : []);
+  const sourceLabel = (s) => (s === 'web' ? 'Εβδομαδιαία' : s === 'leaflet' ? 'Φυλλάδιο' : s === 'manual' ? 'Manual' : s);
+
   const displayName = d.product?.name || d.productName || d.product_name;
   let displayImage = d.product?.imageUrl || d.imageUrl || d.image_url;
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
@@ -93,7 +99,13 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
             {featuredLabel}
           </div>
         )}
-        {pct > 0 && <div className="discount-badge">-{pct}%</div>}
+        
+        {pct > 0 ? (
+          <div className="discount-badge">-{pct}%</div>
+        ) : !originalPrice ? (
+          <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
+        ) : null}
+        
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
 
         {displayImage && !imgFailed ? (
@@ -128,6 +140,28 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
 
       <div className="card-body">
         <h3 className="card-title" title={displayName}>{displayName}</h3>
+
+        {sources.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+            {sources.map((s) => (
+              <span
+                key={s}
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: s === 'leaflet' ? '#fef3c7' : s === 'web' ? '#dbeafe' : '#e5e7eb',
+                  color: s === 'leaflet' ? '#92400e' : s === 'web' ? '#1e40af' : '#374151',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {sourceLabel(s)}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="card-price-row">
           <div>

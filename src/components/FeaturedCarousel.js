@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { DiscountCard } from './DiscountCard';
 import { Icon } from './Icons';
 import { useShoppingListStore } from '@/lib/store';
+import { groupDealsByProduct } from '@/lib/group-deals';
 
 export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHref }) {
   const cartItems = useShoppingListStore((s) => s.items);
   const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
+  const grouped = useMemo(() => groupDealsByProduct(deals), [deals]);
 
-  if (!deals || deals.length === 0) return null;
+  if (!grouped || grouped.length === 0) return null;
 
   return (
     <section className="section">
@@ -27,7 +29,7 @@ export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHr
       </div>
 
       <div className="featured-scroll">
-        {deals.map((d) => (
+        {grouped.map((d) => (
           <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} />
         ))}
       </div>

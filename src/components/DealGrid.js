@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { DiscountCard } from './DiscountCard';
 import { Icon } from './Icons';
 import { useShoppingListStore } from '@/lib/store';
+import { groupDealsByProduct } from '@/lib/group-deals';
 
 function Skeleton() {
   return (
@@ -33,8 +34,9 @@ export function DealGrid({
 }) {
   const cartItems = useShoppingListStore((s) => s.items);
   const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
+  const grouped = useMemo(() => groupDealsByProduct(deals), [deals]);
 
-  const isEmpty = !loading && deals.length === 0;
+  const isEmpty = !loading && grouped.length === 0;
 
   if (isEmpty) {
     return (
@@ -54,7 +56,7 @@ export function DealGrid({
   return (
     <>
       <div className="products-grid">
-        {deals.map((d) => (
+        {grouped.map((d) => (
           <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} />
         ))}
         {loading && Array(8).fill(0).map((_, i) => <Skeleton key={i} />)}
@@ -62,7 +64,7 @@ export function DealGrid({
 
       {!loading && hasMore && onLoadMore && (
         <div className="load-more-wrap">
-          <div className="sub">Εμφανίζονται {deals.length} από {totalCount.toLocaleString("el-GR")}</div>
+          <div className="sub">Εμφανίζονται {grouped.length} από {totalCount.toLocaleString("el-GR")}</div>
           <button
             type="button"
             className="btn btn-outline btn-lg"
@@ -74,9 +76,9 @@ export function DealGrid({
         </div>
       )}
 
-      {!loading && !hasMore && deals.length > 0 && (
+      {!loading && !hasMore && grouped.length > 0 && (
         <div className="sub" style={{ textAlign: "center", marginTop: 28 }}>
-          Εμφανίζονται όλες οι {deals.length.toLocaleString("el-GR")} προσφορές
+          Εμφανίζονται όλες οι {grouped.length.toLocaleString("el-GR")} προσφορές
         </div>
       )}
     </>

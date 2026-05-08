@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -45,3 +46,15 @@ next-env.d.ts
 # local scratch
 /library_data
 /test-gemini.json
+
+# scraping debug artifacts (root-level)
+/lidl_*.html
+/masoutis_*.html
+/masoutis_*.png
+/masoutis_*.json
+/masoutis_*.txt
+/pending_*.json
+/masoutis_leaflet_*.png
+/matcher_run_*.log
+/test-masoutis-*.mjs
+/test_masoutis_*.mjs

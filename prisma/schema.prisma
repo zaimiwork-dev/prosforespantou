@@ -34,6 +34,7 @@ model Product {
   discounts   Discount[]
   priceSnapshots PriceSnapshot[]
   pendingMatches PendingMatch[]
+  matchCache  MatchCache[]
 
   @@index([storeId])
   @@index([supermarket])
@@ -94,6 +95,7 @@ model Discount {
   isFeatured      Boolean  @default(false) @map("is_featured")
   featuredUntil   DateTime? @map("featured_until")
   featuredLabel   String?  @map("featured_label")
+  source          String   @default("web") // "web" | "leaflet" | "manual"
   product         Product? @relation(fields: [productId], references: [id])
   leaflet         Leaflet? @relation(fields: [leafletId], references: [id])
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -107,6 +109,7 @@ model Discount {
   @@index([isActive, validUntil])
   @@index([isActive, supermarket, validUntil])
   @@index([isActive, category, validUntil])
+  @@index([source])
   @@map("discounts")
 }
 
@@ -158,6 +161,31 @@ model Alert {
   @@map("alerts")
 }
 
+// Persistent (rawName, supermarket) → productId mapping. Populated by matcher
+// on every successful LLM match (or auto-accept). Subsequent cycles look up
+// here BEFORE pre-filter / LLM, skipping the expensive call entirely. This is
+// what makes the matcher scale to 10+ supermarkets on free-tier APIs.
+//
+// 90-day expiry on `lastUsedAt` is the cheap correctness mechanism — if a SKU
+// gets renamed or recategorized, the cache row eventually retires itself.
+// Manual eviction also works: DELETE FROM match_cache WHERE raw_name = '...'.
+model MatchCache {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rawName     String   @map("raw_name")
+  supermarket String
+  productId   String   @db.Uuid @map("product_id")
+  brandToken  String?  @map("brand_token")
+  source      String   @default("llm") // 'llm' | 'auto_accept' — for diagnostics
+  createdAt   DateTime @default(now()) @map("created_at")
+  lastUsedAt  DateTime @default(now()) @map("last_used_at")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([rawName, supermarket])
+  @@index([productId])
+  @@index([lastUsedAt])
+  @@map("match_cache")
+}
+
 model PendingMatch {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   rawName            String   @map("raw_name")
@@ -165,9 +193,11 @@ model PendingMatch {
   supermarket        String
   aiConfidence       Float?   @map("ai_confidence") // 0.0 to 100.0
   suggestedProductId String?  @db.Uuid @map("suggested_product_id")
+  imageUrl           String?  @map("image_url")
   createdAt          DateTime @default(now()) @map("created_at")
   product            Product? @relation(fields: [suggestedProductId], references: [id], onDelete: SetNull)
 
+  @@unique([rawName, supermarket])
   @@index([supermarket])
   @@map("pending_matches")
 }

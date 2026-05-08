@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const schema = z.object({
   eventType: z.enum(['deal_click', 'leaflet_click', 'list_add']),
@@ -35,13 +36,20 @@ export async function trackEvent(input: unknown) {
       const parsed = schema.safeParse(input);
       if (!parsed.success) return { success: false };
 
+      const h = await headers();
+      const ip = h.get('x-forwarded-for') || 'unknown';
+      // 60 events/min per IP — well above any legitimate browsing pattern,
+      // tight enough to blunt opportunistic spam of the analytics table.
+      if (!checkRateLimit(`track:${ip}`, 60, 60_000)) {
+        return { success: false, rateLimited: true };
+      }
+
       const d = parsed.data;
       if (d.sessionId) {
         const key = `${d.sessionId}:${d.eventType}:${d.discountId ?? d.leafletId ?? d.supermarket}`;
         if (isDuplicate(key)) return { success: true, deduped: true };
       }
 
-      const h = await headers();
       const userAgent = h.get('user-agent')?.slice(0, 256) ?? null;
 
       await prisma.clickEvent.create({

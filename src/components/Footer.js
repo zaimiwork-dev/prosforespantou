@@ -4,15 +4,18 @@ import { subscribe } from '@/actions/subscribe';
 
 export function Footer() {
   const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
   const [status, setStatus] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus('sending');
-    const res = await subscribe({ email, source: 'homepage_footer' });
+    const res = await subscribe({ email, source: 'homepage_footer', website });
     if (res.success) {
       setStatus('success');
       setEmail('');
+    } else if (res.rateLimited) {
+      setStatus('rate_limited');
     } else {
       setStatus('error');
     }
@@ -27,6 +30,17 @@ export function Footer() {
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 400 }}>
+          {/* Honeypot: hidden from humans, harvested by bots. */}
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            aria-hidden="true"
+            style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+          />
           <input
             type="email"
             value={email}
@@ -50,7 +64,8 @@ export function Footer() {
           </button>
         </form>
 
-        {status === 'success' && <p style={{ color: '#2d6a4f', fontSize: 12, marginTop: 12, fontWeight: 700 }}>✓ Τσέκαρε το email σου για επιβεβαίωση!</p>}
+        {status === 'success' && <p style={{ color: '#2d6a4f', fontSize: 12, marginTop: 12, fontWeight: 700 }}>✓ Είσαι στη λίστα! Θα σε ειδοποιήσουμε όταν ξεκινήσει το newsletter.</p>}
+        {status === 'rate_limited' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>⏳ Πολλές προσπάθειες. Δοκίμασε σε λίγο.</p>}
         {status === 'error' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>❌ Κάτι πήγε στραβά. Δοκίμασε ξανά.</p>}
 
         <div style={{ marginTop: 48, fontSize: 12, color: '#999' }}>

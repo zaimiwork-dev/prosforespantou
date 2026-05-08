@@ -221,6 +221,7 @@ export async function GET(req: Request) {
               validFrom,
               validUntil,
               isActive: true,
+              source: 'leaflet',
             },
           });
           totalCount++;
@@ -232,6 +233,19 @@ export async function GET(req: Request) {
       await sleep(5000);
     }
 
+    // Deactivate prior leaflet rows for this supermarket — only touch source='leaflet'
+    // so the Masoutis web pipeline (source='web') is unaffected.
+    const deactivated = await prisma.discount.updateMany({
+      where: {
+        supermarket: SM_ID,
+        source: 'leaflet',
+        isActive: true,
+        leafletId: { not: leaflet.id },
+      },
+      data: { isActive: false },
+    });
+    console.log(`[LIDL] inserted=${totalCount} deactivated=${deactivated.count} leafletId=${leaflet.id}`);
+
     revalidateTag('deals:default', 'max');
 
     return NextResponse.json({
@@ -240,6 +254,7 @@ export async function GET(req: Request) {
       pages: pages.length,
       failedPages,
       count: totalCount,
+      deactivated: deactivated.count,
       leafletId: leaflet.id,
     });
   } catch (error: any) {

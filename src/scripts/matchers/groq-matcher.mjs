@@ -4,15 +4,19 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-// SOURCE controls which Discount.source the matcher reads/writes/deactivates.
-// Defaults preserve the original web pipeline behaviour. For the leaflet
-// pipeline run with: SOURCE=leaflet INPUT_FILE=./pending_masoutis_leaflet_deals.json node ...
+// Cloud-fast counterpart to ollama-matcher.mjs. Same architecture (source
+// isolation, candidate pre-filter, UUID validation, upsert, end-of-run
+// deactivation, LIMIT mode, PriceSnapshot) — only the LLM call differs.
+//
+// Groq Llama-4 Scout (same model as the Lidl leaflet cron). Free tier ≈ 30 RPM
+// for chat completions. 2s pacing keeps us safely under that. ~6 minutes for
+// 200 items, ~90 minutes for 2000.
+
 const SOURCE = process.env.SOURCE || 'web';
 const INPUT_FILE = process.env.INPUT_FILE || './pending_masoutis_deals.json';
-// LIMIT processes only the first N items — for smoke tests. Unset = process all.
-// IMPORTANT: with LIMIT set, end-of-run deactivation is SKIPPED. Otherwise items
-// past index LIMIT would be incorrectly deactivated for not appearing in this run.
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : null;
+const PACE_MS = parseInt(process.env.PACE_MS || '2000', 10);
+const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
 if (!['web', 'leaflet', 'manual'].includes(SOURCE)) {
   console.error(`❌ Invalid SOURCE='${SOURCE}'. Must be one of: web, leaflet, manual`);
@@ -20,7 +24,7 @@ if (!['web', 'leaflet', 'manual'].includes(SOURCE)) {
 }
 
 function tokensFor(s) {
-  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter((w) => w.length >= 3);
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/\s+/).filter((w) => w.length >= 3);
 }
 
 function calculateOverlap(str1, str2) {
@@ -32,10 +36,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const isUuid = (s) => typeof s === 'string' && UUID_RE.test(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// First-token brand check. Gemma occasionally returns a wrong-brand UUID
-// even when the prompt forbids it. Deterministic safety net, but tolerant of
-// Latin/Greek transliteration so "Fix" matches "Φιξ", "Pampers" matches
-// "Πάμπερς", etc.
+// First-token brand check. Llama-4 occasionally returns a wrong-brand UUID
+// even when the prompt forbids it (e.g. "Arla Protein" → "Μεβγάλ High
+// Protein"). Deterministic safety net — but tolerant of Latin/Greek
+// transliteration so "Fix" matches "Φιξ", "Pampers" matches "Πάμπερς", etc.
 const LATIN_TO_GREEK = {
   th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ', nt: 'ντ', gk: 'γκ',
   a: 'α', b: 'β', g: 'γ', d: 'δ', e: 'ε',
@@ -70,7 +74,7 @@ function transliterateLatinToGreek(s) {
 function brandsMatch(rawFullName, candidateFullName) {
   const a = normalizeBrandToken((rawFullName || '').trim().split(/\s+/)[0]);
   const b = normalizeBrandToken((candidateFullName || '').trim().split(/\s+/)[0]);
-  if (!a || !b) return true;
+  if (!a || !b) return true; // unknown — don't block; defer to LLM judgment
   if (a === b) return true;
   const aIsLatin = /^[a-z0-9]+$/.test(a);
   const bIsLatin = /^[a-z0-9]+$/.test(b);
@@ -79,16 +83,67 @@ function brandsMatch(rawFullName, candidateFullName) {
   return false;
 }
 
+async function callGroq(apiKey, prompt) {
+  let res;
+  try {
+    res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 256,
+      }),
+      // Default Node fetch timeout is 10s — too short on flaky links.
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    // Network-level failures (timeout, ECONNRESET, DNS) — return as transient
+    // so the caller's retry loop catches them. Without this, an unhandled
+    // promise rejection would kill the whole run.
+    return { error: `network: ${err.message || err.name || 'unknown'}`, status: null };
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    return { error: `${res.status}: ${body.slice(0, 200)}`, status: res.status };
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    return { error: `json-parse: ${err.message || 'unknown'}`, status: null };
+  }
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) return { error: 'Empty Groq response' };
+  try {
+    return { result: JSON.parse(text) };
+  } catch {
+    return { error: `Could not parse JSON: ${text.slice(0, 200)}` };
+  }
+}
+
 async function runMatcher() {
   if (!fs.existsSync(INPUT_FILE)) {
     console.error(`❌ Matcher Error: File not found at ${INPUT_FILE}. Run the Extractor first.`);
     process.exit(1);
   }
 
-  const rawDeals = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf8'));
-  console.log(`🤖 Smart Ollama Matcher Agent (source='${SOURCE}'): Loaded ${rawDeals.length} raw deals from ${INPUT_FILE}.`);
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    console.error('❌ GROQ_API_KEY not set in .env.local. Get one at https://console.groq.com/keys');
+    process.exit(1);
+  }
 
-  // Import Prisma client dynamically
+  const rawDeals = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf8'));
+  console.log(`🤖 Groq Matcher (model='${MODEL}', source='${SOURCE}', pace=${PACE_MS}ms): Loaded ${rawDeals.length} raw deals from ${INPUT_FILE}.`);
+
   const { default: prisma } = await import('../../lib/prisma.ts');
 
   // Supabase pooler can be cold (auto-paused free tier) or hold stale
@@ -112,7 +167,6 @@ async function runMatcher() {
     }
   }
 
-  // Get the store ID for Masoutis so we can link it properly
   const store = await withDbRetry('store.findUnique', () =>
     prisma.store.findUnique({ where: { name: 'Μασούτης' } })
   );
@@ -121,29 +175,31 @@ async function runMatcher() {
     process.exit(1);
   }
 
-  // Get Master Catalog for Masoutis
   const masterProducts = await withDbRetry('product.findMany', () =>
     prisma.product.findMany({ where: { supermarket: 'masoutis' }, select: { id: true, name: true } })
   );
-
   console.log(`📚 Master Catalog: Loaded ${masterProducts.length} known products for Masoutis.`);
 
   const runStartedAt = new Date();
   let matchedCount = 0;
   let pendingCount = 0;
   let updatedCount = 0;
+  const total = LIMIT && LIMIT > 0 ? Math.min(LIMIT, rawDeals.length) : rawDeals.length;
+
+  console.log(`\n⚙️ Processing ${total} deals one-by-one via Groq...${LIMIT ? ' (LIMIT mode — deactivation will be SKIPPED)' : ''}`);
+
   let cacheHits = 0;
   let autoAcceptHits = 0;
-  const retries = {};
-
-  const total = LIMIT && LIMIT > 0 ? Math.min(LIMIT, rawDeals.length) : rawDeals.length;
-  console.log(`\n⚙️ Processing ${total} deals ONE-BY-ONE using Gemma 4 + Local Pre-Filtering...${LIMIT ? ' (LIMIT mode — deactivation will be SKIPPED)' : ''}`);
 
   for (let i = 0; i < total; i++) {
+    try {
     const rawDeal = rawDeals[i];
-    process.stdout.write(`[${i+1}/${rawDeals.length}] Analyzing "${rawDeal.rawName}"... `);
+    process.stdout.write(`[${i + 1}/${total}] "${rawDeal.rawName.slice(0, 60)}"... `);
 
-    // === CACHE LOOKUP === — reuse a prior cycle's mapping if we have one
+    // === CACHE LOOKUP ===
+    // Persistent (rawName, supermarket) → productId mapping. If we matched
+    // this raw name on a prior cycle, reuse the result. Skips pre-filter +
+    // LLM entirely.
     let productIdFromShortcut = null;
     let shortcutSource = null;
     let cachedRow = null;
@@ -152,22 +208,31 @@ async function runMatcher() {
         where: { rawName_supermarket: { rawName: rawDeal.rawName, supermarket: rawDeal.supermarket } },
       });
     } catch (cacheErr) {
+      // Non-fatal — just fall through to normal matching.
       console.log(`(cache lookup failed: ${cacheErr.message?.slice(0, 60)}) `);
     }
     if (cachedRow) {
       productIdFromShortcut = cachedRow.productId;
       shortcutSource = 'cache';
       cacheHits++;
-      prisma.matchCache.update({ where: { id: cachedRow.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+      // Bump lastUsedAt — best-effort, don't block.
+      prisma.matchCache.update({
+        where: { id: cachedRow.id },
+        data: { lastUsedAt: new Date() },
+      }).catch(() => {});
     }
 
-    // 1. PRE-FILTERING: Find the top 10 most likely products in the Master Catalog
     const candidates = masterProducts
-      .map(p => ({ ...p, score: calculateOverlap(rawDeal.rawName, p.name) }))
+      .map((p) => ({ ...p, score: calculateOverlap(rawDeal.rawName, p.name) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
-    // === AUTO-ACCEPT === — every rawName token is in top candidate AND brand matches
+    // === AUTO-ACCEPT ===
+    // Strict: every significant rawName token must appear in the top
+    // candidate's name AND the brands must match AND we need at least 3
+    // significant tokens (avoid 1-token flukes). This catches the common case
+    // where the supermarket's data is structurally identical to our catalog
+    // SKU — e.g. "Pampers Premium Care 50τεμ." matching the same name verbatim.
     if (!productIdFromShortcut && candidates.length > 0) {
       const top = candidates[0];
       const rawTokens = tokensFor(rawDeal.rawName);
@@ -180,11 +245,11 @@ async function runMatcher() {
       }
     }
 
-    const catalogList = candidates.map(p => `${p.id} | ${p.name}`).join('\n');
+    const catalogList = candidates.map((p) => `${p.id} | ${p.name}`).join('\n');
 
     const prompt = `
 You are an expert data matching AI for a Greek supermarket aggregator.
-Your task is to match a RAW extracted deal name against a short list of CANDIDATE PRODUCTS from our catalog, and assign the correct CATEGORY.
+Match a RAW extracted deal name against a short list of CANDIDATE PRODUCTS, and assign a CATEGORY.
 
 CANDIDATE PRODUCTS (Format: ID | Name):
 ${catalogList}
@@ -193,7 +258,7 @@ RAW DEAL TO MATCH:
 Name: "${rawDeal.rawName}"
 Price: ${rawDeal.rawPrice}
 
-ALLOWED CATEGORIES (Pick one exactly as written):
+ALLOWED CATEGORIES (Pick exactly one):
 "Φρούτα & Λαχανικά", "Κρέας & Ψάρι", "Γαλακτοκομικά & Είδη Ψυγείου", "Τυριά & Αλλαντικά", "Σαλάτες & Αλοιφές", "Κονσέρβες", "Αρτοποιία", "Κατεψυγμένα", "Είδη Παντοπωλείου", "Πρωινό & Ροφήματα", "Σνακ & Γλυκά", "Κάβα", "Προσωπική Φροντίδα", "Βρεφικά Είδη", "Είδη Καθαρισμού & Σπιτιού", "Είδη Κατοικιδίων", "Άλλο"
 
 INSTRUCTIONS:
@@ -201,85 +266,49 @@ INSTRUCTIONS:
 2. **QUANTITY MUST MATCH EXACTLY.** Compare weight (γρ/g/kg), volume (ml/lt), pack size (τεμ/x). 750ml vs 1lt → NEW. 6x53γρ vs 10x53γρ → NEW.
 3. Only if BOTH brand and quantity match → return the candidate's UUID with confidence reflecting how exact the variant match is.
 4. Confidence is 0-100. Use 0 when no candidate has the right brand at all.
-5. Assign the most appropriate ALLOWED CATEGORY.
-   - Eggs (Αυγά) -> "Είδη Παντοπωλείου"
-   - Cheeses/Deli -> "Τυριά & Αλλαντικά"
-   - Dips/Spreads (Τυροκαυτερή, etc.) -> "Σαλάτες & Αλοιφές"
-   - Canned items (Τόνος, etc.) -> "Κονσέρβες"
-6. Respond ONLY with a valid JSON object. No markdown formatting.
+5. Category hints: Eggs → Είδη Παντοπωλείου; Cheeses/Deli → Τυριά & Αλλαντικά; Dips/Spreads → Σαλάτες & Αλοιφές; Canned → Κονσέρβες.
+6. Return JSON ONLY with keys: rawName, suggestedProductId, confidence, category. No prose.
 
-JSON OUTPUT FORMAT:
-{
-  "rawName": "${rawDeal.rawName}",
-  "suggestedProductId": "uuid-from-candidates-or-NEW",
-  "confidence": 95,
-  "category": "Γαλακτοκομικά & Είδη Ψυγείου"
-}
+OUTPUT shape:
+{ "rawName": "${rawDeal.rawName}", "suggestedProductId": "uuid-or-NEW", "confidence": 95, "category": "..." }
 `;
 
-    try {
-      // Synthesize an LLM-shaped result if we have a cache/auto-accept hit;
-      // otherwise call Ollama for real. Existing dbAttempt loop runs unchanged.
-      let res;
-      if (productIdFromShortcut) {
-        res = {
-          rawName: rawDeal.rawName,
-          suggestedProductId: productIdFromShortcut,
-          confidence: 100,
-          category: rawDeal.category || 'Άλλο',
-        };
-      } else {
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gemma4',
-          prompt: prompt,
-          format: {
-            "type": "object",
-            "properties": {
-              "rawName": { "type": "string" },
-              "suggestedProductId": { "type": "string" },
-              "confidence": { "type": "number" },
-              "category": { "type": "string" }
-            },
-            "required": ["rawName", "suggestedProductId", "confidence", "category"]
-          },
-          stream: false,
-          options: {
-            temperature: 0
-          }
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.error) {
-        retries[i] = (retries[i] || 0) + 1;
-        const msg = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
-        console.log(`❌ Ollama Error (attempt ${retries[i]}/3): ${msg}`);
-        if (retries[i] >= 3) { console.log('⛔ Giving up after 3 attempts'); continue; }
-        await new Promise((r) => setTimeout(r, 2000));
-        i--;
-        continue;
+    let llmResult = null;
+    if (productIdFromShortcut) {
+      // Synthesize an LLM-shaped result so the existing DB-write branch
+      // doesn't need a parallel implementation. category falls back to
+      // rawDeal.category which the existing Discount row will likely
+      // overwrite via update-in-place anyway.
+      llmResult = {
+        rawName: rawDeal.rawName,
+        suggestedProductId: productIdFromShortcut,
+        confidence: 100,
+        category: rawDeal.category || 'Άλλο',
+      };
+    } else {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { result, error, status } = await callGroq(apiKey, prompt);
+        if (result) { llmResult = result; break; }
+        const transient = !status || status === 429 || status >= 500;
+        if (!transient) {
+          console.log(`❌ Groq fatal: ${error}`);
+          break;
+        }
+        const wait = status === 429 ? 30000 : 2000 * attempt;
+        console.log(`🔁 Groq ${status || 'err'} (${attempt}/3), waiting ${wait}ms...`);
+        await sleep(wait);
       }
+      if (!llmResult) { console.log('⛔ giving up'); await sleep(PACE_MS); continue; }
+    }
 
-      try {
-         res = JSON.parse(data.response);
-      } catch (parseErr) {
-         console.log('❌ Failed to parse JSON');
-         continue;
-      }
-      } // end of else (real Ollama call branch)
+    const res = llmResult;
 
-      let dbAttempt = 0;
-      while (dbAttempt < 3) {
+    let dbAttempt = 0;
+    while (dbAttempt < 3) {
       try {
         let productId = null;
-
         if (productIdFromShortcut) {
+          // Cache hit OR auto-accept — already validated upstream, trust it.
           productId = productIdFromShortcut;
         } else if (res.confidence >= 90 && isUuid(res.suggestedProductId)) {
           const candidate = candidates.find((c) => c.id === res.suggestedProductId);
@@ -292,10 +321,23 @@ JSON OUTPUT FORMAT:
               productId = res.suggestedProductId;
             }
           } else {
-            console.log(`⚠️ Gemma returned UUID not in candidates — routing to review`);
+            console.log(`⚠️ UUID not in candidates — routing to review`);
           }
         } else if (res.confidence >= 90 && res.suggestedProductId && res.suggestedProductId !== 'NEW' && res.suggestedProductId !== 'null') {
-          console.log(`⚠️ Gemma returned malformed UUID "${res.suggestedProductId}" — routing to review`);
+          console.log(`⚠️ Malformed UUID "${res.suggestedProductId}" — routing to review`);
+        }
+
+        if (!productId && rawDeal.imageUrl) {
+          const newProduct = await prisma.product.create({
+            data: {
+              name: res.rawName,
+              imageUrl: rawDeal.imageUrl,
+              supermarket: rawDeal.supermarket,
+              storeId: store.id
+            }
+          });
+          productId = newProduct.id;
+          shortcutSource = 'auto_create';
         }
 
         if (productId) {
@@ -377,8 +419,9 @@ JSON OUTPUT FORMAT:
             },
           });
 
-          // Persist for future cycles. Don't re-cache on a cache hit (we already
-          // bumped lastUsedAt). Cache fresh LLM matches and auto-accept matches.
+          // Persist this match for next cycle. Skip if it came FROM the cache
+          // (we already bumped lastUsedAt on read). Write on auto_accept and
+          // on fresh LLM matches.
           if (shortcutSource !== 'cache') {
             try {
               await prisma.matchCache.upsert({
@@ -397,15 +440,15 @@ JSON OUTPUT FORMAT:
                 },
               });
             } catch (cacheWriteErr) {
+              // Non-fatal — the match is already in Discount. Just log.
               console.log(`(cache write failed: ${cacheWriteErr.message?.slice(0, 60)})`);
             }
           }
         } else {
           if (!rawDeal.imageUrl) {
             console.log(`❌ DROPPING: No image (Strict Rule).`);
-            continue;
+            break;
           }
-
           await prisma.pendingMatch.upsert({
             where: { rawName_supermarket: { rawName: res.rawName, supermarket: rawDeal.supermarket } },
             create: {
@@ -432,15 +475,19 @@ JSON OUTPUT FORMAT:
         const transient = /connection|terminated|ECONN|timeout|socket/i.test(dbErr.message || '');
         if (transient && dbAttempt < 3) {
           console.log(`🔁 DB blip, retrying (${dbAttempt}/3): ${dbErr.message}`);
-          await new Promise((r) => setTimeout(r, 2000));
+          await sleep(2000);
           continue;
         }
         console.log(`❌ DB Error (attempt ${dbAttempt}): ${dbErr.message}`);
         break;
       }
-      }
-    } catch (err) {
-      console.log(`❌ Network Error: ${err.message}`);
+    }
+
+    await sleep(PACE_MS);
+    } catch (itemErr) {
+      // Defense in depth — never let a single bad item kill the whole run.
+      console.log(`❌ Item-level error (skipped): ${itemErr.message?.slice(0, 200)}`);
+      await sleep(PACE_MS);
     }
   }
 
@@ -459,12 +506,12 @@ JSON OUTPUT FORMAT:
   }
 
   const llmCalls = total - cacheHits - autoAcceptHits;
-  console.log('\n🏁 Smart Matcher Agent finished processing.');
+  console.log('\n🏁 Groq Matcher finished.');
   console.log(`💾 Cache hits: ${cacheHits}    ⚡ Auto-accepted: ${autoAcceptHits}    🤖 LLM calls: ${llmCalls}`);
-  console.log(`🟢 Created (new active discount): ${matchedCount}`);
-  console.log(`🔄 Updated (refreshed existing): ${updatedCount}`);
+  console.log(`🟢 Created: ${matchedCount}`);
+  console.log(`🔄 Updated: ${updatedCount}`);
   console.log(`🟡 Sent to Review Queue: ${pendingCount}`);
-  console.log(`🪦 Deactivated (no longer in scrape): ${LIMIT ? 'SKIPPED (LIMIT set)' : staleCount}`);
+  console.log(`🪦 Deactivated: ${LIMIT ? 'SKIPPED (LIMIT set)' : staleCount}`);
 }
 
 runMatcher();

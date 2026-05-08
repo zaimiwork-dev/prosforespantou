@@ -108,6 +108,9 @@ export async function searchDeals(query: string) {
     try {
       const expandedTerms = expandSearch(query);
 
+      // After running src/scripts/enable-pg-trgm.mjs, swap unaccent → f_unaccent below
+      // so Postgres can use the GIN trigram index. Until then, queries work but
+      // do a sequential scan.
       const conditions = expandedTerms.map(term => Prisma.sql`
         (unaccent(lower(product_name)) LIKE unaccent(lower(${'%' + term + '%'}))
         OR unaccent(lower(COALESCE(description, ''))) LIKE unaccent(lower(${'%' + term + '%'}))

@@ -9,6 +9,11 @@ import { createDiscount } from "@/actions/admin/create-discount";
 import { createLeaflet, listLeaflets, deleteLeaflet } from "@/actions/admin/leaflet-actions";
 import { getStats } from "@/actions/admin/get-stats";
 import { getSubscribers } from "@/actions/admin/get-subscribers";
+import { listPendingMatches } from "@/actions/admin/list-pending-matches";
+import { approvePendingMatch } from "@/actions/admin/approve-pending-match";
+import { rejectPendingMatch } from "@/actions/admin/reject-pending-match";
+import { createSkuFromPending } from "@/actions/admin/create-sku-from-pending";
+import { setFeatured } from "@/actions/admin/set-featured";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 
 const emptyLeafletForm = {
@@ -93,6 +98,7 @@ export function AdminPanel({ onBack }) {
   const [libSearch, setLibSearch] = useState("");
   const [libSM, setLibSM] = useState("all");
   const [libLoading, setLibLoading] = useState(false);
+  const [libOffset, setLibOffset] = useState(0);
   const [msg, setMsg] = useState({ text: "", type: "" });
   const [search, setSearch] = useState("");
   const [filterFeatured, setFilterFeatured] = useState(false);
@@ -103,6 +109,11 @@ export function AdminPanel({ onBack }) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [subs, setSubs] = useState({ counts: { total: 0, confirmed: 0, pending: 0, unsubscribed: 0 }, list: [] });
   const [subsLoading, setSubsLoading] = useState(false);
+  const [pending, setPending] = useState({ total: 0, rows: [] });
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingRowState, setPendingRowState] = useState({});
+  const [pendingFilterSM, setPendingFilterSM] = useState("masoutis");
+  const [productDetail, setProductDetail] = useState(null);
 
   const showMsg = (text, type = "success") => {
     setMsg({ text, type });
@@ -124,12 +135,15 @@ export function AdminPanel({ onBack }) {
     setListLoading(false);
   }, [discountOffset, search]);
 
-  const loadLibrary = async () => {
+  const loadLibrary = async (reset = false) => {
     setLibLoading(true);
     try {
-      const result = await getProducts({ search: libSearch, supermarket: libSM, limit: 100 });
-      setProducts(result.products || []);
+      const nextOffset = reset ? 0 : libOffset;
+      const result = await getProducts({ search: libSearch, supermarket: libSM, limit: PAGE_SIZE, offset: nextOffset });
+      const fetched = result.products || [];
+      setProducts(reset ? fetched : (prev) => [...prev, ...fetched]);
       setProductTotal(result.total || 0);
+      setLibOffset(nextOffset + fetched.length);
     } catch (e) {
       showMsg("Failed to load products", "error");
     }
@@ -137,7 +151,7 @@ export function AdminPanel({ onBack }) {
   };
 
   useEffect(() => {
-    if (tab === "lib") loadLibrary();
+    if (tab === "lib") loadLibrary(true);
   }, [tab, libSearch, libSM]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadLeaflets = async () => {
@@ -162,11 +176,76 @@ export function AdminPanel({ onBack }) {
     setSubsLoading(false);
   };
 
+  const loadPending = async () => {
+    setPendingLoading(true);
+    const res = await listPendingMatches({ supermarket: pendingFilterSM === "all" ? undefined : pendingFilterSM });
+    if (res.success) {
+      setPending({ total: res.total, rows: res.rows });
+      const init = {};
+      res.rows.forEach((r) => { init[r.id] = { category: "Άλλο", busy: false }; });
+      setPendingRowState(init);
+    } else {
+      showMsg(res.error || "Failed to load review queue", "error");
+    }
+    setPendingLoading(false);
+  };
+
+  const handleApprove = async (row) => {
+    if (!row.suggestedProduct) return;
+    const state = pendingRowState[row.id] || {};
+    setPendingRowState((s) => ({ ...s, [row.id]: { ...state, busy: true } }));
+    const res = await approvePendingMatch({
+      pendingMatchId: row.id,
+      productId: row.suggestedProduct.id,
+      category: state.category || "Άλλο",
+    });
+    if (res.success) {
+      showMsg("✓ Approved");
+      setPending((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== row.id), total: Math.max(0, p.total - 1) }));
+    } else {
+      showMsg(res.error || "Approve failed", "error");
+      setPendingRowState((s) => ({ ...s, [row.id]: { ...state, busy: false } }));
+    }
+  };
+
+  const handleReject = async (row) => {
+    if (!window.confirm("Απόρριψη αυτής της γραμμής;")) return;
+    const res = await rejectPendingMatch({ pendingMatchId: row.id });
+    if (res.success) {
+      showMsg("Απορρίφθηκε");
+      setPending((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== row.id), total: Math.max(0, p.total - 1) }));
+    } else {
+      showMsg(res.error || "Reject failed", "error");
+    }
+  };
+
+  const handleCreateSku = async (row) => {
+    const state = pendingRowState[row.id] || {};
+    if (!row.rawImageUrl) { showMsg("Δεν υπάρχει εικόνα — δεν μπορεί να δημιουργηθεί SKU", "error"); return; }
+    setPendingRowState((s) => ({ ...s, [row.id]: { ...state, busy: true } }));
+    const res = await createSkuFromPending({
+      pendingMatchId: row.id,
+      category: state.category || "Άλλο",
+    });
+    if (res.success) {
+      showMsg("✓ Νέο SKU δημιουργήθηκε");
+      setPending((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== row.id), total: Math.max(0, p.total - 1) }));
+    } else {
+      showMsg(res.error || "Create failed", "error");
+      setPendingRowState((s) => ({ ...s, [row.id]: { ...state, busy: false } }));
+    }
+  };
+
   useEffect(() => {
     if (tab === "leaf") loadLeaflets();
     if (tab === "stats") loadStats();
     if (tab === "subs") loadSubscribers();
+    if (tab === "review") loadPending();
   }, [tab]);
+
+  useEffect(() => {
+    if (tab === "review") loadPending();
+  }, [pendingFilterSM]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveLeaflet = async () => {
     if (!leafletForm.pdfUrl.trim()) {
@@ -232,6 +311,31 @@ export function AdminPanel({ onBack }) {
       loadList(true);
     } else {
       showMsg(res.error || "Delete failed", "error");
+    }
+  };
+
+  const handleToggleFeatured = async (d) => {
+    const willFeature = !d.isFeatured;
+    let durationDays = 7;
+    let label = null;
+    if (willFeature) {
+      const input = window.prompt("Διάρκεια προβολής σε ημέρες (1-60):", "7");
+      if (input === null) return;
+      const parsed = parseInt(input, 10);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 60) {
+        showMsg("Μη έγκυρη διάρκεια", "error");
+        return;
+      }
+      durationDays = parsed;
+      const labelInput = window.prompt("Προαιρετικό label (π.χ. 'Sponsored', 'Top pick') — άφησε κενό για κανένα:", "");
+      label = labelInput?.trim() || null;
+    }
+    const res = await setFeatured({ discountId: d.id, featured: willFeature, durationDays, label: label ?? undefined });
+    if (res.success) {
+      showMsg(willFeature ? `Featured για ${durationDays} ημέρες.` : "Αφαιρέθηκε από featured.");
+      loadList(true);
+    } else {
+      showMsg(res.error || "Featured toggle failed", "error");
     }
   };
 
@@ -387,13 +491,96 @@ export function AdminPanel({ onBack }) {
 
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: "1px solid #ddd", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#f8f9fa", borderRadius: 12, padding: 5, width: "fit-content", border: "1px solid #eee" }}>
-            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["stats", "📊 Αναλυτικά"], ["subs", "📧 Συνδρομητές"], ["add", "➕ Νέα"]].map(([id, label]) => (
+            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["review", "🧐 Review"], ["stats", "📊 Αναλυτικά"], ["subs", "📧 Συνδρομητές"], ["add", "➕ Νέα"]].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ background: tab === id ? "#1c1e24" : "transparent", color: tab === id ? "#fff" : "#707680", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 {label}
               </button>
             ))}
           </div>
+
+          {tab === "review" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+                <select value={pendingFilterSM} onChange={(e) => setPendingFilterSM(e.target.value)} style={{ ...inp, maxWidth: 200 }}>
+                  <option value="all">Όλα τα supermarkets</option>
+                  {SUPERMARKETS.map(sm => <option key={sm.id} value={sm.id}>{sm.name}</option>)}
+                </select>
+                <button onClick={loadPending} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 RELOAD</button>
+                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{pending.total} σε εκκρεμότητα</div>
+              </div>
+
+              {pendingLoading ? (
+                <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση...</div>
+              ) : pending.rows.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 60, background: "#f8f9fa", borderRadius: 16, color: G.muted }}>✅ Καμία εκκρεμότητα.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {pending.rows.map((row) => {
+                    const state = pendingRowState[row.id] || { category: "Άλλο", busy: false };
+                    const canApprove = !!row.suggestedProduct;
+                    const canCreateSku = !canApprove && !!row.rawImageUrl;
+                    const displayImg = row.suggestedProduct?.imageUrl || row.rawImageUrl;
+                    return (
+                      <div key={row.id} style={{ display: "grid", gridTemplateColumns: "60px 1fr auto", gap: 14, alignItems: "center", padding: 12, background: "#fff", border: "1px solid #eee", borderRadius: 12 }}>
+                        <div style={{ width: 60, height: 60, background: "#f8f9fa", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                          {displayImg && <img src={displayImg} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{row.rawName}</div>
+                          <div style={{ fontSize: 11, color: G.muted }}>
+                            {row.rawPrice}€ · {row.supermarket} · AI {Math.round(row.aiConfidence)}%
+                          </div>
+                          <div style={{ fontSize: 11, color: canApprove ? "#2d6a4f" : G.red, marginTop: 4 }}>
+                            {canApprove
+                              ? `→ ${row.suggestedProduct.name}`
+                              : canCreateSku
+                                ? "❌ Καμία αντιστοιχία — δημιούργησε νέο SKU"
+                                : "❌ Καμία αντιστοιχία και χωρίς εικόνα"}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {(canApprove || canCreateSku) && (
+                            <select
+                              value={state.category}
+                              onChange={(e) => setPendingRowState((s) => ({ ...s, [row.id]: { ...state, category: e.target.value } }))}
+                              style={{ ...inp, width: 180, padding: "6px 8px", fontSize: 12 }}
+                            >
+                              {CATEGORIES.filter(c => c.id !== 'all').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                            </select>
+                          )}
+                          {canApprove && (
+                            <button
+                              onClick={() => handleApprove(row)}
+                              disabled={state.busy}
+                              style={{ background: "#2d6a4f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}
+                            >
+                              {state.busy ? "..." : "✓ Approve"}
+                            </button>
+                          )}
+                          {canCreateSku && (
+                            <button
+                              onClick={() => handleCreateSku(row)}
+                              disabled={state.busy}
+                              style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}
+                            >
+                              {state.busy ? "..." : "🌟 Create SKU"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleReject(row)}
+                            style={{ background: "#fff", border: `1px solid ${G.red}`, color: G.red, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}
+                          >
+                            ✗ Reject
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {tab === "stats" && renderStatsTable()}
 
@@ -478,23 +665,38 @@ export function AdminPanel({ onBack }) {
                   <option value="all">All Stores</option>
                   {SUPERMARKETS.map(sm => <option key={sm.id} value={sm.id}>{sm.name}</option>)}
                 </select>
-                <button onClick={loadLibrary} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 LOAD PRODUCTS</button>
-                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{productTotal} items</div>
+                <button onClick={() => loadLibrary(true)} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 LOAD PRODUCTS</button>
+                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{products.length} of {productTotal}</div>
               </div>
-              {libLoading ? (
+              {libLoading && products.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 60, background: "#f8f9fa", borderRadius: 16 }}>⏳ Fetching products...</div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
-                  {products.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 40, color: "#888" }}>No products found in database.</div>}
-                  {products.map(p => (
-                    <div key={p.id} style={{ background: "#fff", borderRadius: 12, padding: 10, border: "1px solid #eee", textAlign: "center" }}>
-                      <div style={{ aspectRatio: "1/1", background: "#fff", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
-                        {p.imageUrl && <img src={p.imageUrl} alt="" style={{ width: "80%", height: "80%", objectFit: "contain" }} />}
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+                    {products.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 40, color: "#888" }}>No products found in database.</div>}
+                    {products.map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => setProductDetail(p)}
+                        style={{ background: "#fff", borderRadius: 12, padding: 10, border: "1px solid #eee", textAlign: "center", cursor: "pointer", transition: "transform 0.1s, box-shadow 0.1s" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.12)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; }}
+                      >
+                        <div style={{ aspectRatio: "1/1", background: "#fff", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+                          {p.imageUrl && <img src={p.imageUrl} alt="" style={{ width: "80%", height: "80%", objectFit: "contain" }} />}
+                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 700, height: "2.4em", overflow: "hidden", lineHeight: 1.2 }}>{p.name}</div>
                       </div>
-                      <div style={{ fontSize: 10, fontWeight: 700, height: "2.4em", overflow: "hidden", lineHeight: 1.2 }}>{p.name}</div>
+                    ))}
+                  </div>
+                  {products.length < productTotal && (
+                    <div style={{ textAlign: "center", marginTop: 18 }}>
+                      <button onClick={() => loadLibrary(false)} disabled={libLoading} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", cursor: libLoading ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, opacity: libLoading ? 0.6 : 1 }}>
+                        {libLoading ? "⏳ Loading..." : `Φόρτωσε κι άλλα (${productTotal - products.length} ακόμα)`}
+                      </button>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -517,19 +719,41 @@ export function AdminPanel({ onBack }) {
                       <th style={{ padding: 12 }}>Category</th>
                       <th style={{ padding: 12 }}>Price</th>
                       <th style={{ padding: 12 }}>Store</th>
+                      <th style={{ padding: 12 }}>Featured</th>
                       <th style={{ padding: 12 }}></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredList.map(d => (
-                      <tr key={d.id} style={{ borderTop: "1px solid #eee" }}>
-                        <td style={{ padding: 12 }}>{d.productName}</td>
-                        <td style={{ padding: 12 }}>{d.category}</td>
-                        <td style={{ padding: 12 }}>{d.discountedPrice}€</td>
-                        <td style={{ padding: 12 }}>{d.supermarket}</td>
-                        <td style={{ padding: 12 }}><button onClick={() => handleDelete(d.id)} style={{ color: G.red, background: "none", border: "none", cursor: "pointer" }}>🗑️</button></td>
-                      </tr>
-                    ))}
+                    {filteredList.map(d => {
+                      const featuredActive = d.isFeatured && (!d.featuredUntil || new Date(d.featuredUntil) > new Date());
+                      return (
+                        <tr key={d.id} style={{ borderTop: "1px solid #eee" }}>
+                          <td style={{ padding: 12 }}>{d.productName}</td>
+                          <td style={{ padding: 12 }}>{d.category}</td>
+                          <td style={{ padding: 12 }}>{d.discountedPrice}€</td>
+                          <td style={{ padding: 12 }}>{d.supermarket}</td>
+                          <td style={{ padding: 12 }}>
+                            <button
+                              onClick={() => handleToggleFeatured(d)}
+                              title={featuredActive && d.featuredUntil ? `έως ${new Date(d.featuredUntil).toLocaleDateString('el-GR')}` : ''}
+                              style={{
+                                background: featuredActive ? "#ffd60a" : "transparent",
+                                color: featuredActive ? "#1c1e24" : G.muted,
+                                border: featuredActive ? "1px solid #f5b800" : "1px solid #ddd",
+                                borderRadius: 6,
+                                padding: "4px 10px",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                                fontSize: 11,
+                              }}
+                            >
+                              {featuredActive ? `⭐ ${d.featuredLabel || 'Featured'}` : "☆ Feature"}
+                            </button>
+                          </td>
+                          <td style={{ padding: 12 }}><button onClick={() => handleDelete(d.id)} style={{ color: G.red, background: "none", border: "none", cursor: "pointer" }}>🗑️</button></td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -595,6 +819,39 @@ export function AdminPanel({ onBack }) {
         </div>
       </div>
       {msg.text && <div style={{ position: "fixed", bottom: 40, left: "50%", transform: "translateX(-50%)", background: msg.type === "error" ? G.red : "#1c1e24", color: "#fff", padding: "12px 24px", borderRadius: 12, fontWeight: 700, zIndex: 1000 }}>{msg.text}</div>}
+
+      {productDetail && (
+        <div
+          onClick={() => setProductDetail(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 480, width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, paddingRight: 16 }}>{productDetail.name}</h2>
+              <button onClick={() => setProductDetail(null)} style={{ background: "transparent", border: "none", fontSize: 24, cursor: "pointer", color: G.muted, lineHeight: 1, padding: 0 }}>✕</button>
+            </div>
+            {productDetail.imageUrl && (
+              <div style={{ background: "#f8f9fa", borderRadius: 12, padding: 16, marginBottom: 16, textAlign: "center" }}>
+                <img src={productDetail.imageUrl} alt="" style={{ maxWidth: "100%", maxHeight: 280, objectFit: "contain" }} />
+              </div>
+            )}
+            <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
+              <div><strong style={lbl}>Supermarket</strong>{productDetail.supermarket || "—"}</div>
+              {productDetail.barcode && <div><strong style={lbl}>Barcode</strong>{productDetail.barcode}</div>}
+              {productDetail.description && productDetail.description !== productDetail.name && (
+                <div><strong style={lbl}>Description</strong>{productDetail.description}</div>
+              )}
+              <div><strong style={lbl}>Product ID</strong><code style={{ fontSize: 11, color: G.muted }}>{productDetail.id}</code></div>
+              {productDetail.imageUrl && (
+                <a href={productDetail.imageUrl} target="_blank" rel="noreferrer" style={{ color: G.blue, fontSize: 12, fontWeight: 700 }}>Open image ↗</a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

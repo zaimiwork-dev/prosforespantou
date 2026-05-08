@@ -22,6 +22,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'masoutisimagesneu.blob.core.windows.net',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {

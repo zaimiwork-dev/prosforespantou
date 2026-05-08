@@ -3,18 +3,33 @@ import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { headers } from 'next/headers';
 
 const schema = z.object({
   email: z.string().email().max(254),
   source: z.string().max(64).optional(),
   preferredStores: z.array(z.string()).optional(),
+  // Honeypot — hidden input. Bots auto-fill it; humans never see it.
+  // Non-empty value = silent fake-success, no DB write.
+  website: z.string().max(254).optional(),
 });
 
 export async function subscribe(input: unknown) {
   return await Sentry.withServerActionInstrumentation('subscribe', { recordResponse: false }, async () => {
     try {
+      const ip = (await headers()).get('x-forwarded-for') || 'unknown';
+      if (!checkRateLimit(`subscribe:${ip}`, 5, 60_000)) {
+        return { success: false, rateLimited: true, error: 'Πολλές προσπάθειες' };
+      }
+
       const parsed = schema.safeParse(input);
       if (!parsed.success) return { success: false, error: 'Μη έγκυρο email' };
+
+      // Bot tripped the honeypot — fake-success so it stops retrying. No row written.
+      if (parsed.data.website && parsed.data.website.trim().length > 0) {
+        return { success: true, emailSent: false };
+      }
 
       const email = parsed.data.email.toLowerCase().trim();
       const existing = await prisma.subscriber.findUnique({ where: { email } });
@@ -37,10 +52,11 @@ export async function subscribe(input: unknown) {
         },
       });
 
-      // TODO: send confirmation email via Resend/Postmark/SES using sub.confirmToken.
+      // Phase 3 will replace this with a real provider send. Until then the URL is
+      // logged so the admin can hand-deliver it for the rare confirmation request.
       console.log(`Confirmation URL: ${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/subscribe/confirm?token=${sub.confirmToken}`);
 
-      return { success: true };
+      return { success: true, emailSent: false };
     } catch (error) {
       Sentry.captureException(error);
       return { success: false, error: 'Κάτι πήγε στραβά' };

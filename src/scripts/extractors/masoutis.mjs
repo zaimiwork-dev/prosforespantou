@@ -28,11 +28,15 @@ function deepSearchItems(obj, isDiscountContext = false) {
       else if (obj.images && Array.isArray(obj.images) && obj.images.length > 0 && obj.images[0].url) imageUrl = obj.images[0].url;
 
       if ((finalOriginalPrice || isNewDiscountContext) && imageUrl) {
+        const matches = [...imageUrl.matchAll(/_(\d{12,14})(?=[._])/g)];
+        const barcode = matches.find(m => m[1].length === 13)?.[1] || matches[matches.length - 1]?.[1] || null;
+
         items.push({
           rawName: obj.name,
           rawPrice: discountedPrice,
           originalPrice: finalOriginalPrice,
-          imageUrl: imageUrl
+          imageUrl: imageUrl,
+          barcode
         });
       }
     }
@@ -67,14 +71,16 @@ async function extract() {
         const json = JSON.parse($(el).text());
         const found = deepSearchItems(json, isProsforesFile);
         found.forEach(item => {
-           if (!allDeals.has(item.rawName)) {
-              allDeals.set(item.rawName, {
-                ...item,
-                supermarket: 'masoutis',
-                category: 'Άλλο'
-              });
-              count++;
-           }
+          const existing = allDeals.get(item.rawName);
+          const better = !existing || (item.originalPrice && !existing.originalPrice);
+          if (better) {
+            allDeals.set(item.rawName, {
+              ...item,
+              supermarket: 'masoutis',
+              category: 'Άλλο'
+            });
+            if (!existing) count++;
+          }
         });
       } catch (e) {}
     });
@@ -83,9 +89,16 @@ async function extract() {
   }
 
   const extractedDeals = Array.from(allDeals.values());
-  console.log(`✅ Extractor Agent: Pulled ${extractedDeals.length} total unique leaflet/offer deals.`);
-  
+  const withOriginal = extractedDeals.filter(d => d.originalPrice).length;
+  const withBarcode = extractedDeals.filter(d => d.barcode).length;
+  console.log(`✅ Extractor Agent: Pulled ${extractedDeals.length} unique deals (${withOriginal} with originalPrice, ${withBarcode} with barcode).`);
+
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(extractedDeals, null, 2));
+
+  const date = new Date().toISOString().slice(0, 10);
+  const archivePath = path.join(DATA_DIR, `extracted_masoutis_${date}.json`);
+  fs.writeFileSync(archivePath, JSON.stringify(extractedDeals, null, 2));
+  console.log(`📁 Archive copy: ${archivePath}`);
 }
 
 extract();
