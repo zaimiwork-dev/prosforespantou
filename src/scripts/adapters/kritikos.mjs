@@ -49,18 +49,18 @@ async function getCategoryTree() {
   return cats;
 }
 
-// Walk the tree, return [{ path: 'parent/child/leaf', offers }] for leaves with offers > 0.
-function collectLeafPaths(tree) {
+// Walk the tree and return EVERY node's path (all depths). We can't filter to
+// "leaves with offers" up-front because deep leaves often return SPA-fallback
+// HTML — products under those leaves are still reachable via a 2-level parent's
+// staticProducts (keyed by descendant ObjectId). The per-product offer filter
+// (toOfferItem) removes non-offers later.
+function collectAllPaths(tree) {
   const out = [];
-  function walk(node, path = []) {
-    const np = node.slugAscii ? [...path, node.slugAscii] : path;
-    const kids = node.subCategories || [];
-    if (kids.length === 0) {
-      const offers = node.numberOfProductsToDisplayWithOffer || 0;
-      if (offers > 0 && np.length) out.push({ path: np.join('/'), offers });
-    } else {
-      kids.forEach((k) => walk(k, np));
-    }
+  function walk(node, parents = []) {
+    if (!node.slugAscii) return;
+    const path = [...parents, node.slugAscii];
+    out.push({ path: path.join('/'), depth: path.length });
+    (node.subCategories || []).forEach((k) => walk(k, path));
   }
   tree.forEach((c) => walk(c, []));
   return out;
@@ -84,15 +84,24 @@ function productsFromCategoryJson(j) {
 
 // Kritikos product → contract OfferItem (or null to skip).
 function toOfferItem(p) {
-  // Skip products with no real price discount AND no offer sticker — they're
-  // just regular catalog items appearing in the category listing.
-  const hasPriceCut = p.finalPrice > 0 && p.beginPrice > p.finalPrice;
-  const hasSticker = !!(p.mobileSticker || p.webSticker);
-  if (!hasPriceCut && !hasSticker) return null;
   if (!p.available || !p.enabled) return null;
 
-  // Prices are in cents (integers). Use offerValue/bestPrice as float fallback.
-  const price = p.finalPrice ? p.finalPrice / 100 : p.offerValue || null;
+  // Primary offer signal: every product carries `offerType`, with "none" for
+  // regular catalog items. Real offer types observed: "amount" (single price
+  // cut), "percentage" (% off), "super" (multibuy / X-for-Y). Anything other
+  // than "none" / falsy is a genuine offer.
+  const isOnOffer = p.offerType && p.offerType !== 'none';
+  // Belt-and-braces: also treat any direct price cut or sticker as an offer,
+  // in case Kritikos adds new offerType values we don't know about yet.
+  const hasPriceCut = p.finalPrice > 0 && p.beginPrice > p.finalPrice;
+  const hasSticker = !!(p.mobileSticker || p.webSticker);
+  if (!isOnOffer && !hasPriceCut && !hasSticker) return null;
+
+  // Prices are in cents (integers). Fall back to offerValue (already a float)
+  // when finalPrice is missing.
+  const price = p.finalPrice ? p.finalPrice / 100 : (p.offerValue || null);
+  // beginPrice is only meaningful as an "originalPrice" when it's strictly
+  // higher than finalPrice — for multibuy super offers, they're often equal.
   const original = hasPriceCut ? p.beginPrice / 100 : null;
   if (!price || price <= 0) return null;
 
@@ -112,7 +121,7 @@ function toOfferItem(p) {
     unit: (p.quantity || '').trim() || null,
     category: p.category?.name?.trim() || 'Άλλο',
     imageUrl: img,
-    offerType: sticker || (p.offerType || null),
+    offerType: (p.offerType && p.offerType !== 'none') ? p.offerType : (sticker || null),
   };
 }
 
@@ -121,17 +130,17 @@ async function run() {
   const buildId = await getBuildId();
   console.log(`   buildId: ${buildId}`);
   const tree = await getCategoryTree();
-  const leaves = collectLeafPaths(tree);
-  const expectedOffers = leaves.reduce((s, l) => s + l.offers, 0);
-  console.log(`   ${leaves.length} leaf categories with offers (expected ~${expectedOffers} products)`);
+  const paths = collectAllPaths(tree);
+  console.log(`   ${paths.length} category paths total (all depths)`);
 
   const bySku = new Map();
-  let errs = 0;
-  for (let i = 0; i < leaves.length; i++) {
-    const { path } = leaves[i];
+  let errs = 0, jsonOk = 0, spaFallback = 0;
+  for (let i = 0; i < paths.length; i++) {
+    const { path } = paths[i];
     try {
       const j = await fetchCategoryJson(buildId, path);
-      if (!j) { continue; }
+      if (!j) { spaFallback++; continue; }
+      jsonOk++;
       for (const p of productsFromCategoryJson(j)) {
         if (p.sku) bySku.set(String(p.sku), p);
       }
@@ -139,13 +148,13 @@ async function run() {
       errs++;
       if (errs < 5) console.log(`\n   ⚠️  ${path} — ${e.message}`);
     }
-    if ((i + 1) % 25 === 0 || i === leaves.length - 1) {
-      process.stdout.write(`\r   leaf ${i + 1}/${leaves.length} — unique products: ${bySku.size}   `);
+    if ((i + 1) % 25 === 0 || i === paths.length - 1) {
+      process.stdout.write(`\r   path ${i + 1}/${paths.length} — unique products: ${bySku.size} | json=${jsonOk} spa=${spaFallback}   `);
     }
     if (bySku.size >= LIMIT) break;
     await new Promise((r) => setTimeout(r, PACE_MS));
   }
-  console.log(`\n   fetched ${bySku.size} unique products across ${leaves.length} categories (${errs} errors)`);
+  console.log(`\n   fetched ${bySku.size} unique products (${jsonOk} json paths, ${spaFallback} SPA-fallback, ${errs} errors)`);
 
   let items = [...bySku.values()].map(toOfferItem).filter((it) => it && it.name);
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
