@@ -126,6 +126,7 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(60);
   const { items: cart, addItem } = useShoppingListStore();
 
   const filtered = useMemo(() => {
@@ -145,6 +146,11 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
 
     return sortDeals(byCategory, sortBy);
   }, [initialDeals, activeCategory, sortBy, searchQuery]);
+
+  // Reset visible count when filters change
+  useMemo(() => setVisibleCount(60), [activeCategory, searchQuery, sortBy]);
+
+  const visibleDeals = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
   const biggestDiscount = useMemo(() => {
     return initialDeals.reduce((max, d) => Math.max(max, d.discountPercent ?? 0), 0);
@@ -280,7 +286,7 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
           <SortBar value={sortBy} onChange={setSortBy} totalCount={filtered.length} />
 
           <DealGrid
-            deals={filtered}
+            deals={visibleDeals}
             loading={false}
             loadingMore={false}
             onAdd={addItem}
@@ -289,6 +295,29 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
             emptyText="Δοκίμασε άλλη κατηγορία ή επίστρεψε αργότερα."
             onClearFilters={activeCategory !== "all" ? () => setActiveCategory("all") : null}
           />
+          
+          {visibleCount < filtered.length && (
+            <div style={{ textAlign: "center", marginTop: 40 }}>
+              <button
+                onClick={() => setVisibleCount(prev => prev + 60)}
+                style={{
+                  padding: "14px 32px",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  background: "#fff",
+                  color: sm.color,
+                  border: `2px solid ${sm.color}`,
+                  borderRadius: 14,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = sm.color; e.currentTarget.style.color = "#fff"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = sm.color; }}
+              >
+                Φόρτωση περισσότερων ({filtered.length - visibleCount} υπολείπονται)
+              </button>
+            </div>
+          )}
         </section>
       </main>
 

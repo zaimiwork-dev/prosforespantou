@@ -59,49 +59,72 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
-## Phase 4 — Agentic Ingestion & Matching (IN PROGRESS — Masoutis web cycle 1 done 2026-05-06; leaflet cycle 1 ~45% blocked on Groq quota)
+## Phase 4 — Per-chain adapters + shared pipeline (IN PROGRESS — Masoutis migrated 2026-05-26, AB built, Kritikos next)
 
-**Why:** Data staleness is the single biggest product risk. But we also want a perfectly clean database. Instead of treating every store's items as new products, we use the existing Wolt data as a "Master Catalog" and map new prices to it using AI.
+**Why:** Data staleness is the single biggest product risk. The old per-chain bespoke pipelines (Playwright fetcher → Cheerio extractor → LLM matcher per chain) didn't scale to 10 chains — every new chain meant rewriting 3 scripts and managing their interactions. The new approach: **one adapter per chain (does fetching + shape mapping only) → one shared pipeline (matching + DB writes + safety checks)**. Adding a chain becomes ~80 lines, not a 3-file project.
 
-**Architecture (decided 2026-04-26):**
-- `Discount.source` field (`'web'` / `'leaflet'` / `'manual'`) isolates each scraper's runs. End-of-run deactivation only touches its own source — leaflet matcher cannot wipe web data, and vice versa.
-- `Product` rows are still chain-specific (`supermarket = 'masoutis'`). Cross-chain canonical products are deferred until Lidl is added.
-- One product can have many active `Discount` rows (one per source). UI groups by `productId` to render a single card with multiple source tags.
+**Architecture (decided 2026-04-26, GTIN pivot 2026-05-11, adapter refactor 2026-05-26):**
 
-**Shipped (Masoutis web):**
-- ✅ Live fetcher [src/scripts/fetchers/masoutis.mjs](src/scripts/fetchers/masoutis.mjs) — Playwright + stealth, scrapes masoutis.gr/prosfores, dated HTML output to `library_data/`.
-- ✅ Web extractor [src/scripts/extractors/masoutis-web.mjs](src/scripts/extractors/masoutis-web.mjs) — Cheerio parser for the Angular DOM (`.product` / `.pDscntPrice` / `.pStartPrice`), produces matcher-ready JSON.
-- ✅ Hardened matcher [src/scripts/matchers/ollama-matcher.mjs](src/scripts/matchers/ollama-matcher.mjs) — local Gemma4 via Ollama, token-set pre-filter, UUID + candidate-list validation (kills hallucinations), 3× retry on Ollama errors, 3× retry on transient DB errors, update-in-place with reactivation, end-of-run stale-deactivation filtered by source.
-- ✅ `PriceSnapshot` written on every match.
-- ✅ Admin Review Queue UI: 🧐 Review tab in [src/components/AdminPanel.js](src/components/AdminPanel.js) — Approve / Create-SKU / Reject buttons per row.
-- ✅ Server actions: [list-pending-matches.ts](src/actions/admin/list-pending-matches.ts), [approve-pending-match.ts](src/actions/admin/approve-pending-match.ts), [reject-pending-match.ts](src/actions/admin/reject-pending-match.ts), [create-sku-from-pending.ts](src/actions/admin/create-sku-from-pending.ts).
-- ✅ `PendingMatch` upsert by `(rawName, supermarket)` — runs no longer accumulate duplicates.
+- `Discount.source` field (`'web'` / `'leaflet'` / `'manual'` / `'wolt'`) isolates each scraper's runs. End-of-run deactivation only touches its own source. The new adapters use `'web'` (and `'leaflet'` for leaflet flows).
+- `Product` is the canonical cross-chain table. `Product.barcode` (normalized GTIN-13) is `@unique` and is the primary cross-chain key.
+- One Product → many active Discount rows (one per source). UI groups by `productId`.
+- **`ChainProductMapping(supermarket, chainItemcode, productId)`** — stable per-chain SKU → Product lookup. Populated by the pipeline on any successful match. Makes re-ingestion idempotent and instant.
+- **GTIN-14 → GTIN-13 normalization mandatory** for any barcode write. `normalizeBarcode()` in [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs) AND [lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) — kept identical. Without it: cross-chain duplicate Products.
 
-**Shipped (Masoutis leaflet, 2026-05-01 → 2026-05-06):**
-- ✅ Leaflet fetcher [src/scripts/fetchers/masoutis-leaflet.mjs](src/scripts/fetchers/masoutis-leaflet.mjs) — same shape as web fetcher, hits `subitem=2`.
-- ✅ Leaflet extractor [src/scripts/extractors/masoutis-leaflet.mjs](src/scripts/extractors/masoutis-leaflet.mjs) — does NOT filter on `originalPrice` (single-price items are valid offers; see CONTEXT.md §4.1).
-- ✅ Source-isolated matching: `SOURCE=leaflet INPUT_FILE=./pending_masoutis_leaflet_deals.json node src/scripts/matchers/groq-matcher.mjs`.
-- ✅ Multi-source UI grouping shipped: [src/lib/group-deals.js](src/lib/group-deals.js) groups by `productId`; DiscountCard renders source-tag chips.
+**Adapter contract + shared pipeline (shipped 2026-05-26):**
 
-**Still to do:**
-- **Resume leaflet cycle 1** — partial run stopped at item 1041/2319 on 2026-05-06 (Groq daily quota burned). Cache from partial run will skip the first 1041 in next attempt. Re-run after quota reset OR over multiple days OR overnight via Ollama.
-- **Master catalog gaps** — Wolt-sourced library is missing personal care / hair / cosmetics. Either save more Wolt category pages OR rely on Create-SKU-from-pending for those items.
-- **Library viewer pagination** — Library tab fetches `limit: 100` so only a fraction of 1327 catalog items is browsable.
-- **Lidl extractor** — only after Masoutis (web + leaflet) is fully clean.
-- **Scheduled runs** — GitHub Actions / cron to run fetcher → extractor → matcher nightly.
+- [src/scripts/adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) — read-first rulebook for every chain adapter. Defines the `OfferItem` shape and the safety guarantees.
+- [src/scripts/lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) — shared pipeline. Exports `ingestOffers({chain, source, items, dryRun})`. Implements the matching waterfall (mapping → barcode → cache → PendingMatch), per-item writes, and the safety rules.
+
+**Per-item matching waterfall** (first hit wins):
+1. `ChainProductMapping` lookup `(chain, chainItemcode)` → instant
+2. `Product.barcode` lookup → records ChainProductMapping for next time
+3. `MatchCache` lookup `(name, chain)` → binds a ChainProductMapping too
+4. None → `PendingMatch` row (Review Queue). Pipeline NEVER invents a Product.
+
+**Safety guarantees:**
+- Adapter returns `[]` → abort, NOTHING deactivated.
+- Adapter returns < 50% of currently-active when active > 20 → writes happen, deactivation SKIPPED.
+- Soft delete only.
+- Source isolation: deactivation always filters `(supermarket, source)`.
+
+**Currently shipped:**
+
+| Chain | Adapter | Status | Notes |
+|---|---|---|---|
+| Masoutis | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) | ✅ LIVE | 152 active Discounts, 70 in Review Queue, verified correct. Replaces the old fetcher+extractor+groq-matcher path. **DO NOT run that old path alongside.** |
+| AB Vasilopoulos | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) | ⚠️ built, not run live | Dry-run OK: 394 real price discounts reachable (vs Wolt's 41). All would cold-start to Review Queue — needs LLM resolver first. |
+| Kritikos | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) | 🚧 draft, broken | Filter too strict (3/94 pass) + URL-depth issues. Decision: build canonical scraper first. |
+
+**Still to do (priority order):**
+
+1. **`kritikos-canonical-scraper.mjs`** — modeled on Wolt scraper. Walks all 8,216 Kritikos products, upserts by GTIN. Grows canonical catalog.
+2. **Fix Kritikos offers adapter** — loosen filter, handle SPA-fallback HTML responses.
+3. **Live-run Kritikos** — expect ~2,700 Discounts, ~100% barcode matches after step 1.
+4. **`resolve-pending-matches.mjs`** — LLM resolver as standalone infra (not Masoutis-specific like today's groq-matcher). Reads PendingMatch table, calls Groq with candidates, writes Discount + MatchCache + ChainProductMapping on success.
+5. **Live-run AB** — once resolver exists, the 394 PendingMatch items become Discounts.
+6. **AB persisted-query hash recovery** — automate re-capture when hash 404s.
+7. **Other Wolt-listed chains** — Sklavenitis, My Market, Market In via [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs). Trivial.
+8. **Lidl** — PDF leaflet OCR. May reuse existing Lidl cron with adapter-style payload.
+9. **Scheduled cron** for daily/weekly runs.
 
 **Do NOT:**
-- Auto-create new SKUs from the matcher (Gemma's "NEW" verdict). Route to Review Queue and let admin decide via Create-SKU button.
-- Delete `Discount` rows. Flip `isActive` so click history + PriceSnapshot history stay intact.
-- Conflate `web` and `leaflet` deactivation runs — always filter `where: { source }`.
+- Run the legacy Masoutis chain (`fetchers/masoutis.mjs → extractors/masoutis-web.mjs → matchers/groq-matcher.mjs`) alongside the new adapter — they both write `masoutis/web` Discounts and would stomp each other. The old `groq-matcher.mjs` is kept ONLY as a reference for building the standalone LLM resolver.
+- Create a Product row from a chain adapter without going through the matching waterfall. The pipeline routes unmatched items to `PendingMatch` — the LLM resolver (or admin Review tab) is the only legitimate path to a new Product.
+- Conflate sources. Always filter `(supermarket, source)` on deactivation.
+- Auto-create SKUs from any matcher's "NEW" verdict.
+- Delete `Discount` rows. Flip `isActive`.
+- Skip GTIN normalization on any barcode write.
+- Edit any adapter without first reading [adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md).
 
-**Exit:**
-- ✅ Masoutis web extractor + matcher end-to-end (done 2026-04-26).
-- ✅ Admin Review Queue UI functional (done 2026-04-26).
-- ✅ Masoutis leaflet fetcher + extractor + matcher wiring (done 2026-05-01).
-- ✅ Web cycle 1 with cache + auto-accept (done 2026-05-06).
-- ⏳ Leaflet cycle 1 — resume from item 1041 after Groq quota reset.
-- ⏳ Library tab pagination + Wolt catalog gaps closed (or workflow defined).
+**Exit (Phase 4 is "complete" when):**
+- ✅ Adapter contract + shared pipeline shipped (2026-05-26)
+- ✅ Masoutis on the new pipeline (2026-05-26)
+- ⏳ Kritikos canonical + adapter live
+- ⏳ AB live (after LLM resolver)
+- ⏳ ≥1 Wolt-only chain (Sklavenitis or My Market) live as baseline
+- ⏳ Scheduled cron running at least one chain daily without manual intervention
+- ⏳ Documented "add a new chain" recipe (probably just CONTRACT.md + a one-paragraph quickstart)
 
 ---
 
@@ -151,13 +174,16 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 3. **Surface placement:**
    - Offer detail page (`/offer/[id]`) — full comparison block.
    - DiscountCard modal — collapsed comparison summary "Επίσης σε X άλλα μαγαζιά".
-4. **Cross-chain canonicalization** of `Product` rows. Today `Product` is keyed by `(woltId)` and tagged with a `supermarket` slug, so the same physical SKU has N rows across N chains. Canonicalize via shared `barcode` (when present) OR a normalized name-and-quantity fingerprint. Add a `canonicalProductId` self-reference on `Product` rather than a destructive merge.
+4. **Cross-chain canonicalization** of `Product` rows. **2026-05-11 update:** `Product.barcode` is now `@unique` and gets populated from Wolt's `barcode_gtin` field — single canonical table, no `canonicalProductId` self-reference needed. Items not on Wolt (Lidl, fresh produce) fall back to fuzzy matching as before. Coverage measured: 99.7-99.8% of items have a real GTIN. See [CONTEXT.md §3.1](CONTEXT.md#31-wolt-primary-source-today) for the assortment-API recipe.
 
 **Do NOT:**
-- Merge `Product` rows destructively. `canonicalProductId` self-reference preserves per-chain product history (PriceSnapshot, Discount).
-- Match across chains using just rawName — too noisy. Require either matching `barcode` or matching normalized `(brandToken, primaryNoun, quantityToken)` triple.
+- Match across chains using just rawName — too noisy. Use `Product.barcode` first; only fall back to `(brandToken, primaryNoun, quantityToken)` triple when barcode is null on both sides.
+- Build the `canonicalProductId` self-reference. With Wolt as the canonical source it's no longer necessary — one `Product` row per real-world product, identified by `barcode`.
+- **NEW 2026-05-12**: build the cross-chain comparison UI on top of Wolt-strikethrough data alone. Wolt only exposes strikethrough discounts (`original_price > price`), which is ~5% of items. The dominant Greek-supermarket promo pattern is **ΜΟΝΟ-style offers** ("ΜΟΝΟ X.XX€", no strikethrough) which Wolt does NOT flag. Proved empirically by scanning 3,750 Masoutis items: 0 had any non-strikethrough promo signal. For complete offer coverage, the UI must consume chain-direct ingestion (masoutis.gr's offers API has explicit `OfferDescr: "μόνo"` flag).
 
 **Exit:** ELVIVE 400ml shampoo (or any popular cross-chain SKU) renders a single offer detail page showing prices from every chain that currently has it discounted, with the cheapest highlighted.
+
+**2026-05-12 status:** Phase 4.6 is blocked on chain-direct offer ingestion. The Wolt canonical catalog is ready (7,271 canonical Products, 373 shared between Masoutis and AB). What's missing is per-chain offer data that captures ΜΟΝΟ-style promos. The path forward is to adapt the existing masoutis web/leaflet matcher (which already detects `OfferDescr: "μόνο"`) to write Discounts linked to the new canonical Products via GTIN-first matching.
 
 ---
 

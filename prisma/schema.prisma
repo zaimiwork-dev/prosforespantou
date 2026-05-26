@@ -24,9 +24,15 @@ model Product {
   name        String
   description String?
   imageUrl    String?    @map("image_url")
-  barcode     String?
+  // GTIN-13/14 from Wolt's `barcode_gtin`. Canonical cross-chain key.
+  // NULL for items not yet linked to Wolt (Lidl, fresh produce, chain-exclusive).
+  barcode     String?    @unique
+  // Pre-extracted brand (Wolt manufacturerName / Masoutis BrandNameDescr).
+  brand       String?
+  // Unit info "650 g" / "1 L" — used for per-unit price display.
+  unitInfo    String?    @map("unit_info")
   woltId      String?    @unique @map("wolt_id")
-  supermarket String?    // The slug like "ab", "lidl"
+  supermarket String?    // legacy: first chain to surface this product. Deprecated, kept for back-compat.
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
   storeId     String     @db.Uuid @map("store_id")
@@ -35,10 +41,12 @@ model Product {
   priceSnapshots PriceSnapshot[]
   pendingMatches PendingMatch[]
   matchCache  MatchCache[]
+  chainMappings ChainProductMapping[]
 
   @@index([storeId])
   @@index([supermarket])
   @@index([updatedAt])
+  @@index([brand])
   @@map("products")
 }
 
@@ -184,6 +192,27 @@ model MatchCache {
   @@index([productId])
   @@index([lastUsedAt])
   @@map("match_cache")
+}
+
+// Maps each chain's internal SKU to a canonical Product. Stable identity layer:
+// re-ingesting Masoutis Itemcode "2160844" always hits the same Product row —
+// no fuzzy matching needed for items we've seen before. Populated by chain
+// scrapers after a successful GTIN match or LLM match. The matcher's per-item
+// fast path becomes:
+//   1) lookup (supermarket, chainItemcode) here → done if hit
+//   2) extract GTIN from chain image filename → Product.barcode match → done
+//   3) fall back to existing fuzzy MatchCache + LLM flow
+model ChainProductMapping {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String   @db.Uuid @map("product_id")
+  supermarket   String   // 'masoutis' | 'ab' | 'lidl' | ...
+  chainItemcode String   @map("chain_itemcode") // chain's internal SKU
+  createdAt     DateTime @default(now()) @map("created_at")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supermarket, chainItemcode])
+  @@index([productId])
+  @@map("chain_product_mappings")
 }
 
 model PendingMatch {

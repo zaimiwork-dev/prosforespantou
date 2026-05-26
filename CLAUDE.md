@@ -4,6 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## At the start of EVERY new session — read these before responding
+
+Before answering the user's first message in a new conversation, read **both** of these in this order:
+
+1. [CONTEXT.md](CONTEXT.md) — especially the `## ⚡ Pick up here` section at the top. This is the live state of the project: what shipped, what's in flight, what to do next, what bit us recently. The "Pick up here" section is rewritten regularly and is the single source of truth for current status.
+2. The pickup-state memory file linked from `MEMORY.md` (a short mirror of "Pick up here" for quick recall).
+
+Skipping this step is the #1 way a new session goes wrong — you'll miss in-flight pivots, recent architectural decisions, "Do NOT" rules added because of recent incidents, and which file to work on next. It costs ~5 seconds to read and prevents large mistakes.
+
+If the user's first message is a trivial chat ("hi", "what time is it"), you can skip — but if they're asking about the project or want to do any work, read CONTEXT.md first, then respond.
+
 ## Read these before non-trivial work
 
 - [CONTEXT.md](CONTEXT.md) — current state of the system: schema, conventions, what shipped vs what's in flight. Updated regularly.

@@ -58,3 +58,9 @@ next-env.d.ts
 /matcher_run_*.log
 /test-masoutis-*.mjs
 /test_masoutis_*.mjs
+
+# local agent state
+.claude/
+
+# stray installers
+public/logos/*.exe
