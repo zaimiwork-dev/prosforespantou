@@ -220,6 +220,10 @@ model PendingMatch {
   rawName            String   @map("raw_name")
   rawPrice           Float    @map("raw_price")
   supermarket        String
+  // Adapter-supplied brand (e.g. AB's manufacturerName). Persisted so the LLM
+  // resolver can do brand-aware matching for chains that strip the brand from
+  // the displayed product name. NULL when the adapter didn't have one.
+  brand              String?
   aiConfidence       Float?   @map("ai_confidence") // 0.0 to 100.0
   suggestedProductId String?  @db.Uuid @map("suggested_product_id")
   imageUrl           String?  @map("image_url")

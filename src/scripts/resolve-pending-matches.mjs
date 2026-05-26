@@ -110,6 +110,28 @@ function brandsMatch(rawFull, candFull) {
   return false;
 }
 
+// Brand-aware variant: when the adapter persisted a real brand (AB's
+// manufacturerName, Lidl's brand field, etc.), use THAT for the guard instead
+// of the first token of rawName. AB's "Σαλάτα Δροσερή" with brand "Σινάκου"
+// should match a candidate named "Σινάκου Σαλάτα Δροσερή" — first-token
+// matching would reject "Σαλάτα" vs "Σινάκου".
+function brandsMatchWithBrand(rawBrand, candFull) {
+  if (!rawBrand) return null; // caller falls back to brandsMatch(rawFull, candFull)
+  const a = normalizeBrandToken(rawBrand);
+  const candFirst = normalizeBrandToken((candFull || '').trim().split(/\s+/)[0]);
+  if (!a || !candFirst) return true;
+  if (a === candFirst) return true;
+  // Also allow if our brand token appears anywhere in the candidate name (some
+  // candidates have multi-word brands like "Δωδώνη Α.Ε.").
+  const candFlat = normalizeBrandToken(candFull || '');
+  if (candFlat.includes(a)) return true;
+  const aLatin = /^[a-z0-9]+$/.test(a);
+  const bLatin = /^[a-z0-9]+$/.test(candFirst);
+  if (aLatin && !bLatin) return transliterateLatinToGreek(a) === candFirst;
+  if (!aLatin && bLatin) return a === transliterateLatinToGreek(candFirst);
+  return false;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (s) => typeof s === 'string' && UUID_RE.test(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -144,8 +166,9 @@ async function callGroq(apiKey, prompt) {
   try { return { result: JSON.parse(text) }; } catch { return { error: `unparseable: ${text.slice(0, 200)}` }; }
 }
 
-function buildPrompt(rawName, rawPrice, candidates) {
+function buildPrompt(rawName, rawPrice, rawBrand, candidates) {
   const list = candidates.map((p) => `${p.id} | ${p.name}`).join('\n');
+  const brandLine = rawBrand ? `Brand: "${rawBrand}" (chain-supplied; may be missing from Name)\n` : '';
   return `
 You are an expert data matching AI for a Greek supermarket aggregator.
 Match a RAW extracted deal name against a short list of CANDIDATE PRODUCTS, and assign a CATEGORY.
@@ -154,7 +177,7 @@ CANDIDATE PRODUCTS (Format: ID | Name):
 ${list}
 
 RAW DEAL TO MATCH:
-Name: "${rawName}"
+${brandLine}Name: "${rawName}"
 Price: ${rawPrice}
 
 ALLOWED CATEGORIES (Pick exactly one):
@@ -225,12 +248,16 @@ async function run() {
     process.stdout.write(`[${i + 1}/${pending.length}] "${pm.rawName.slice(0, 60)}"... `);
 
     try {
+      // When the adapter supplied a real brand (e.g. AB's manufacturerName),
+      // include it in the token-overlap score so brand-stripped names like
+      // "Σαλάτα Δροσερή" still surface "Σινάκου Σαλάτα Δροσερή" candidates.
+      const effectiveName = pm.brand ? `${pm.brand} ${pm.rawName}` : pm.rawName;
       const top = candidates
-        .map((c) => ({ ...c, score: calculateOverlap(pm.rawName, c.name) }))
+        .map((c) => ({ ...c, score: calculateOverlap(effectiveName, c.name) }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 10);
 
-      const prompt = buildPrompt(pm.rawName, pm.rawPrice, top);
+      const prompt = buildPrompt(pm.rawName, pm.rawPrice, pm.brand, top);
 
       let llm = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
@@ -250,8 +277,21 @@ async function run() {
       if (llm.confidence >= 90 && isUuid(llm.suggestedProductId)) {
         const cand = top.find((c) => c.id === llm.suggestedProductId);
         if (!cand) { rejectReason = 'hallucinated UUID'; hallucinations++; }
-        else if (!brandsMatch(pm.rawName, cand.name)) { rejectReason = `brand mismatch ('${pm.rawName.split(/\s+/)[0]}' vs '${cand.name.split(/\s+/)[0]}')`; brandRejects++; }
-        else chosenProductId = llm.suggestedProductId;
+        else {
+          // Use brand-aware guard when the adapter persisted a brand;
+          // otherwise fall back to first-token matching.
+          const ok = pm.brand
+            ? brandsMatchWithBrand(pm.brand, cand.name)
+            : brandsMatch(pm.rawName, cand.name);
+          if (!ok) {
+            const expected = pm.brand || pm.rawName.split(/\s+/)[0];
+            const got = cand.name.split(/\s+/)[0];
+            rejectReason = `brand mismatch ('${expected}' vs '${got}')`;
+            brandRejects++;
+          } else {
+            chosenProductId = llm.suggestedProductId;
+          }
+        }
       } else if (llm.suggestedProductId === 'NEW' || llm.confidence < 90) {
         rejectReason = `low confidence (${llm.confidence}%, suggestion=${llm.suggestedProductId})`;
         lowConf++;
@@ -325,7 +365,7 @@ async function run() {
             rawName: pm.rawName,
             supermarket: CHAIN,
             productId: chosenProductId,
-            brandToken: normalizeBrandToken(pm.rawName.split(/\s+/)[0]) || null,
+            brandToken: normalizeBrandToken(pm.brand || pm.rawName.split(/\s+/)[0]) || null,
             source: 'llm',
           },
           update: { productId: chosenProductId, lastUsedAt: new Date(), source: 'llm' },

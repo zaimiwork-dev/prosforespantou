@@ -223,9 +223,14 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
             where: { rawName_supermarket: { rawName: item.name, supermarket: chain } },
             create: {
               rawName: item.name, rawPrice: item.price, supermarket: chain,
+              brand: item.brand || null,
               imageUrl: item.imageUrl || null,
             },
-            update: { rawPrice: item.price, imageUrl: item.imageUrl || null },
+            update: {
+              rawPrice: item.price,
+              brand: item.brand || null,
+              imageUrl: item.imageUrl || null,
+            },
           });
           report.reviewQueued++;
         } else {
