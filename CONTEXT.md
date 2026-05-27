@@ -459,7 +459,10 @@ Reads are tagged by string (match existing names in each action — grep before 
 - **Cross-chain price comparison UI.** Schema ready (one Product can have many active Discounts). Needs a query (`WHERE productId IN (...)`) + a comparison component on the offer detail page.
 - **Capacitor wrap → iOS/Android app.** End form per [§0](#0-product-vision-recorded-2026-05-01-directly-from-owner).
 - **Library tab pagination.** Admin Library tab fetches `limit: 100` so only a fraction of catalog items is browsable.
-- **Scheduled ingestion (cron).** No cron / GitHub Actions job for the new adapters. Pipeline still runs by hand.
+- **Scheduled ingestion (operationalised 2026-05-27).**
+  - **Vercel Cron** runs Masoutis (fits in the 300s function timeout): daily 06:00 UTC for web, weekly Thu 06:30 UTC for leaflet. Route: [src/app/api/cron/scrape-masoutis/route.ts](src/app/api/cron/scrape-masoutis/route.ts). Auth: `Authorization: Bearer ${CRON_SECRET}`.
+  - **GitHub Actions** runs the heavier adapters (Kritikos, AB, My Market, Sklavenitis) because they exceed Vercel's serverless timeout. Workflow: [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml). Requires repo secrets `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`. Schedules: Kritikos offers daily 02:00 UTC, AB offers + resolver daily 03:00 UTC, canonical scrapes weekly Sundays 04-06 UTC.
+  - Manual trigger for any chain: GitHub UI → Actions → "Scrape supermarket chains" → "Run workflow" → pick chain.
 - **Email sending.** Subscribers / alerts save fine, but no provider wired. Confirmation + alert emails currently log to console.
 - **Mobile leaflet viewer.** Desktop-first right now.
 - **Price history UI.** `PriceSnapshot` is populated by every matcher run, but nothing reads from it on the public site yet.

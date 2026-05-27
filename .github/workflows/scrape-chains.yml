@@ -1,0 +1,157 @@
+name: Scrape supermarket chains
+
+# Runs the heavier adapters that exceed Vercel's 300s serverless timeout.
+# Each schedule entry below maps to one job via `if: github.event.schedule`.
+# Manual triggers via workflow_dispatch let us re-run any chain on demand.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   DATABASE_URL   — Supabase pooler URL (port 6543, pgbouncer)
+#   DIRECT_URL     — Direct Postgres URL (port 5432) for migrations
+#   GROQ_API_KEY   — Groq Cloud key for AB LLM resolver
+#
+# Masoutis is NOT here — it fits in Vercel's timeout and runs as a cron route.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # daily 02:00 UTC — Kritikos offers
+    - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers + LLM resolver
+    - cron: '0 4 * * 0'   # weekly Sun 04:00 UTC — My Market canonical (Wolt)
+    - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis canonical (Wolt)
+    - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
+  workflow_dispatch:
+    inputs:
+      chain:
+        description: 'Which chain to run'
+        required: true
+        type: choice
+        options:
+          - kritikos-offers
+          - ab-offers
+          - mymarket-canonical
+          - sklavenitis-canonical
+          - kritikos-canonical
+          - ab-resolver-only
+
+permissions:
+  contents: read
+
+jobs:
+  kritikos-offers:
+    if: github.event.schedule == '0 2 * * *' || github.event.inputs.chain == 'kritikos-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/adapters/kritikos.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '150'
+
+  ab-offers:
+    if: github.event.schedule == '0 3 * * *' || github.event.inputs.chain == 'ab-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Run AB adapter
+        run: node src/scripts/adapters/ab.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Run LLM resolver on AB pending
+        # AB lacks GTIN, so every adapter run creates PendingMatch rows.
+        # The resolver turns most into Discounts; remainder go to admin Review.
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: ab
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  mymarket-canonical:
+    if: github.event.schedule == '0 4 * * 0' || github.event.inputs.chain == 'mymarket-canonical'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/wolt-canonical-scraper.mjs my-market mymarket
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '200'
+
+  sklavenitis-canonical:
+    if: github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'sklavenitis-canonical'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/wolt-canonical-scraper.mjs sklavenitis-gerakas sklavenitis
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '200'
+
+  kritikos-canonical:
+    if: github.event.schedule == '0 6 * * 0' || github.event.inputs.chain == 'kritikos-canonical'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/kritikos-canonical-scraper.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '150'
+
+  ab-resolver-only:
+    if: github.event.inputs.chain == 'ab-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: ab
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
