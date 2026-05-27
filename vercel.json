@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/scrape-lidl",
       "schedule": "0 7 * * 4"
+    },
+    {
+      "path": "/api/cron/scrape-masoutis",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-masoutis?source=leaflet",
+      "schedule": "30 6 * * 4"
     }
   ]
 }

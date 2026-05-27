@@ -8,6 +8,10 @@
 //   SOURCE=leaflet node src/scripts/adapters/masoutis.mjs   # leaflet offers (Φυλλαδίου)
 //   DRY_RUN=1 node src/scripts/adapters/masoutis.mjs    # fetch + match, no DB writes
 //
+// Programmatic (e.g. from a cron route):
+//   import { runMasoutisAdapter } from '@/scripts/adapters/masoutis.mjs';
+//   const report = await runMasoutisAdapter({ source: 'web', dryRun: false });
+//
 // How it works:
 //   1. GET /api/eshop/GetCred → { Uid, Usl, Key } (anonymous credential).
 //   2. POST /api/eshop/GetPromoItemWith... once per page. The body field
@@ -16,12 +20,7 @@
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
 
-const SOURCE = process.env.SOURCE === 'leaflet' ? 'leaflet' : 'web';
-const DRY_RUN = process.env.DRY_RUN === '1';
-const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-
 const BASE = 'https://www.masoutis.gr/api/eshop';
-const ITEMCODE_FILTER = SOURCE === 'leaflet' ? '0,2' : '0,1';
 const PAGE_SIZE = 50;
 const MAX_PAGES = 60; // safety cap
 
@@ -42,10 +41,10 @@ async function getCred() {
   return { uid: c.Uid, usl: c.Usl, key: c.Key };
 }
 
-async function fetchPage(cred, page) {
+async function fetchPage(cred, page, itemcodeFilter) {
   const body = {
     PassKey: 'Sc@NnSh0p',
-    Itemcode: ITEMCODE_FILTER,
+    Itemcode: itemcodeFilter,
     ItemDescr: '0',
     IfWeight: String(page),
     ServiceResponse: '', Token: '', Zip: '', BrandName: '', TeamId: '', ExtraFilter: '',
@@ -80,31 +79,39 @@ function toOfferItem(raw) {
   };
 }
 
-async function run() {
-  console.log(`🛒 Masoutis adapter — source=${SOURCE}${DRY_RUN ? ' (DRY_RUN)' : ''}`);
+// Programmatic entry — return the ingest report instead of exiting.
+export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit = Infinity, log = console.log } = {}) {
+  const itemcodeFilter = source === 'leaflet' ? '0,2' : '0,1';
+  log(`🛒 Masoutis adapter — source=${source}${dryRun ? ' (DRY_RUN)' : ''}`);
   const cred = await getCred();
-  console.log(`   credential ok (usl=${cred.usl})`);
+  log(`   credential ok (usl=${cred.usl})`);
 
   const byItemcode = new Map();
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const rows = await fetchPage(cred, page);
+    const rows = await fetchPage(cred, page, itemcodeFilter);
     for (const r of rows) {
       if (r.Itemcode != null) byItemcode.set(String(r.Itemcode), r);
     }
-    process.stdout.write(`\r   page ${page} — ${rows.length} rows — unique items: ${byItemcode.size}   `);
+    log(`   page ${page} — ${rows.length} rows — unique items: ${byItemcode.size}`);
     if (rows.length < PAGE_SIZE) break;
-    if (byItemcode.size >= LIMIT) break;
+    if (byItemcode.size >= limit) break;
     await new Promise((r) => setTimeout(r, 300));
   }
-  console.log('');
 
   let items = [...byItemcode.values()].map(toOfferItem).filter((it) => it && it.name);
-  if (items.length > LIMIT) items = items.slice(0, LIMIT);
-  console.log(`   ${items.length} offers ready to ingest`);
+  if (items.length > limit) items = items.slice(0, limit);
+  log(`   ${items.length} offers ready to ingest`);
 
-  const report = await ingestOffers({ chain: 'masoutis', source: SOURCE, items, dryRun: DRY_RUN });
-  printReport(report);
-  process.exit(report.healthOk ? 0 : 1);
+  return await ingestOffers({ chain: 'masoutis', source, items, dryRun });
 }
 
-run().catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
+// CLI behavior — only when this file is invoked directly via `node`.
+const isMain = process.argv[1] && /[\\/]masoutis\.mjs$/.test(process.argv[1]);
+if (isMain) {
+  const source = process.env.SOURCE === 'leaflet' ? 'leaflet' : 'web';
+  const dryRun = process.env.DRY_RUN === '1';
+  const limit = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
+  runMasoutisAdapter({ source, dryRun, limit })
+    .then((report) => { printReport(report); process.exit(report.healthOk ? 0 : 1); })
+    .catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
+}
