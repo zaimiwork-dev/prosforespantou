@@ -101,7 +101,7 @@ function expandSearch(query: string): string[] {
   return Array.from(expanded);
 }
 
-export async function searchDeals(query: string) {
+export async function searchDeals(query: string, supermarket?: string) {
   return await Sentry.withServerActionInstrumentation('searchDeals', { recordResponse: true }, async () => {
     if (!query || query.trim().length < 2) return [];
 
@@ -118,14 +118,19 @@ export async function searchDeals(query: string) {
       `);
 
       const joinedConditions = Prisma.join(conditions, ' OR ');
+      const supermarketClause = supermarket
+        ? Prisma.sql`AND supermarket = ${supermarket}`
+        : Prisma.empty;
+      const idLimit = supermarket ? 200 : 50;
 
       const rows = await prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM discounts
         WHERE is_active = true
           AND valid_until > NOW()
+          ${supermarketClause}
           AND (${joinedConditions})
         ORDER BY valid_until ASC
-        LIMIT 50
+        LIMIT ${idLimit}
       `;
 
       if (rows.length === 0) return [];

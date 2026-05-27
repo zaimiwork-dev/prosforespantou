@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useShoppingListStore } from "@/lib/store";
 import { ProductModal } from "@/components/ProductModal";
@@ -12,6 +12,7 @@ import { CategoryGrid } from "@/components/CategoryGrid";
 import { Footer } from "@/components/Footer";
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
+import { searchDeals } from '@/actions/search-deals';
 
 const GREEKLISH_MAP = {
   th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ',
@@ -120,35 +121,61 @@ function sortDeals(deals, sortBy) {
   return copy;
 }
 
-export default function SupermarketClient({ sm, initialDeals, leaflet }) {
+export default function SupermarketClient({ sm, initialDeals, totalCount, leaflet }) {
   const [sortBy, setSortBy] = useState("discount");
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(60);
+  // Server-side results for searches: covers the full chain catalog (the
+  // initialDeals prop is capped to top-500 best-discount items to keep the
+  // RSC payload mobile-sized). Null = not searched yet; [] = empty result.
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const { items: cart, addItem } = useShoppingListStore();
 
+  // Debounced server search across the chain's full catalog.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) { setSearchResults(null); setSearchLoading(false); return; }
+    setSearchLoading(true);
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const rows = await searchDeals(q, sm.id);
+        if (!cancelled) {
+          const serialized = (rows || []).map((d) => ({
+            ...d,
+            validFrom: d.validFrom?.toISOString?.() ?? d.validFrom,
+            validUntil: d.validUntil?.toISOString?.() ?? d.validUntil,
+            createdAt: d.createdAt?.toISOString?.() ?? d.createdAt,
+            updatedAt: d.updatedAt?.toISOString?.() ?? d.updatedAt,
+          }));
+          setSearchResults(serialized);
+        }
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearchLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [searchQuery, sm.id]);
+
   const filtered = useMemo(() => {
-    let byCategory = activeCategory === "all"
-      ? initialDeals
-      : initialDeals.filter((d) => d.category === activeCategory);
-
-    if (searchQuery.trim().length >= 2) {
-      const expandedTerms = expandSearch(searchQuery);
-
-      byCategory = byCategory.filter(d => {
-         const name = d.productName ? d.productName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-         const desc = d.description ? d.description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-         return expandedTerms.some(term => name.includes(term) || desc.includes(term));
-      });
-    }
-
+    // When the user is searching, render the server results (they cover the
+    // full catalog, not just the top-500 initialDeals). Otherwise filter the
+    // initial set by category and sort.
+    const base = searchResults ?? initialDeals;
+    const byCategory = activeCategory === "all"
+      ? base
+      : base.filter((d) => d.category === activeCategory);
     return sortDeals(byCategory, sortBy);
-  }, [initialDeals, activeCategory, sortBy, searchQuery]);
+  }, [initialDeals, searchResults, activeCategory, sortBy]);
 
   // Reset visible count when filters change
-  useMemo(() => setVisibleCount(60), [activeCategory, searchQuery, sortBy]);
+  useEffect(() => { setVisibleCount(60); }, [activeCategory, searchQuery, sortBy]);
 
   const visibleDeals = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
@@ -216,7 +243,7 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
           </div>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, fontWeight: 700, color: "rgba(28,30,36,0.85)" }}>
-            <span>{initialDeals.length} ενεργές</span>
+            <span>{totalCount ?? initialDeals.length} ενεργές</span>
             {biggestDiscount > 0 && (
               <>
                 <span style={{ opacity: 0.35 }}>•</span>
@@ -287,7 +314,7 @@ export default function SupermarketClient({ sm, initialDeals, leaflet }) {
 
           <DealGrid
             deals={visibleDeals}
-            loading={false}
+            loading={searchLoading && searchResults === null}
             loadingMore={false}
             onAdd={addItem}
             onSelect={setSelectedProduct}
