@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import * as Sentry from '@sentry/nextjs';
-// @ts-expect-error — .mjs adapter has no .d.ts; runtime resolution works.
 import { runMasoutisAdapter } from '@/scripts/adapters/masoutis.mjs';
 
 export const maxDuration = 300;
