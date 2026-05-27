@@ -8,14 +8,17 @@ import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
+import { getPriceComparison } from '@/actions/get-price-comparison';
 
 export function ProductModal({ product, onClose, onAdd }) {
   const [qty, setQty] = useState(1);
+  const [comparison, setComparison] = useState([]);
   const prevPathRef = useRef(null);
 
   useEffect(() => {
     if (!product) return;
     setQty(1);
+    setComparison([]);
     prevPathRef.current = window.location.pathname + window.location.search;
     const newUrl = `/offer/${product.id}`;
     window.history.pushState({ offerModal: product.id }, '', newUrl);
@@ -26,7 +29,16 @@ export function ProductModal({ product, onClose, onAdd }) {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
 
+    // Fetch cross-chain comparison in the background. Modal renders without
+    // it; the section appears once the action returns. Errors swallowed —
+    // a missing comparison is non-fatal.
+    let cancelled = false;
+    getPriceComparison(product.id)
+      .then((rows) => { if (!cancelled) setComparison(rows || []); })
+      .catch(() => {});
+
     return () => {
+      cancelled = true;
       window.removeEventListener('popstate', onPop);
       window.removeEventListener('keydown', onKey);
       if (window.history.state?.offerModal === product.id) {
@@ -135,6 +147,73 @@ export function ProductModal({ product, onClose, onAdd }) {
           <button type="button" className="btn btn-primary btn-lg modal-cta" onClick={handleAdd}>
             Προσθήκη στη λίστα
           </button>
+
+          {comparison.length > 0 && (() => {
+            const currentRow = {
+              id: product.id,
+              price: Number(discountedPrice),
+              sm,
+              isCurrent: true,
+            };
+            const otherRows = comparison.map((c) => {
+              const cSm = SUPERMARKETS.find((s) => s.id === c.supermarket) || { name: c.store?.name || '', color: '#888' };
+              return { id: c.id, price: Number(c.discountedPrice), sm: cSm, isCurrent: false };
+            });
+            const rows = [currentRow, ...otherRows].sort((a, b) => a.price - b.price);
+            const cheapest = rows[0];
+            return (
+              <section style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#8b929c', marginBottom: 8 }}>
+                  Σύγκριση τιμής
+                </div>
+                <div style={{ border: '1px solid #ececf0', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+                  {rows.map((row) => {
+                    const isCheapest = row.id === cheapest.id;
+                    const diff = row.price - cheapest.price;
+                    const body = (
+                      <>
+                        <div style={{ background: row.sm.color, color: '#fff', fontSize: 10, fontWeight: 900, padding: '3px 8px', borderRadius: 6, minWidth: 70, textAlign: 'center', letterSpacing: '0.3px' }}>
+                          {row.sm.name.toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {isCheapest && (
+                            <span style={{ background: '#22c55e', color: '#fff', fontSize: 9, fontWeight: 900, padding: '2px 6px', borderRadius: 5, letterSpacing: '0.3px' }}>
+                              ΦΘΗΝΟΤΕΡΑ
+                            </span>
+                          )}
+                          {row.isCurrent && (
+                            <span style={{ color: '#8b929c', fontSize: 10, fontWeight: 700 }}>Βλέπεις τώρα</span>
+                          )}
+                          {!isCheapest && diff > 0 && (
+                            <span style={{ color: '#ff3b30', fontSize: 10, fontWeight: 700 }}>+{diff.toFixed(2)}€</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 900, color: '#1c1e24', letterSpacing: '-0.2px' }}>
+                          {row.price.toFixed(2)}€
+                        </div>
+                      </>
+                    );
+                    const rowStyle = {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 12px',
+                      borderBottom: '1px solid #f3f5f8',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      background: row.isCurrent ? '#f6fbff' : '#fff',
+                      cursor: row.isCurrent ? 'default' : 'pointer',
+                    };
+                    return row.isCurrent ? (
+                      <div key={row.id} style={rowStyle}>{body}</div>
+                    ) : (
+                      <Link key={row.id} href={`/offer/${row.id}`} style={rowStyle}>{body}</Link>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })()}
 
           <Link href={`/offer/${product.id}`} className="modal-link">
             Δες αναλυτικά <Icon.ArrowRight size={12} />
