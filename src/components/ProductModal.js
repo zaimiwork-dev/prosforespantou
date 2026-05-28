@@ -9,16 +9,20 @@ import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { getPriceComparison } from '@/actions/get-price-comparison';
+import { getPriceHistory } from '@/actions/get-price-history';
+import { PriceHistory } from './PriceHistory';
 
 export function ProductModal({ product, onClose, onAdd }) {
   const [qty, setQty] = useState(1);
   const [comparison, setComparison] = useState([]);
+  const [history, setHistory] = useState(null);
   const prevPathRef = useRef(null);
 
   useEffect(() => {
     if (!product) return;
     setQty(1);
     setComparison([]);
+    setHistory(null);
     prevPathRef.current = window.location.pathname + window.location.search;
     const newUrl = `/offer/${product.id}`;
     window.history.pushState({ offerModal: product.id }, '', newUrl);
@@ -29,13 +33,19 @@ export function ProductModal({ product, onClose, onAdd }) {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
 
-    // Fetch cross-chain comparison in the background. Modal renders without
-    // it; the section appears once the action returns. Errors swallowed —
-    // a missing comparison is non-fatal.
+    // Background fetches: comparison + history. Modal renders without them;
+    // sections appear when actions return. Errors swallowed — both panels
+    // are nice-to-have, not critical.
     let cancelled = false;
+    const productId = product.productId || product.product?.id;
     getPriceComparison(product.id)
       .then((rows) => { if (!cancelled) setComparison(rows || []); })
       .catch(() => {});
+    if (productId) {
+      getPriceHistory(productId, { days: 90 })
+        .then((h) => { if (!cancelled) setHistory(h); })
+        .catch(() => {});
+    }
 
     return () => {
       cancelled = true;
@@ -214,6 +224,8 @@ export function ProductModal({ product, onClose, onAdd }) {
               </section>
             );
           })()}
+
+          <PriceHistory history={history} compact />
 
           <Link href={`/offer/${product.id}`} className="modal-link">
             Δες αναλυτικά <Icon.ArrowRight size={12} />

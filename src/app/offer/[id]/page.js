@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import OfferClientContent from "./OfferClientContent";
 import { getPriceComparison } from "@/actions/get-price-comparison";
+import { getPriceHistory } from "@/actions/get-price-history";
 import { unstable_cache } from 'next/cache';
 import { SUPERMARKETS } from "@/lib/constants";
 
@@ -81,7 +82,10 @@ export default async function OfferPage({ params }) {
     updatedAt: toIso(offer.updatedAt),
   };
 
-  const comparison = await getPriceComparison(id);
+  const [comparison, history] = await Promise.all([
+    getPriceComparison(id),
+    getPriceHistory(offer.productId, { days: 90 }),
+  ]);
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://prosforespantou.gr";
   const supermarketName = SUPERMARKETS.find(s => s.id === offer.supermarket)?.name || "Σούπερ Μάρκετ";
@@ -113,7 +117,7 @@ export default async function OfferPage({ params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(cleanJsonLd) }}
       />
-      <OfferClientContent offer={serializedOffer} comparison={comparison} />
+      <OfferClientContent offer={serializedOffer} comparison={comparison} history={history} />
     </>
   );
 }

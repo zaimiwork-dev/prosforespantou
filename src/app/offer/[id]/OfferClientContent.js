@@ -7,8 +7,9 @@ import { SUPERMARKETS } from "@/lib/constants";
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
+import { PriceHistory } from "@/components/PriceHistory";
 
-export default function OfferClientContent({ offer, comparison = [] }) {
+export default function OfferClientContent({ offer, comparison = [], history = null }) {
   const { items, addItem } = useShoppingListStore();
   const [added, setAdded] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -183,6 +184,8 @@ export default function OfferClientContent({ offer, comparison = [] }) {
             </button>
           </div>
         </div>
+
+        <PriceHistory history={history} />
 
         {comparison.length > 0 && (
           <section style={{ marginTop: 28 }}>
