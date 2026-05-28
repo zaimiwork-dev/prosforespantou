@@ -48,6 +48,18 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx prisma generate
+      - name: Sanity-check DATABASE_URL (host only, no creds)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node -e "
+            const url = process.env.DATABASE_URL || '';
+            console.log('DATABASE_URL set:', !!url);
+            console.log('DATABASE_URL length:', url.length);
+            console.log('starts with postgres://?:', url.startsWith('postgres'));
+            try { const u = new URL(url); console.log('host:', u.hostname); console.log('port:', u.port); console.log('db:', u.pathname); }
+            catch(e) { console.log('URL parse error:', e.message); console.log('first 30 chars:', url.slice(0,30)); }
+          "
       - run: node src/scripts/adapters/kritikos.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
