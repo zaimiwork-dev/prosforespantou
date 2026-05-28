@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { headers } from 'next/headers';
+import { sendConfirmationEmail } from '@/lib/email';
 
 const schema = z.object({
   email: z.string().email().max(254),
@@ -52,11 +53,10 @@ export async function subscribe(input: unknown) {
         },
       });
 
-      // Phase 3 will replace this with a real provider send. Until then the URL is
-      // logged so the admin can hand-deliver it for the rare confirmation request.
-      console.log(`Confirmation URL: ${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/subscribe/confirm?token=${sub.confirmToken}`);
-
-      return { success: true, emailSent: false };
+      // Send via Resend if configured; falls back to console.log otherwise so
+      // local dev still works without an API key.
+      const r = await sendConfirmationEmail(sub.email, sub.confirmToken, sub.unsubToken);
+      return { success: true, emailSent: r.ok };
     } catch (error) {
       Sentry.captureException(error);
       return { success: false, error: 'Κάτι πήγε στραβά' };

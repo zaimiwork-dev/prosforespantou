@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/session';
 import { revalidateTag } from 'next/cache';
 import { discountInputSchema } from '@/lib/validations/discount-input';
 import * as Sentry from "@sentry/nextjs";
+import { sendAlertEmail } from '@/lib/email';
 
 const SM_MAPPING: Record<string, string> = {
   ab: 'AB Vassilopoulos',
@@ -52,12 +53,28 @@ async function fireAlertsFor(discount: any) {
     return true;
   });
 
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://prosforespantou.gr';
+  const supermarketName = SM_MAPPING[discount.supermarket] || discount.supermarket;
+
   for (const a of matched) {
-    // console.log(`Alert triggered for ${a.subscriber.email}: ${discount.productName}`);
-    await prisma.alert.update({ 
-      where: { id: a.id }, 
-      data: { lastTriggeredAt: new Date() } 
+    // Mark triggered first to enforce the 6h cooldown even if email send fails.
+    await prisma.alert.update({
+      where: { id: a.id },
+      data: { lastTriggeredAt: new Date() },
     });
+
+    // Send the alert email — non-blocking errors only log.
+    sendAlertEmail({
+      email: a.subscriber.email,
+      unsubToken: a.subscriber.unsubToken,
+      keyword: a.keyword,
+      productName: discount.productName,
+      supermarketName,
+      discountedPrice: Number(discount.discountedPrice),
+      originalPrice: discount.originalPrice != null ? Number(discount.originalPrice) : null,
+      discountPercent: discount.discountPercent != null ? Number(discount.discountPercent) : null,
+      offerUrl: `${baseUrl}/offer/${discount.id}`,
+    }).catch(() => {});
   }
 }
 
