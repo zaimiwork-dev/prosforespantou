@@ -35,6 +35,11 @@ on:
 permissions:
   contents: read
 
+# Opt into Node 24 for the actions themselves (silences the deprecation
+# warning about checkout/setup-node running on Node 20 internally).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   kritikos-offers:
     if: github.event.schedule == '0 2 * * *' || github.event.inputs.chain == 'kritikos-offers'
