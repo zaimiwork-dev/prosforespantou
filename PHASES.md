@@ -36,30 +36,30 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
-## Phase 3 — Email delivery (NEXT)
+## Phase 3 — Email delivery (CODE SHIPPED 2026-06-04, ACTIVATION PENDING)
 
 **Why:** Phase 2 left confirmation + alert emails logging to console. Nothing monetization-related ships publicly until real mail goes out — the newsletter list is worthless without delivery, and alerts don't retain users without it.
 
-**Deliverables:**
-- Pick one provider: **Resend** (simplest), Postmark (best deliverability), or SES (cheapest at scale). Default recommendation: **Resend** for v1.
-- Add `RESEND_API_KEY` to `.env.local` (tell the user — do NOT edit env files).
-- Thin wrapper `src/lib/email.ts` exporting `sendConfirmation(sub)`, `sendAlert(sub, discount)`, `sendUnsubscribeReceipt(sub)`. Wrapper signs every send with the existing `unsubToken` for one-click unsubscribe.
-- Wire into [subscribe.ts](src/actions/subscribe.ts) (confirmation) and the alert matcher in [create-discount.ts](src/actions/admin/create-discount.ts).
-- DKIM/SPF records on the sending domain. Warm the domain on low volume before a public push.
-- Log every send as a `EmailEvent` row (type, subscriberId, sentAt, providerMessageId) so bounces / complaints have a paper trail.
+**Shipped:**
+- Provider: **Resend** (free tier 3k/mo, 100/day).
+- [src/lib/email.ts](src/lib/email.ts) — wraps Resend with Greek HTML+text templates for confirmation + price alerts. Falls back to console.log when `RESEND_API_KEY` unset (dev-friendly).
+- Wired into [subscribe.ts](src/actions/subscribe.ts) (confirmation on signup) and `fireAlertsFor()` in [create-discount.ts](src/actions/admin/create-discount.ts) (price-match notification, after 6h cooldown bookkeeping).
+- Env vars documented in [.env.example](.env.example): `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`.
+
+**Still pending for full activation:**
+- Add `RESEND_API_KEY` to Vercel env vars (currently emails fall back to console.log in production).
+- Verify a sending domain in Resend (`prosforespantou.gr`) and set `EMAIL_FROM="Prosfores Pantou <alerts@prosforespantou.gr>"`. Without this, the default `onboarding@resend.dev` only delivers to the Resend account holder.
+- Alerts currently fire only from admin `createDiscount`; bulk-pipeline (ingest-offers) writes don't trigger alerts by design (would mail-bomb users). Plan: separate daily cron pass that batches alerts off recent NEW Discounts. Not built yet.
 
 **Do NOT:**
 - Send any marketing before `confirmedAt` is set.
 - Reuse the confirmToken as the unsubscribe token. Separate tokens, already in schema.
 
-**Exit:**
-- Real confirmation email arrives within 30s of form submit.
-- Alert creates for a confirmed subscriber → when admin creates a matching discount, the email arrives.
-- Bounce on a fake address flips a flag (or at minimum logs to Sentry) and stops future sends.
+**Exit:** Real confirmation email arrives within 30s of form submit + alert creates → matching new Discount → email arrives.
 
 ---
 
-## Phase 4 — Per-chain adapters + shared pipeline (IN PROGRESS — Masoutis migrated 2026-05-26, AB built, Kritikos next)
+## Phase 4 — Per-chain adapters + shared pipeline (5 CHAINS LIVE 2026-06-04; coverage imbalance is the active gap)
 
 **Why:** Data staleness is the single biggest product risk. The old per-chain bespoke pipelines (Playwright fetcher → Cheerio extractor → LLM matcher per chain) didn't scale to 10 chains — every new chain meant rewriting 3 scripts and managing their interactions. The new approach: **one adapter per chain (does fetching + shape mapping only) → one shared pipeline (matching + DB writes + safety checks)**. Adding a chain becomes ~80 lines, not a 3-file project.
 
@@ -88,24 +88,33 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 - Soft delete only.
 - Source isolation: deactivation always filters `(supermarket, source)`.
 
-**Currently shipped:**
+**Currently shipped (2026-06-04 — 5,225 active Discounts across 5 chains):**
 
-| Chain | Adapter | Status | Notes |
+| Chain | Adapter | Active | Notes |
 |---|---|---|---|
-| Masoutis | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) | ✅ LIVE | 152 active Discounts, 70 in Review Queue, verified correct. Replaces the old fetcher+extractor+groq-matcher path. **DO NOT run that old path alongside.** |
-| AB Vasilopoulos | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) | ⚠️ built, not run live | Dry-run OK: 394 real price discounts reachable (vs Wolt's 41). All would cold-start to Review Queue — needs LLM resolver first. |
-| Kritikos | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) | 🚧 draft, broken | Filter too strict (3/94 pass) + URL-depth issues. Decision: build canonical scraper first. |
+| Kritikos | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) | **2,867 web** | GitHub Actions daily 02:00 UTC. 100% barcode-matched. Filter: `offerType !== 'none'`. |
+| Masoutis | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) | **2,015** (180 web + 1,835 leaflet) | Vercel Cron daily web 06:00 + weekly leaflet Thu 06:30 UTC. |
+| AB Vasilopoulos | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) | **255 web** | GitHub Actions daily 03:00 UTC, immediately chained with [resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs). ~70% resolution rate via brand-aware matching. |
+| My Market | (canonical only via Wolt) | **56 wolt-strikethrough** | Weekly Sun 04:00 UTC. Chain-direct adapter not built — biggest coverage win remaining. |
+| Sklavenitis | (canonical only via Wolt) | **32 wolt-strikethrough** | Weekly Sun 05:00 UTC. Chain-direct adapter not built. |
+| Lidl | [api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) | unclear | Vercel Cron Thu 07:00 UTC. Existing OCR cron bypasses ingest-offers. Rewire ~2h. |
 
-**Still to do (priority order):**
+**Infrastructure shipped 2026-05-26 → 2026-06-04:**
 
-1. **`kritikos-canonical-scraper.mjs`** — modeled on Wolt scraper. Walks all 8,216 Kritikos products, upserts by GTIN. Grows canonical catalog.
-2. **Fix Kritikos offers adapter** — loosen filter, handle SPA-fallback HTML responses.
-3. **Live-run Kritikos** — expect ~2,700 Discounts, ~100% barcode matches after step 1.
-4. **`resolve-pending-matches.mjs`** — LLM resolver as standalone infra (not Masoutis-specific like today's groq-matcher). Reads PendingMatch table, calls Groq with candidates, writes Discount + MatchCache + ChainProductMapping on success.
-5. **Live-run AB** — once resolver exists, the 394 PendingMatch items become Discounts.
-6. **AB persisted-query hash recovery** — automate re-capture when hash 404s.
-7. **Other Wolt-listed chains** — Sklavenitis, My Market, Market In via [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs). Trivial.
-8. **Lidl** — PDF leaflet OCR. May reuse existing Lidl cron with adapter-style payload.
+- LLM resolver [src/scripts/resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) — chain-agnostic; brand-aware via new `PendingMatch.brand` column (added 2026-05-27).
+- Kritikos canonical scraper [src/scripts/kritikos-canonical-scraper.mjs](src/scripts/kritikos-canonical-scraper.mjs) — 6,850 new canonical Products.
+- Kritikos offers adapter — broadened filter to `offerType !== 'none'`, walks full category tree.
+- Vercel Cron route [src/app/api/cron/scrape-masoutis/route.ts](src/app/api/cron/scrape-masoutis/route.ts).
+- GitHub Actions workflow [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml). Required repo secrets: `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`.
+
+**Still to do (priority order — chain coverage is the visible gap):**
+
+1. **Sklavenitis chain-direct adapter** — currently 32 (Wolt 5%); their site has full feed → expected 500-1,500. ~3h.
+2. **My Market chain-direct adapter** — same pattern, currently 56. ~3h.
+3. **Lidl pipeline rewire** — make existing OCR cron use ingest-offers (source isolation, MatchCache, PriceSnapshot). ~2h.
+4. **Bulk Review Queue admin actions** — clear ~1,172 pending rows. ~1h.
+5. **AB persisted-query hash auto-recovery** — automate re-capture when hash 404s.
+6. **Bazaar / Galaxias / Market In / Discount Markt** — Tier 3 — leaflet OCR if pursued at all.
 9. **Scheduled cron** for daily/weekly runs.
 
 **Do NOT:**
@@ -163,7 +172,7 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
-## Phase 4.6 — Cross-chain price comparison (NEW; elevated 2026-05-01 from competitor analysis)
+## Phase 4.6 — Cross-chain price comparison (SHIPPED 2026-05-27)
 
 **Why:** A competitor app already ships this as their headline feature (cross-chain price for a single product, "Φθηνότερο" badge on cheapest, % delta vs cheapest). Per the owner-validated product vision in [CONTEXT.md §0](CONTEXT.md#0-product-vision-recorded-2026-05-01-directly-from-owner), this is differentiator #1. Schema is already capable: a single `Product` can have many active `Discount` rows across `supermarket` slugs, and `MatchCache` will increasingly map raw names from different chains onto the same `productId` once cross-chain canonicalization happens.
 
@@ -185,11 +194,15 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 **2026-05-12 status:** Phase 4.6 is blocked on chain-direct offer ingestion. The Wolt canonical catalog is ready (7,271 canonical Products, 373 shared between Masoutis and AB). What's missing is per-chain offer data that captures ΜΟΝΟ-style promos. The path forward is to adapt the existing masoutis web/leaflet matcher (which already detects `OfferDescr: "μόνο"`) to write Discounts linked to the new canonical Products via GTIN-first matching.
 
+**2026-05-27 update — SHIPPED:** `getPriceComparison` already existed and queries by `productId`. ProductModal got the comparison block (was only on offer detail page). 67+ cross-chain Products with active multi-chain Discounts visible today. Will grow as Sklavenitis/My Market chain-direct adapters ship (Phase 4 priority list).
+
 ---
 
-## Phase 4.7 — Capacitor wrap → real iOS/Android app (NEW; per product vision §0)
+## Phase 4.7 — Capacitor wrap → real iOS/Android app (UPCOMING — gated on completion of the rest of Phase 4)
 
-**Why:** End form per [CONTEXT.md §0](CONTEXT.md#0-product-vision-recorded-2026-05-01-directly-from-owner) is a native app on App Store + Play Store. Native unlocks: push notifications for watch-list alerts, barcode scanner, app-store presence (huge for an elderly audience that finds apps via the store search). Doing this BEFORE the cross-chain comparison feature ships is wrong (no compelling app); doing it AFTER lets us launch with a real differentiator.
+**Owner alignment (2026-06-04):** Estimated 3-4 weeks to live on both stores. Sequence: finish remaining web items (Phase 3 activation, Phase 4 chain coverage, daily-deals widget, shopping-list pricing) → mobile UX audit → privacy policy + ToS → app icon + splash + screenshots → Capacitor wrap (1-2 days) → Apple/Google review (1-2 weeks).
+
+**Why:** End form per [CONTEXT.md §0](CONTEXT.md#0-product-vision-recorded-2026-05-01-directly-from-owner) is a native app on App Store + Play Store. Native unlocks: push notifications for watch-list alerts, barcode scanner, app-store presence (huge for an elderly audience that finds apps via the store search). The Phase 4.6 cross-chain comparison + Phase 6 price-history features are now shipped, so the app would launch with real differentiators on day 1 of TestFlight.
 
 **Why Capacitor and not React Native:** the current codebase is Next.js + JS components. Rewriting in RN is a 2-3 month project with high regression risk. Capacitor wraps the existing app as a real iOS/Android binary — same codebase, native shell, native plugins for push + barcode. Pragmatic 1-2 day wrap.
 
@@ -223,16 +236,21 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
-## Phase 6 — Price history UI
+## Phase 6 — Price history UI (SHIPPED 2026-06-04)
 
 **Why:** "Is this actually a good price?" is the #1 question after "what's on offer?". Phase 4 populated the data; now show it.
 
-**Deliverables:**
-- Tiny sparkline on `DiscountCard` showing last-30-day price.
-- Offer detail page gets a full chart + "lowest in last 90 days" badge.
-- Honest-price logic: if `discountedPrice` is within 2% of the 30-day median, suppress the "Χορηγούμενο" feel of the UI — users will learn the chip means "actually cheap", not just "in leaflet".
+**Shipped:**
+- [src/actions/get-price-history.ts](src/actions/get-price-history.ts) — returns last-N-day points, min/max/avg + verdict (lowest/good/fair/meh/high). Tuned for honesty: "lowest" only when current = window min; "high" warns when current > avg.
+- [src/components/PriceHistory.js](src/components/PriceHistory.js) — inline SVG sparkline (no charting dep), Greek verdict pill, plain summary line. `compact` prop for the tighter modal layout.
+- Rendered in `ProductModal` (background fetch on open) and the offer detail page (server-side in `Promise.all`).
+- Uses already-collected `PriceSnapshot` rows (~12,542 as of 2026-06-04, top products have 50-115 snapshots).
 
-**Exit:** a product that's been in the system ≥30 days shows a trend on its card.
+**Verified live:**
+- Heinz Mayo at €1.74 (range €1.74-€3.21) → ✓ "Χαμηλότερη τιμή που έχουμε δει"
+- Colgate Max White at €3.75 (range €1.68-€3.75) → ⚠ "Πάνω από τον μέσο όρο"
+
+**Renders only when ≥3 data points exist for a product** — newer chains' Discounts show nothing until 3 cycles have been ingested. Daily crons fix this naturally.
 
 ---
 
@@ -249,16 +267,11 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
-## Phase 8 — Scale beyond Wolt-listed chains
+## Phase 8 — Scale beyond Wolt-listed chains (PARTIALLY SHIPPED — see Phase 4 status)
 
-**Why:** Coverage is the moat. Chains not on Wolt (Bazaar, My Market, Kritikos, Galaxias) require their own ingestion paths.
+**Original goal:** ≥6 chains live with automated ingestion.
 
-**Deliverables:**
-- Per-chain adapter pattern under `src/scripts/adapters/{chain}.mjs`. Each adapter produces the same upsert shape the current Wolt scripts do.
-- At least one non-Wolt chain live.
-- Adapter contract documented so a contractor could add a new chain without touching core code.
-
-**Exit:** ≥6 chains live with automated ingestion.
+**2026-06-04 status: 5 chains live** (Kritikos, Masoutis, AB, My Market, Sklavenitis). Lidl has a cron but bypasses ingest-offers. Remaining Tier 1/2 gaps tracked in Phase 4's "Still to do" list. Tier 3 chains (Bazaar, Galaxias, Market In, Discount Markt) remain unaddressed — leaflet-OCR path via the Lidl pattern is the future option if pursued at all.
 
 ---
 

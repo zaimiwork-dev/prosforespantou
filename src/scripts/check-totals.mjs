@@ -1,0 +1,16 @@
+import 'dotenv/config';
+const { default: prisma } = await import('../lib/prisma.ts');
+const p = await prisma.product.count();
+const pwb = await prisma.product.count({ where: { barcode: { not: null } } });
+const m = await prisma.matchCache.count();
+const cm = await prisma.chainProductMapping.count();
+const pm = await prisma.pendingMatch.count();
+const ps = await prisma.priceSnapshot.count();
+const totalDisc = await prisma.discount.count({ where: { isActive: true, validUntil: { gt: new Date() } } });
+console.log(`Total active discounts: ${totalDisc}`);
+console.log(`Products total: ${p} (with barcode: ${pwb})`);
+console.log(`MatchCache rows: ${m}`);
+console.log(`ChainProductMapping rows: ${cm}`);
+console.log(`PendingMatch rows: ${pm}`);
+console.log(`PriceSnapshot rows: ${ps}`);
+await prisma.$disconnect();

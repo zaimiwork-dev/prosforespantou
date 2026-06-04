@@ -4,13 +4,13 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-05-26, end of session)
+## ⚡ Pick up here (2026-06-04, end of session)
 
-**Status: Adapter architecture shipped + Masoutis migrated to it (live, 152 Discounts). AB API cracked but not run live (cold-start needs LLM resolver). Kritikos in progress — pivoted to canonical-scraper-first approach.**
+**Status: 5 chains live, ~5,225 active Discounts, ~19,687 canonical Products. Pipeline self-running on Vercel Cron + GitHub Actions. Cross-chain comparison + price history + honest "actually cheap?" verdict shipped. Email delivery wired through Resend. Credentials rotated. Imbalanced coverage is the biggest visible gap (Kritikos dominates).**
 
 ### The shape of things now
 
-There's a new abstraction layer for chain ingestion. Read [src/scripts/adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) before touching anything chain-related.
+There's an abstraction layer for chain ingestion. Read [src/scripts/adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) before touching anything chain-related.
 
 ```
 chain adapter (per chain, ~100 lines) ──┐
@@ -21,46 +21,59 @@ chain adapter (per chain, ~100 lines) ──┐
                                          │                       4. fail → PendingMatch (Review Queue)
                                          │
                                          └─→ safety: zero items / suspiciously low → SKIP deactivation
+                                         
+PendingMatch rows are cleared by the LLM resolver
+[src/scripts/resolve-pending-matches.mjs] — chain-agnostic, brand-aware:
+  CHAIN=ab SOURCE=web node src/scripts/resolve-pending-matches.mjs
+  → Groq Llama-4 picks from top-10 candidates → writes Discount + MatchCache
 ```
 
 - Contract doc: [src/scripts/adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) — the rule every adapter follows.
-- Shared pipeline: [src/scripts/lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) — matching + writes + health checks. The ONLY place we write `Discount` rows from chain-direct adapters. Dry-run is truly read-only (verified 2026-05-26 after a bug fix).
-- Per-chain adapters live under [src/scripts/adapters/](src/scripts/adapters/).
+- Shared pipeline: [src/scripts/lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) — matching + writes + health checks. The ONLY place we write `Discount` rows from chain-direct adapters.
+- Per-chain adapters: [src/scripts/adapters/](src/scripts/adapters/).
+- LLM resolver: [src/scripts/resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) — runs as a separate pass over PendingMatch rows. Uses `PendingMatch.brand` (schema added 2026-05-27) for brand-aware matching on chains that strip brand from display name (AB).
 
-### Per-chain status
+### Per-chain status (2026-06-04)
 
-| Chain | Adapter | Last live run | Notes |
+| Chain | Adapter | Active Discounts | Notes |
 |---|---|---|---|
-| **Masoutis** | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) ✅ | **2026-05-26** — 238 fetched, 168 matched (collapsed to 152 distinct Discounts), 70 → Review Queue, 174 stale rows deactivated, 0 errors. Matches spot-checked correct. | Pure HTTP via `GetPromoItemWithListCouponsSubCategoriesAutoPromosv2`. `Itemcode` is the chainItemcode; **no barcode** in API. |
-| **AB Vasilopoulos** | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) ⚠️ built, NOT run live | Dry-run only: **394 real price discounts reachable** (filtered from 880 promos; ~56% are loyalty-points-only). 21× more than Wolt's 41 strikethroughs. **All 394 would go to Review Queue on first run** (cold-start — no AB items in MatchCache yet, no barcodes to deterministically match). | Apollo persisted-query hash replay (sustainable as long as AB doesn't redeploy frontend). Hash: `1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800`. **Fragility:** if AB redeploys, hash 404s → re-capture via probe + update `PQ_HASH` constant. |
-| **Kritikos** | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) 🚧 draft, NOT working | Smoke test: 94 products fetched, **only 3 passed the offer filter** — filter is wrong. | Products have `barcodes: string[]` ✅ — instant GTIN matching once filter is fixed. 8,216 total products / 2,719 discounted across 285 leaf categories. Backend API at `kritikos-cxm-production.herokuapp.com/api/v2/categories/tree`. **DECISION pending:** build `kritikos-canonical-scraper.mjs` FIRST (mirrors Wolt scraper) → grows canonical catalog → then offers adapter gets 100% barcode matches. |
-| **Lidl / Sklavenitis / My Market / Market In / Bazaar / Galaxias / e-fresh** | none yet | — | See "Sustainability tiers" below. |
+| **Kritikos** | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) ✅ | **2,867 (web)** | 100% barcode-matched via canonical scrape. Daily 02:00 UTC on GitHub Actions. Filter uses `offerType !== 'none'` (Kritikos default = "none"; real offers are amount/super/percentage). |
+| **Masoutis** | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) ✅ | **2,015** (180 web + 1,835 leaflet) | Daily 06:00 UTC web + weekly Thu 06:30 UTC leaflet, both on Vercel Cron. Leaflet adds the bulk via `Itemcode=0,2`. |
+| **AB Vasilopoulos** | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) ✅ | **255 (web)** | Daily 03:00 UTC on GitHub Actions, immediately followed by resolver in same job. Resolver gets ~70% resolution rate when brand is present in PendingMatch (vs 1.5% before brand column added 2026-05-27). |
+| **My Market** | (canonical only) | **56 (wolt strikethrough)** | Weekly Sun 04:00 UTC canonical scrape via `wolt-canonical-scraper.mjs my-market mymarket`. Only 5% of offers exposed via Wolt — chain-direct adapter is the next coverage win. |
+| **Sklavenitis** | (canonical only) | **32 (wolt strikethrough)** | Weekly Sun 05:00 UTC canonical via `sklavenitis-gerakas` venue slug. Same 5% exposure problem as My Market. |
+| **Lidl** | [api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) ⚠️ | unknown — last run unclear | Existing Vercel Cron (Thu 07:00 UTC) does Groq vision OCR on the printed leaflet. Writes Discounts directly without going through ingest-offers (no matching, no source isolation). **TODO: rewire through new pipeline.** |
+| **Bazaar / Galaxias / Market In / Discount Markt** | none | 0 | Tier 3 — no public API explored. Future leaflet-OCR via the same path as Lidl. |
 
-### Sustainability tiers (decided 2026-05-26)
+### Sustainability tiers (decided 2026-05-26, still current)
 
-- **Tier 1 — barcoded, set-and-forget:** Masoutis (live), Kritikos (in progress), any Wolt-sourced strikethrough feed. Zero LLM, ~99% deterministic, daily.
-- **Tier 2 — works but costlier:** AB direct (needs LLM resolver for cold-start, persisted-query hash needs occasional re-capture), Lidl PDF (vision OCR, weekly).
-- **Tier 3 — skip:** Bazaar, Galaxias, e-fresh, afroditi (no public API, tiny chains). Don't pursue.
+- **Tier 1 — barcoded, set-and-forget:** Kritikos ✅, Masoutis ✅ (via chainItemcode+cache, no GTIN in their API but rawName stable). Wolt-strikethrough scrapes for any chain on Wolt (My Market, Sklavenitis — current; AB Wolt also).
+- **Tier 2 — works but costlier:** AB direct ✅ (LLM resolver for the unmatched), Lidl PDF (vision OCR, weekly).
+- **Tier 3 — skip / future:** Bazaar, Galaxias, e-fresh, afroditi (no public API, tiny chains). Don't pursue unless via leaflet OCR.
 
-### Known immediate debt (must address before another chain)
+### Known immediate debt
 
-1. **Old `groq-matcher.mjs` and new `ingest-offers.mjs` both write `masoutis/web` Discounts** — they would fight if both ran. The new adapter REPLACES the old `fetcher → extractor → groq-matcher` path for Masoutis. **DO NOT run the old chain for Masoutis anymore.** The old matcher's role shrinks to "LLM resolver for PendingMatch rows" once we build that.
-2. **70 Masoutis Review Queue items pending** from today's run. Need either LLM resolver or admin Review-tab clicks.
-3. **AB persisted-query hash will eventually break.** Recovery script (re-capture + update `PQ_HASH`) is on the to-do list; today it's a manual `probe-ab-offers-capture.mjs` + edit.
-4. **Schema + docs are uncommitted to git** (CLAUDE.md, CONTEXT.md, PHASES.md, prisma/schema.prisma, src/components/SupermarketClient.js). DB and live schema agree, so no runtime risk — but a fresh clone won't have `ChainProductMapping` until `npx prisma db push`. **First-thing-in-next-session: consider committing.**
-5. **`src/components/SupermarketClient.js` uses `useMemo` to call `setVisibleCount`** when filters change ([line ~151](src/components/SupermarketClient.js#L151)). That's a React anti-pattern — should be `useEffect`. Works in practice; not blocking.
+1. **Chain coverage is heavily imbalanced.** Kritikos: 2,867. Everything else: 32-2,015. The two cheapest wins are **chain-direct adapters for Sklavenitis and My Market** — their websites have full offer feeds, not just the 5% Wolt slice. Each should add 500-1,500 Discounts. ~3h each per CONTEXT estimate.
+2. **1,172 PendingMatch rows accumulated.** Mostly genuine catalog gaps (personal care, niche brands) but bulk-approve admin UI would clear them faster than per-item clicks. Roadmap item.
+3. **Lidl pipeline doesn't use ingest-offers.** Writes Discounts directly, bypasses matching/cache/PriceSnapshot. Rewire is ~2h.
+4. **AB persisted-query hash will eventually break.** Manual recovery via [probe-ab-offers-capture.mjs](src/scripts/probe-ab-offers-capture.mjs) + edit `PQ_HASH` constant. Auto-recovery script not built.
+5. **`RESEND_API_KEY` not yet set in Vercel.** Email module ([src/lib/email.ts](src/lib/email.ts)) falls back to console.log silently — both confirmation and price-alert emails currently log only. To activate: get a Resend key, add as Vercel env var, optionally verify a domain and set `EMAIL_FROM`.
+6. **Alerts don't fire from the bulk pipeline.** `fireAlertsFor` only runs from admin `createDiscount` — bulk-adapter writes don't trigger emails. By design (would mail-bomb users) but means alerts only fire on manual entries. Plan: separate daily cron pass that batches alerts off recent new Discounts.
+7. **Old `groq-matcher.mjs` and new `ingest-offers.mjs` both write `masoutis/web` Discounts.** DO NOT run the old chain alongside the new adapter. Old matcher is now superseded by the chain-agnostic resolver.
 
-### Next concrete steps (priority order)
+### Next concrete steps (priority order — the "5 web items + chain coverage" roadmap)
 
-1. **Build `src/scripts/kritikos-canonical-scraper.mjs`** modeled on [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs). Walk all 8,216 Kritikos products, upsert into `Product` by barcode. Grows canonical catalog significantly with Kritikos-only items Wolt doesn't carry.
-2. **Fix [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs)**:
-   - Loosen the offer filter (today only `finalPrice < beginPrice || sticker` passes; needs to also accept `offerType` non-null and other signals)
-   - Investigate which URL depths serve real JSON vs Next.js SPA-fallback HTML (3-level paths like `proswpikh-frontida/swmatos/afroloutra.json` returned HTML in smoke test; 2-level worked)
-3. **Live-run the Kritikos adapter** — expect ~2,700 Discounts, ~100% barcode matches, near-zero Review Queue (after canonical scraper has seeded its products).
-4. **Build LLM resolver (`src/scripts/resolve-pending-matches.mjs`)** as standalone infrastructure. Reads PendingMatch table, calls Groq with top-N candidates, writes Discount + MatchCache + ChainProductMapping on success. **Unlocks AB live + every future barcode-less chain.**
-5. **Live-run the AB adapter** (394 PendingMatch rows → LLM resolves → visible Discounts).
-6. **Lidl** via leaflet PDF OCR (existing Lidl cron has this; might just need to wire it through the new pipeline).
-7. **Sklavenitis / My Market / Market In on Wolt** as a Tier 1 baseline. Re-use `wolt-canonical-scraper.mjs`.
+Pre-agreed sequence:
+
+1. ~~**Email delivery via Resend**~~ ✅ shipped 2026-06-04 (needs RESEND_API_KEY in Vercel to activate)
+2. ~~**Masoutis leaflet automation**~~ ✅ wired in vercel.json + ran 2026-06-04 (1,835 leaflet Discounts now active)
+3. **Shopping list cross-chain pricing** — when user adds item to list, show cheapest chain inline. Reuses `getPriceComparison`. ~1.5h.
+4. **Daily best deals widget on homepage** — top 10 deepest discounts across all chains. ~1h.
+5. **Sklavenitis chain-direct adapter** — biggest coverage win (32 → 500-1,500). Look at their offers page HTML/API. Probably needs HTML extraction since no obvious API. ~3h.
+6. **My Market chain-direct adapter** — same shape as Sklavenitis. ~3h.
+7. **Lidl pipeline rewire** — make existing OCR cron use ingest-offers. ~2h.
+8. **Bulk review-queue admin actions** — "Approve all" / "Reject all" per chain. ~1h.
+9. (Later) **Mobile UX audit**, **Capacitor wrap**, **App Store submission**.
 
 ### Per-chain offer-API field notes (for reference when re-building / debugging)
 
@@ -71,22 +84,44 @@ chain adapter (per chain, ~100 lines) ──┐
 **AB `ProductList` (PROMOTION_SEARCH)** (GET, plain HTTP, but needs `apollo-require-preflight: true` header to bypass Apollo CSRF guard):
 - Pagination: `pageNumber` 0..N, `lazyLoadCount: 10`. Use `pagination.totalPages` from response, NOT short-page-detection (page 2 had 9 in middle of 89).
 - Per item: `code`, `name`, `manufacturerName`, `firstLevelCategory.name`, `price.value` (regular), `price.discountedPriceFormatted` ("€6,08" — parse it for real price), `price.wasPrice` (often null even for discounts!), `images[]`, `potentialPromotions[]`.
-- `potentialPromotions[].promotionType` — filter to keep only price-affecting promos. ~70% are loyalty-points-only ("X Plus points for Y articles", "Fixed Points For Threshold Promotion") — skip those unless `INCLUDE_POINTS=1`.
-- **No barcode.** `code` is AB internal SKU.
+- `potentialPromotions[].promotionType` — filter to keep only price-affecting promos. ~56% are loyalty-points-only ("X Plus points for Y articles", "Fixed Points For Threshold Promotion") — skip those unless `INCLUDE_POINTS=1`.
+- **No barcode.** `code` is AB internal SKU. `manufacturerName` is the brand — adapter writes it to `PendingMatch.brand` so the resolver can match brand-stripped names.
 
 **Kritikos `_next/data/{buildId}/categories/{parent}/{child}.json`** (GET, plain HTTP, no auth):
 - `pageProps.staticProducts` is an OBJECT keyed by category MongoDB ObjectId → value is product array. `Object.values(sp).flat()` to get products.
 - Per item: `sku`, `name`, `brand`, `quantity`, **`barcodes: string[]`** (GTIN array, 1+ values), `finalPrice` & `beginPrice` in CENTS, `offerType`, `mobileSticker`, `webSticker`, `images.primary` + `images.baseUrl`.
+- **`offerType` values:** `"none"` (default — most items), `"amount"`, `"percentage"`, `"super"`. Filter as `offerType !== 'none'` — that's the real offer signal (not finalPrice<beginPrice, which misses multibuy "super" offers).
 - buildId: scrape from homepage HTML (`"buildId":"<id>"`). Self-heals across deploys.
-- Category tree: `https://kritikos-cxm-production.herokuapp.com/api/v2/categories/tree?collectionType=900` → `payload.categories[].subCategories[]` recursively. Use `numberOfProductsToDisplayWithOffer > 0` to skip empty leaves.
-- **OPEN QUESTION**: which category URL depths actually return JSON. Confirmed: 2-level (`categories/galaktokomika/giaourtia.json`). NOT confirmed: 3-level paths returned SPA fallback in smoke test. The canonical scraper should figure this out by trying all paths and tallying.
+- Category tree: `https://kritikos-cxm-production.herokuapp.com/api/v2/categories/tree?collectionType=900` → `payload.categories[].subCategories[]` recursively.
+- **URL depth note:** 3-level paths often return SPA-fallback HTML; their products are reachable via the 2-level parent's `staticProducts` (keyed by descendant ObjectId). Adapter walks ALL paths and filters per-product downstream.
+
+**Wolt assortment `consumer-api.wolt.com/consumer-api/consumer-assortment/v1/venues/slug/<venue>/assortment`** (GET, plain HTTP):
+- `categories` tree. Each cat slug → `/assortment/categories/slug/<slug>` → items[].
+- Per item: `id`, `name`, `description`, **`barcode_gtin`** (99.7% coverage on Masoutis-Makedonias). `price` and `original_price` in CENTS.
+- Known venue slugs: `masoutis-makedonias`, `ab-vasilopoulos-pylaia`, `my-market`, `sklavenitis-gerakas`.
+- Market In / Galaxias / Bazaar slugs not found via simple guessing.
+
+### Operations — cron schedule
+
+**Vercel Cron** (in [vercel.json](vercel.json)):
+- `/api/cron/scrape-lidl` — Thu 07:00 UTC (existing, pre-pipeline, writes Discounts directly)
+- `/api/cron/scrape-masoutis` — daily 06:00 UTC (web offers)
+- `/api/cron/scrape-masoutis?source=leaflet` — Thu 06:30 UTC (leaflet)
+
+**GitHub Actions** ([.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml)) — for adapters that exceed Vercel's 300s timeout:
+- daily 02:00 UTC — `kritikos-offers`
+- daily 03:00 UTC — `ab-offers` + resolver (chained in same job)
+- weekly Sun 04:00 UTC — `mymarket-canonical` (Wolt)
+- weekly Sun 05:00 UTC — `sklavenitis-canonical` (Wolt)
+- weekly Sun 06:00 UTC — `kritikos-canonical` (catalog refresh)
+- Workflow_dispatch trigger for manual re-runs of any chain.
+- Required GitHub repo secrets: `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`. Active since 2026-05-27.
 
 ### Carryover from earlier sessions
 
 - **GTIN-14 → GTIN-13 normalization** is mandatory in any scraper writing to `Product.barcode`. See `normalizeBarcode()` in [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs) and [ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs). Without it: cross-chain duplicate Products.
-- **7,271 distinct canonical Products** in DB at last count (Masoutis 3,620 + AB 3,431 + shared 373, all from Wolt scrapes 2026-05-12). 4,051 pre-pivot rows with `barcode = NULL` still untouched.
+- **~19,687 canonical Products** as of 2026-06-04 (15,636 with barcode). Catalog growth came from per-chain canonical scrapes: Masoutis-Makedonias (Wolt), AB-Pylaia (Wolt), Kritikos-canonical (direct, +6,850), My Market (Wolt, +1,446), Sklavenitis-Gerakas (Wolt). 4,051 pre-pivot rows with `barcode = NULL` still in DB.
 - **Wolt only exposes ~5% of offers (strikethrough)** — 94% of real Greek-chain offers are ΜΟΝΟ-style and need chain-direct adapters. That's the whole point of this architecture.
-- **Cleanup done 2026-05-26**: 28 `.log` files, 5 `debug-html*` scripts, 1 throwaway probe deleted. 24 older `probe-*`/`check-*`/`investigate-*` scripts left intact (some preserved by design per earlier CONTEXT).
 
 **Architecture status — what shipped during 2026-05-01 → 2026-05-06:**
 
@@ -440,35 +475,47 @@ Reads are tagged by string (match existing names in each action — grep before 
 - [x] **Wolt canonical catalog (2026-05-11/12)** — `wolt-canonical-scraper.mjs` walks any venue's assortment, upserts Products by GTIN. 7,271 distinct canonical Products ingested from Masoutis Makedonias + AB Pylaia (373 shared cross-chain).
 - [x] **Schema GTIN-pivot (pushed 2026-05-11)** — `Product.barcode @unique` + `Product.brand` + `Product.unitInfo` + `ChainProductMapping` table.
 - [x] **Adapter contract + shared pipeline (2026-05-26)** — [adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) + [lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs). One adapter per chain, all feed into the same matching+writes+safety code.
-- [x] **Masoutis migrated to adapter (2026-05-26)** — [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) live, 152 active Discounts (verified correct via [verify-masoutis-matches.mjs](src/scripts/verify-masoutis-matches.mjs)). Pure HTTP, no Playwright. Replaces old fetcher+extractor+matcher chain.
-- [x] **AB GraphQL cracked (2026-05-26)** — [adapters/ab.mjs](src/scripts/adapters/ab.mjs) built (not run live). 394 real price discounts reachable via Apollo persisted-query hash replay. ~21× more than Wolt's 41.
+- [x] **Masoutis chain-direct adapter (2026-05-26)** — pure HTTP, no Playwright. Web + leaflet via `Itemcode=0,1` / `0,2`. Daily/weekly Vercel Cron.
+- [x] **Kritikos canonical scraper + offers adapter (2026-05-26/27)** — 6,850 new canonical Products, then 2,902 offers all barcode-matched on first live run (~100% deterministic, 0 Review Queue). Filter uses `offerType !== 'none'`.
+- [x] **AB Vasilopoulos live ingestion (2026-05-26/27)** — adapter + LLM resolver pipeline. 394 promo rows → ~70% resolved into Discounts on each run.
+- [x] **LLM resolver (`src/scripts/resolve-pending-matches.mjs`, 2026-05-27)** — chain-agnostic, brand-aware. Reads PendingMatch, asks Groq with top-10 candidates, writes Discount + MatchCache. **Brand column added to PendingMatch** so chains that strip brand from name (AB) still resolve correctly.
+- [x] **Wolt canonical scrapes for cross-chain catalog growth** — Masoutis-Makedonias + AB-Pylaia (2026-05), My Market + Sklavenitis-Gerakas (2026-05-27). ~19,687 Products as of 2026-06-04.
+- [x] **Operationalised ingestion (2026-05-27)** — Vercel Cron (Masoutis) + GitHub Actions (Kritikos, AB+resolver, canonical scrapes). Manual `workflow_dispatch` trigger.
+- [x] **Cross-chain price comparison UI (2026-05-27)** — `getPriceComparison` already existed; surfaced into ProductModal (was only on offer detail page). 67+ cross-chain Products with active comparison.
+- [x] **Supermarket page payload cap (2026-05-27)** — `take: 500` server-side fetch + `searchDeals(query, supermarket)` server action for full-catalog search. Kritikos page dropped 4.4 MB → 1.06 MB (~70% smaller).
+- [x] **Price history sparkline + "actually cheap?" verdict (2026-06-04)** — uses already-collected PriceSnapshot data (~12,542 rows). Component renders in modal + offer page. Honest verdicts: green when at window-min, red when above average.
+- [x] **Email delivery via Resend (2026-06-04)** — [src/lib/email.ts](src/lib/email.ts) wraps Resend with Greek HTML+text templates for confirmation + price alerts. Wired into `subscribe.ts` and `fireAlertsFor`. Falls back to console.log when `RESEND_API_KEY` is unset (dev-friendly).
+- [x] **Credential rotation tooling exercised (2026-05-27)** — Groq + Supabase DB passwords rotated successfully without downtime.
 
 ---
 
 ## 7. What's not done yet
 
-- **Kritikos canonical scraper.** Decided 2026-05-26: build `src/scripts/kritikos-canonical-scraper.mjs` (modeled on Wolt's) before finalizing the Kritikos adapter. Kritikos has barcodes on every product, so canonical-first → offer adapter gets 100% deterministic matches.
-- **Kritikos offers adapter fixes.** Draft at [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) — filter too strict (passed 3/94 in smoke test), and some 3-level category URLs return Next.js SPA fallback HTML instead of JSON. Both diagnosable while building the canonical scraper.
-- **LLM resolver (`src/scripts/resolve-pending-matches.mjs`).** Reusable infrastructure that reads `PendingMatch` rows, calls Groq with candidates, writes Discount + MatchCache + ChainProductMapping. Unlocks AB live + every future barcode-less chain. Today's old `groq-matcher.mjs` does this for a single hardcoded Masoutis JSON file — needs generalization.
-- **AB live run.** 394 PendingMatch rows would be created on first run; LLM resolver needed first.
-- **AB persisted-query hash auto-recovery.** Today: manual `probe-ab-offers-capture.mjs` + edit constant in adapter. Future: a recovery script that re-captures and updates automatically when the hash 404s.
-- **70 Masoutis Review Queue items** from today's run. Either run LLM resolver (when it exists) or click through admin Review tab.
-- **Sklavenitis / My Market / Market In on Wolt.** Re-use `wolt-canonical-scraper.mjs` to grow the catalog and capture strikethroughs. Plain copies of the Masoutis-on-Wolt pattern.
-- **Lidl direct.** PDF leaflet via vision OCR. Existing Lidl cron at [src/app/api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) — may just need to be wired through the new pipeline (or kept separate as a leaflet flow).
-- **Bazaar / Galaxias / e-fresh / afroditi.** Tier 3 — no public API. Skip indefinitely or PDF-only later.
-- **Cross-chain price comparison UI.** Schema ready (one Product can have many active Discounts). Needs a query (`WHERE productId IN (...)`) + a comparison component on the offer detail page.
-- **Capacitor wrap → iOS/Android app.** End form per [§0](#0-product-vision-recorded-2026-05-01-directly-from-owner).
-- **Library tab pagination.** Admin Library tab fetches `limit: 100` so only a fraction of catalog items is browsable.
-- **Scheduled ingestion (operationalised 2026-05-27).**
-  - **Vercel Cron** runs Masoutis (fits in the 300s function timeout): daily 06:00 UTC for web, weekly Thu 06:30 UTC for leaflet. Route: [src/app/api/cron/scrape-masoutis/route.ts](src/app/api/cron/scrape-masoutis/route.ts). Auth: `Authorization: Bearer ${CRON_SECRET}`.
-  - **GitHub Actions** runs the heavier adapters (Kritikos, AB, My Market, Sklavenitis) because they exceed Vercel's serverless timeout. Workflow: [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml). Requires repo secrets `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`. Schedules: Kritikos offers daily 02:00 UTC, AB offers + resolver daily 03:00 UTC, canonical scrapes weekly Sundays 04-06 UTC.
-  - Manual trigger for any chain: GitHub UI → Actions → "Scrape supermarket chains" → "Run workflow" → pick chain.
-- **Email sending.** Subscribers / alerts save fine, but no provider wired. Confirmation + alert emails currently log to console.
+### Chain coverage (the biggest visible gap — Kritikos dominates)
+- **Sklavenitis chain-direct adapter** — currently 32 Discounts (Wolt strikethrough only). Their website has the full feed; needs HTML extraction or hidden API discovery. Expected ~500-1,500 Discounts. ~3h.
+- **My Market chain-direct adapter** — same pattern as Sklavenitis. Currently 56. Expected ~500-1,500. ~3h.
+- **Lidl pipeline rewire** — existing OCR cron at [src/app/api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) writes Discounts directly without `ingest-offers`. Rewire would give source isolation + MatchCache + PriceSnapshot. ~2h.
+- **Bazaar / Galaxias / Market In / Discount Markt** — Tier 3, no public API. Leaflet OCR via Lidl-style cron is the future path.
+
+### Product features
+- **Shopping list cross-chain pricing** — when item is added, show cheapest chain inline (reuse `getPriceComparison`). ~1.5h.
+- **Daily best deals widget on homepage** — top 10 deepest-discount Discounts across all chains. ~1h.
+- **Bulk Review Queue admin actions** — "Approve all / Reject all" per chain to clear the ~1,172 pending rows. ~1h.
+- **Mobile UX audit** — tap targets, card density, scroll perf. Required before native app submission.
+- **Capacitor wrap → iOS/Android app** — end form per [§0](#0-product-vision-recorded-2026-05-01-directly-from-owner). After web feels complete + mobile pass.
 - **Mobile leaflet viewer.** Desktop-first right now.
-- **Price history UI.** `PriceSnapshot` is populated by every matcher run, but nothing reads from it on the public site yet.
 - **Analytics charts.** Admin Αναλυτικά is a plain table.
 - **Public-facing partner dashboard.** Supermarkets can't see their own numbers yet.
-- **Commit uncommitted local changes.** Today's session left CLAUDE.md, CONTEXT.md, PHASES.md, prisma/schema.prisma, src/components/SupermarketClient.js modified but uncommitted. DB and live schema agree, but a fresh clone needs `npx prisma db push` before the app runs.
+- **Library tab pagination.** Admin Library tab fetches `limit: 100` so only a fraction of catalog items is browsable.
+
+### Email + alerts
+- **`RESEND_API_KEY` not yet set in Vercel.** Email module silently falls back to console.log; in production this means no confirmation or alert emails go out. Activate by adding the env var in Vercel.
+- **Verified sender domain.** Currently `EMAIL_FROM` defaults to `onboarding@resend.dev` which Resend only delivers to the account holder. Need to verify `prosforespantou.gr` in Resend for real user delivery.
+- **Alert firing from bulk pipeline.** Currently alerts only fire from admin `createDiscount`. Bulk-adapter writes don't trigger emails by design (would spam). Needs a separate daily cron pass that batches alerts off recent new Discounts.
+
+### Ops debt
+- **AB persisted-query hash auto-recovery.** Manual via `probe-ab-offers-capture.mjs` + edit `PQ_HASH` constant.
+- **Old `groq-matcher.mjs`** — superseded by the chain-agnostic resolver. Keep for reference but DO NOT run alongside the new adapter for the same source.
 
 ---
 
@@ -486,10 +533,17 @@ Reads are tagged by string (match existing names in each action — grep before 
 | Shopping list store | [src/lib/store.js](src/lib/store.js) |
 | Adapter contract | [src/scripts/adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) — read before writing/modifying a chain adapter |
 | Shared ingest pipeline | [src/scripts/lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) — only place chain-direct adapters write to DB |
-| Per-chain adapters | [src/scripts/adapters/](src/scripts/adapters/) — `masoutis.mjs` (live), `ab.mjs` (built), `kritikos.mjs` (draft) |
+| Per-chain adapters | [src/scripts/adapters/](src/scripts/adapters/) — `masoutis.mjs` ✅, `ab.mjs` ✅, `kritikos.mjs` ✅ live; Sklavenitis + My Market direct adapters not built yet |
+| LLM resolver (chain-agnostic) | [src/scripts/resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) — `CHAIN=ab SOURCE=web node ...`. Brand-aware via `PendingMatch.brand`. |
 | Canonical (Wolt) scraper | [src/scripts/wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs) — `<venue-slug> [chain-slug]` args. Use for any Wolt-listed chain. |
+| Kritikos canonical scraper | [src/scripts/kritikos-canonical-scraper.mjs](src/scripts/kritikos-canonical-scraper.mjs) — walks the full Kritikos category tree, upserts Products by GTIN. |
 | Verify match correctness | [src/scripts/verify-masoutis-matches.mjs](src/scripts/verify-masoutis-matches.mjs) — pattern for spot-checking any chain's matches |
-| LEGACY Masoutis pipeline (DO NOT run alongside new adapter) | [fetchers/masoutis.mjs](src/scripts/fetchers/masoutis.mjs), [extractors/masoutis-web.mjs](src/scripts/extractors/masoutis-web.mjs), [matchers/groq-matcher.mjs](src/scripts/matchers/groq-matcher.mjs) — kept for reference + future LLM-resolver source. |
+| LEGACY Masoutis pipeline (DO NOT run alongside new adapter) | [fetchers/masoutis.mjs](src/scripts/fetchers/masoutis.mjs), [extractors/masoutis-web.mjs](src/scripts/extractors/masoutis-web.mjs), [matchers/groq-matcher.mjs](src/scripts/matchers/groq-matcher.mjs) — kept for reference. |
+| Email delivery | [src/lib/email.ts](src/lib/email.ts) — Resend wrapper. `sendConfirmationEmail` + `sendAlertEmail`. |
+| Cross-chain comparison | [src/actions/get-price-comparison.ts](src/actions/get-price-comparison.ts) + render in [ProductModal.js](src/components/ProductModal.js) and [OfferClientContent.js](src/app/offer/%5Bid%5D/OfferClientContent.js) |
+| Price history + verdict | [src/actions/get-price-history.ts](src/actions/get-price-history.ts) + [src/components/PriceHistory.js](src/components/PriceHistory.js) |
+| Cron routes | [vercel.json](vercel.json) + [src/app/api/cron/](src/app/api/cron/) (scrape-lidl, scrape-masoutis) |
+| GitHub Actions workflow | [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml) — heavy adapters that don't fit Vercel's 300s timeout |
 | Multi-source grouping | [src/lib/group-deals.js](src/lib/group-deals.js) — used by DealGrid + FeaturedCarousel |
 | Review Queue actions | [src/actions/admin/list-pending-matches.ts](src/actions/admin/list-pending-matches.ts), [approve-pending-match.ts](src/actions/admin/approve-pending-match.ts), [create-sku-from-pending.ts](src/actions/admin/create-sku-from-pending.ts) |
 | Anonymous session id | [src/lib/session-id.js](src/lib/session-id.js) |
