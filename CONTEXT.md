@@ -6,7 +6,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ## ⚡ Pick up here (2026-06-04, end of session)
 
-**Status: 5 chains live, ~5,225 active Discounts, ~19,687 canonical Products. Pipeline self-running on Vercel Cron + GitHub Actions. Cross-chain comparison + price history + honest "actually cheap?" verdict shipped. Email delivery wired through Resend. Credentials rotated. Imbalanced coverage is the biggest visible gap (Kritikos dominates).**
+**Status (end of 2026-06-05): 5 chains live, ~5,290 active Discounts + ~8,000 PendingMatch awaiting first overnight resolver pass (Sklavenitis 2,877 + My Market 5,134). After tomorrow's 00:00–03:00 UTC GH Actions runs land, expect ~12,000 active Discounts across 5 chains. ~19,687 canonical Products. Pipeline self-running on Vercel Cron + GitHub Actions. Cross-chain comparison + price history + honest "actually cheap?" verdict + shopping-list cheaper-chain hints + real top-deals carousel all shipped. Email delivery wired through Resend (still needs `RESEND_API_KEY` in Vercel).**
 
 ### The shape of things now
 
@@ -40,8 +40,8 @@ PendingMatch rows are cleared by the LLM resolver
 | **Kritikos** | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) ✅ | **2,867 (web)** | 100% barcode-matched via canonical scrape. Daily 02:00 UTC on GitHub Actions. Filter uses `offerType !== 'none'` (Kritikos default = "none"; real offers are amount/super/percentage). |
 | **Masoutis** | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) ✅ | **2,015** (180 web + 1,835 leaflet) | Daily 06:00 UTC web + weekly Thu 06:30 UTC leaflet, both on Vercel Cron. Leaflet adds the bulk via `Itemcode=0,2`. |
 | **AB Vasilopoulos** | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) ✅ | **255 (web)** | Daily 03:00 UTC on GitHub Actions, immediately followed by resolver in same job. Resolver gets ~70% resolution rate when brand is present in PendingMatch (vs 1.5% before brand column added 2026-05-27). |
-| **My Market** | (canonical only) | **56 (wolt strikethrough)** | Weekly Sun 04:00 UTC canonical scrape via `wolt-canonical-scraper.mjs my-market mymarket`. Only 5% of offers exposed via Wolt — chain-direct adapter is the next coverage win. |
-| **Sklavenitis** | (canonical only) | **32 (wolt strikethrough)** | Weekly Sun 05:00 UTC canonical via `sklavenitis-gerakas` venue slug. Same 5% exposure problem as My Market. |
+| **My Market** | [adapters/mymarket.mjs](src/scripts/adapters/mymarket.mjs) ✅ | **65 today + 5,134 pending resolver** (9 web + 56 wolt) | Adapter shipped 2026-06-05. First full run ingested 5,134 offers → 9 cache-hit Discounts + 5,134 PendingMatch waiting for first resolver pass. Expected ~4,600 active web Discounts after resolver (~90% resolution rate observed on smoke sample). Daily 00:00 UTC on GitHub Actions, immediately followed by resolver. HTML scrape of `/offers?page=N`. The /offers landing mixes ~5,276 products sorted offers-first; we keep only cards with `selling-unit-row.is-on-offer`. Brand is included in the per-card `data-google-analytics-item-value` JSON blob → highest-fidelity brand-aware matching of any chain so far. UA gotcha: mymarket.gr blocks old Chrome 120 UA → adapter uses Chrome 131 (update if 429s appear). `PACE_MS` env var (default 600ms) throttles requests. Weekly Sun 04:00 UTC canonical via `my-market` venue slug still runs for catalog growth. |
+| **Sklavenitis** | [adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) ✅ | **49 today, 2,877 pending resolver** (17 web + 32 wolt) | Adapter shipped 2026-06-05. Daily 01:00 UTC on GitHub Actions, immediately followed by resolver. HTML scrape of `/sylloges/prosfores/?pg=N` (Knockout.js front-end, server-rendered cards). No GTIN exposed — resolver relies on brand baked into rawName (90% resolution on first sample of 20). Full active count climbs to ~2,500 once resolver clears the queue overnight. Weekly Sun 05:00 UTC canonical via `sklavenitis-gerakas` venue slug still runs for catalog growth. |
 | **Lidl** | [api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) ⚠️ | unknown — last run unclear | Existing Vercel Cron (Thu 07:00 UTC) does Groq vision OCR on the printed leaflet. Writes Discounts directly without going through ingest-offers (no matching, no source isolation). **TODO: rewire through new pipeline.** |
 | **Bazaar / Galaxias / Market In / Discount Markt** | none | 0 | Tier 3 — no public API explored. Future leaflet-OCR via the same path as Lidl. |
 
@@ -53,7 +53,7 @@ PendingMatch rows are cleared by the LLM resolver
 
 ### Known immediate debt
 
-1. **Chain coverage is heavily imbalanced.** Kritikos: 2,867. Everything else: 32-2,015. The two cheapest wins are **chain-direct adapters for Sklavenitis and My Market** — their websites have full offer feeds, not just the 5% Wolt slice. Each should add 500-1,500 Discounts. ~3h each per CONTEXT estimate.
+1. **Chain coverage gap closing.** Kritikos 2,867 ✅, Sklavenitis ~2,895 pending resolution ✅, Masoutis 2,015 ✅, My Market first chain-direct run in progress 2026-06-05 ✅, AB 255 ✅. Last big rewire is Lidl pipeline (currently bypasses ingest-offers). ~2h.
 2. **1,172 PendingMatch rows accumulated.** Mostly genuine catalog gaps (personal care, niche brands) but bulk-approve admin UI would clear them faster than per-item clicks. Roadmap item.
 3. **Lidl pipeline doesn't use ingest-offers.** Writes Discounts directly, bypasses matching/cache/PriceSnapshot. Rewire is ~2h.
 4. **AB persisted-query hash will eventually break.** Manual recovery via [probe-ab-offers-capture.mjs](src/scripts/probe-ab-offers-capture.mjs) + edit `PQ_HASH` constant. Auto-recovery script not built.
@@ -67,10 +67,10 @@ Pre-agreed sequence:
 
 1. ~~**Email delivery via Resend**~~ ✅ shipped 2026-06-04 (needs RESEND_API_KEY in Vercel to activate)
 2. ~~**Masoutis leaflet automation**~~ ✅ wired in vercel.json + ran 2026-06-04 (1,835 leaflet Discounts now active)
-3. **Shopping list cross-chain pricing** — when user adds item to list, show cheapest chain inline. Reuses `getPriceComparison`. ~1.5h.
-4. **Daily best deals widget on homepage** — top 10 deepest discounts across all chains. ~1h.
-5. **Sklavenitis chain-direct adapter** — biggest coverage win (32 → 500-1,500). Look at their offers page HTML/API. Probably needs HTML extraction since no obvious API. ~3h.
-6. **My Market chain-direct adapter** — same shape as Sklavenitis. ~3h.
+3. ~~**Shopping list cross-chain pricing**~~ ✅ shipped 2026-06-05 — `getCheaperAlternatives` batched server action + inline "Πιο φθηνά στο X · −Y€" chip per item + group/total savings hints in `ShoppingList` drawer.
+4. ~~**Daily best deals widget on homepage**~~ ✅ shipped 2026-06-05 — fixed `getTopDealsCached` to actually rank by `discountPercent DESC` (was sorted by createdAt before) with per-chain cap of 2 + fallback fill. Today the pool is limited to Kritikos + AB because only those chains populate `discountPercent`; widens automatically as other chains' originalPrice coverage improves.
+5. ~~**Sklavenitis chain-direct adapter**~~ ✅ shipped 2026-06-05 — HTML scrape of `/sylloges/prosfores/?pg=N`. 2,895 offers ingested on first run, 2,877 in PendingMatch waiting for first resolver pass. Daily 01:00 UTC GH Actions schedule. See per-chain row above.
+6. ~~**My Market chain-direct adapter**~~ ✅ shipped 2026-06-05 — HTML scrape of `/offers?page=N`. 5,134 offers ingested on first run (more than expected — `is-on-offer` density climbs from 46% on page 1 to 100% on later pages). Brand populated for ~100% of items from `data-google-analytics-item-value` JSON. Daily 00:00 UTC GH Actions. See per-chain row above.
 7. **Lidl pipeline rewire** — make existing OCR cron use ingest-offers. ~2h.
 8. **Bulk review-queue admin actions** — "Approve all" / "Reject all" per chain. ~1h.
 9. (Later) **Mobile UX audit**, **Capacitor wrap**, **App Store submission**.
@@ -109,6 +109,8 @@ Pre-agreed sequence:
 - `/api/cron/scrape-masoutis?source=leaflet` — Thu 06:30 UTC (leaflet)
 
 **GitHub Actions** ([.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml)) — for adapters that exceed Vercel's 300s timeout:
+- daily 00:00 UTC — `mymarket-offers` + resolver (chained in same job)
+- daily 01:00 UTC — `sklavenitis-offers` + resolver (chained in same job)
 - daily 02:00 UTC — `kritikos-offers`
 - daily 03:00 UTC — `ab-offers` + resolver (chained in same job)
 - weekly Sun 04:00 UTC — `mymarket-canonical` (Wolt)
@@ -485,6 +487,10 @@ Reads are tagged by string (match existing names in each action — grep before 
 - [x] **Supermarket page payload cap (2026-05-27)** — `take: 500` server-side fetch + `searchDeals(query, supermarket)` server action for full-catalog search. Kritikos page dropped 4.4 MB → 1.06 MB (~70% smaller).
 - [x] **Price history sparkline + "actually cheap?" verdict (2026-06-04)** — uses already-collected PriceSnapshot data (~12,542 rows). Component renders in modal + offer page. Honest verdicts: green when at window-min, red when above average.
 - [x] **Email delivery via Resend (2026-06-04)** — [src/lib/email.ts](src/lib/email.ts) wraps Resend with Greek HTML+text templates for confirmation + price alerts. Wired into `subscribe.ts` and `fireAlertsFor`. Falls back to console.log when `RESEND_API_KEY` is unset (dev-friendly).
+- [x] **Shopping list cross-chain pricing (2026-06-05)** — batched [src/actions/get-cheaper-alternatives.ts](src/actions/get-cheaper-alternatives.ts) (UUID-validated, ≤100 ids/call) joins by `productId` + `Product.barcode`. [src/components/ShoppingList.js](src/components/ShoppingList.js) renders per-item "Πιο φθηνά στο X · −Y€" chip linking to the cheaper offer, per-group savings hint, and a footer total-savings line. Threshold: ignore alternatives below €0.05.
+- [x] **Real top-deals carousel (2026-06-05)** — [getTopDealsCached](src/actions/get-active-deals.ts) now actually ranks by `discountPercent DESC` (with `originalPrice IS NOT NULL` per §4.1 strict view) and applies a per-chain cap of 2 over an 80-row pool for diversity, falling back to over-cap fills if not enough chains are eligible. Was previously ordering by `createdAt DESC` — a known mislabel.
+- [x] **Sklavenitis chain-direct adapter (2026-06-05)** — [src/scripts/adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs). Pure-HTML scrape of `/sylloges/prosfores/?pg=N` (Knockout.js front-end but offer cards are server-rendered) → cheerio. No GTIN, no strikethrough — all offers are ΜΟΝΟ-style. Brand is embedded in rawName (e.g. "PUMMARO Ντομάτα…") which gives resolver ~90% resolution rate without a separate brand column. Daily 01:00 UTC GitHub Actions job runs adapter + resolver in sequence; pickups ~2,895 offers per cycle, ~2,500 expected to land as Discounts after first resolver pass.
+- [x] **My Market chain-direct adapter (2026-06-05)** — [src/scripts/adapters/mymarket.mjs](src/scripts/adapters/mymarket.mjs). HTML scrape of `/offers?page=N`. The /offers landing mixes all ~5,276 products sorted offers-first; we filter to cards with `selling-unit-row.is-on-offer`. Per-card `data-google-analytics-item-value` JSON gives name + brand + category structured, so brand is populated on virtually every offer. Daily 00:00 UTC GitHub Actions job. **Anti-bot quirk:** mymarket.gr returns 429 on Chrome 120 UA — adapter sets Chrome 131. `PACE_MS` env tunes throttling (default 600ms ≈ 1.6 req/s).
 - [x] **Credential rotation tooling exercised (2026-05-27)** — Groq + Supabase DB passwords rotated successfully without downtime.
 
 ---
