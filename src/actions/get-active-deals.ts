@@ -87,6 +87,8 @@ export async function getActiveDeals(
   });
 }
 
+const PER_CHAIN_CAP = 2;
+
 const getTopDealsCached = unstable_cache(
   async (limit: number) => {
     const now = new Date();
@@ -102,17 +104,34 @@ const getTopDealsCached = unstable_cache(
       take: 2,
     });
 
-    const deals = await prisma.discount.findMany({
+    const pool = await prisma.discount.findMany({
       where: {
         isActive: true,
         validUntil: { gt: now },
-        id: { notIn: featured.map(f => f.id) }
+        discountPercent: { not: null, gt: 0 },
+        originalPrice: { not: null },
+        id: { notIn: featured.map(f => f.id) },
       },
       include: { store: true, leaflet: true, product: true },
-      orderBy: { createdAt: 'desc' }, // Order by newest since discountPercent might be null
-      take: limit - featured.length,
+      orderBy: [{ discountPercent: 'desc' }, { validUntil: 'asc' }],
+      take: 80,
     });
-    return [...featured, ...deals];
+
+    const need = limit - featured.length;
+    const perChain = new Map<string, number>();
+    const picked: typeof pool = [];
+    for (const d of pool) {
+      if (picked.length >= need) break;
+      const used = perChain.get(d.supermarket) || 0;
+      if (used >= PER_CHAIN_CAP) continue;
+      perChain.set(d.supermarket, used + 1);
+      picked.push(d);
+    }
+    if (picked.length < need) {
+      const fill = pool.filter((d) => !picked.includes(d)).slice(0, need - picked.length);
+      picked.push(...fill);
+    }
+    return [...featured, ...picked];
   },
   ['deals:top'],
   { tags: ['deals:default'], revalidate: 300 }
