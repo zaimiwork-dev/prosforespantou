@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useShoppingListStore } from '@/lib/store';
 import { SUPERMARKETS } from '@/lib/constants';
 import { Icon } from './Icons';
+import { getCheaperAlternatives } from '@/actions/get-cheaper-alternatives';
 
 export function ShoppingList({ isOpen, onClose }) {
   const { items, addItem, decreaseItem, clearList, getShareText } = useShoppingListStore();
+  const [alternatives, setAlternatives] = useState({});
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -29,6 +31,36 @@ export function ShoppingList({ isOpen, onClose }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
+
+  const itemIdsKey = useMemo(() => items.map((i) => i.id).sort().join(','), [items]);
+
+  useEffect(() => {
+    if (!isOpen || items.length === 0) return;
+    const ids = items.map((i) => i.id).filter(Boolean);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    getCheaperAlternatives(ids).then((res) => {
+      if (!cancelled) setAlternatives(res || {});
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isOpen, itemIdsKey, items]);
+
+  const groupSavings = useMemo(() => {
+    const sums = new Map();
+    for (const item of items) {
+      const alt = alternatives[item.id];
+      if (!alt) continue;
+      const smId = item.supermarket || item.supermarket_id;
+      const qty = item.quantity || 1;
+      sums.set(smId, (sums.get(smId) || 0) + alt.savings * qty);
+    }
+    return sums;
+  }, [items, alternatives]);
+
+  const totalSavings = useMemo(
+    () => Array.from(groupSavings.values()).reduce((a, b) => a + b, 0),
+    [groupSavings]
+  );
 
   if (!isOpen) return null;
 
@@ -76,12 +108,18 @@ export function ShoppingList({ isOpen, onClose }) {
 
               {groups.map((g) => {
                 const sm = SUPERMARKETS.find((s) => s.id === g.smId);
+                const savings = groupSavings.get(g.smId) || 0;
                 return (
                   <div key={g.smId} className="list-group">
                     <div className="list-group-head" style={{ background: sm?.color || 'var(--ink-2)' }}>
                       <span>{sm?.name || g.smId}</span>
                       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{g.subtotal.toFixed(2)}€</span>
                     </div>
+                    {savings >= 0.05 && (
+                      <div className="list-group-savings">
+                        💡 Με αλλαγή καταστήματος σε αυτά τα προϊόντα γλιτώνεις έως <b>{savings.toFixed(2)}€</b>
+                      </div>
+                    )}
                     <div className="list-group-body">
                       {g.items.map((item) => {
                         const name = item.product?.name || item.productName || item.product_name;
@@ -90,6 +128,8 @@ export function ShoppingList({ isOpen, onClose }) {
                           img = `/wolt_images/${img.split('/').pop()}`;
                         }
                         const price = Number(item.discountedPrice || item.discounted_price);
+                        const alt = alternatives[item.id];
+                        const altSm = alt ? SUPERMARKETS.find((s) => s.id === alt.supermarket) : null;
                         return (
                           <div key={item.id} className="list-item">
                             <div className="list-item-img">
@@ -102,6 +142,16 @@ export function ShoppingList({ isOpen, onClose }) {
                             <div className="list-item-body">
                               <h4 className="list-item-name">{name}</h4>
                               <div className="list-item-price">{(price * (item.quantity || 1)).toFixed(2)}€</div>
+                              {alt && alt.savings >= 0.05 && (
+                                <a
+                                  href={`/offer/${alt.discountId}`}
+                                  className="cheaper-chip"
+                                  style={{ borderColor: altSm?.color, color: altSm?.color }}
+                                  title={`${alt.discountedPrice.toFixed(2)}€ στο ${altSm?.name || alt.supermarket}`}
+                                >
+                                  Πιο φθηνά στο {altSm?.short || alt.supermarket} · −{alt.savings.toFixed(2)}€
+                                </a>
+                              )}
                             </div>
                             <div className="qty-stepper">
                               <button type="button" onClick={() => decreaseItem(item.id)} aria-label="Μείωση">
@@ -129,6 +179,11 @@ export function ShoppingList({ isOpen, onClose }) {
               <span className="lbl">Συνολικό κόστος</span>
               <span className="val">{total.toFixed(2)}€</span>
             </div>
+            {totalSavings >= 0.05 && (
+              <div className="drawer-savings">
+                Με αλλαγή καταστημάτων η λίστα γίνεται έως <b>{totalSavings.toFixed(2)}€</b> φθηνότερη
+              </div>
+            )}
             <div className="drawer-actions">
               <button type="button" className="btn btn-primary" onClick={handleShare}>
                 <Icon.Share size={14} /> Κοινοποίηση

@@ -1097,6 +1097,37 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.drawer-savings {
+  margin: -4px 0 14px;
+  font-size: 13px;
+  color: #1a7f37;
+  background: #ecfdf3;
+  border: 1px solid #b7ebc6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  line-height: 1.35;
+}
+.list-group-savings {
+  font-size: 12px;
+  color: #1a7f37;
+  background: #f6fef9;
+  border-bottom: 1px solid #e6f4ea;
+  padding: 6px 12px;
+  line-height: 1.35;
+}
+.cheaper-chip {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.cheaper-chip:hover { filter: brightness(0.92); }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop-in  { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
