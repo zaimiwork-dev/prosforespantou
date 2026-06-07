@@ -7,18 +7,37 @@ name: Scrape supermarket chains
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   DATABASE_URL   — Supabase pooler URL (port 6543, pgbouncer)
 #   DIRECT_URL     — Direct Postgres URL (port 5432) for migrations
-#   GROQ_API_KEY   — Groq Cloud key for AB LLM resolver
+#   GROQ_API_KEY   — Groq Cloud key for LLM resolver
 #
-# Masoutis is NOT here — it fits in Vercel's timeout and runs as a cron route.
+# Design (2026-06-07):
+#   Adapters run as their own short jobs (60-min timeout). They do scrape + DB
+#   ingest, never call Groq. Whatever they don't deterministically match goes to
+#   PendingMatch.
+#
+#   A single combined `resolvers` job runs daily at 04:00 UTC (after all
+#   adapters), processes every chain's PendingMatch queue sequentially, and has
+#   a 350-min budget (max GH Actions allows is 360). Steady-state most rows are
+#   cache hits so the job finishes in minutes; the budget is for first-day /
+#   catch-up backfills.
+#
+#   The old design (adapter + resolver chained in one 90-min job) bit us on
+#   2026-06-06/07 when a 5,134-row mymarket first-run resolver couldn't finish
+#   inside the timeout — the whole job got cancelled and tomorrow's adapter
+#   then re-ingested the same rows. Splitting makes adapters cheap-and-fast and
+#   gives the resolver room to chew through backlog independently.
+#
+# Masoutis is NOT here — its adapter fits in Vercel's timeout and runs as a
+# cron route, then its PendingMatch rows are picked up by this resolver job.
 
 on:
   schedule:
+    - cron: '0 0 * * *'   # daily 00:00 UTC — My Market offers
+    - cron: '0 1 * * *'   # daily 01:00 UTC — Sklavenitis offers
     - cron: '0 2 * * *'   # daily 02:00 UTC — Kritikos offers
-    - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers + LLM resolver
-    - cron: '0 1 * * *'   # daily 01:00 UTC — Sklavenitis offers + LLM resolver
-    - cron: '0 0 * * *'   # daily 00:00 UTC — My Market offers + LLM resolver
-    - cron: '0 4 * * 0'   # weekly Sun 04:00 UTC — My Market canonical (Wolt)
+    - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
+    - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis canonical (Wolt)
+    - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market canonical (Wolt)
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
   workflow_dispatch:
     inputs:
@@ -31,12 +50,14 @@ on:
           - ab-offers
           - sklavenitis-offers
           - mymarket-offers
-          - mymarket-canonical
-          - sklavenitis-canonical
-          - kritikos-canonical
+          - resolvers-all
           - ab-resolver-only
           - sklavenitis-resolver-only
           - mymarket-resolver-only
+          - masoutis-resolver-only
+          - mymarket-canonical
+          - sklavenitis-canonical
+          - kritikos-canonical
 
 permissions:
   contents: read
@@ -82,9 +103,61 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      - name: Run LLM resolver on AB pending
-        # AB lacks GTIN, so every adapter run creates PendingMatch rows.
-        # The resolver turns most into Discounts; remainder go to admin Review.
+
+  sklavenitis-offers:
+    if: github.event.schedule == '0 1 * * *' || github.event.inputs.chain == 'sklavenitis-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Run Sklavenitis adapter
+        run: node src/scripts/adapters/sklavenitis.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+  mymarket-offers:
+    if: github.event.schedule == '0 0 * * *' || github.event.inputs.chain == 'mymarket-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Run My Market adapter
+        run: node src/scripts/adapters/mymarket.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '600'
+
+  resolvers:
+    # Daily 04:00 UTC + manual `resolvers-all`. Walks every chain's PendingMatch
+    # queue sequentially. continue-on-error so one stuck chain doesn't block
+    # the rest. 350-min budget for first-day backfills; steady-state takes < 5 min.
+    if: github.event.schedule == '0 4 * * *' || github.event.inputs.chain == 'resolvers-all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Resolve AB pending
+        continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
           CHAIN: ab
@@ -92,9 +165,116 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Resolve Sklavenitis pending
+        continue-on-error: true
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: sklavenitis
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Resolve My Market pending
+        continue-on-error: true
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: mymarket
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Resolve Masoutis pending
+        continue-on-error: true
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: masoutis
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  ab-resolver-only:
+    if: github.event.inputs.chain == 'ab-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: ab
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  sklavenitis-resolver-only:
+    if: github.event.inputs.chain == 'sklavenitis-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: sklavenitis
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  mymarket-resolver-only:
+    if: github.event.inputs.chain == 'mymarket-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: mymarket
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  masoutis-resolver-only:
+    if: github.event.inputs.chain == 'masoutis-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: masoutis
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
   mymarket-canonical:
-    if: github.event.schedule == '0 4 * * 0' || github.event.inputs.chain == 'mymarket-canonical'
+    if: github.event.schedule == '30 5 * * 0' || github.event.inputs.chain == 'mymarket-canonical'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -146,120 +326,3 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           PACE_MS: '150'
-
-  ab-resolver-only:
-    if: github.event.inputs.chain == 'ab-resolver-only'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npx prisma generate
-      - run: node src/scripts/resolve-pending-matches.mjs
-        env:
-          CHAIN: ab
-          SOURCE: web
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-
-  sklavenitis-offers:
-    if: github.event.schedule == '0 1 * * *' || github.event.inputs.chain == 'sklavenitis-offers'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npx prisma generate
-      - name: Run Sklavenitis adapter
-        run: node src/scripts/adapters/sklavenitis.mjs
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      - name: Run LLM resolver on Sklavenitis pending
-        # Sklavenitis lacks GTIN. Brand is embedded in the rawName so the
-        # resolver gets ~90% resolution without a separate brand column.
-        run: node src/scripts/resolve-pending-matches.mjs
-        env:
-          CHAIN: sklavenitis
-          SOURCE: web
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-
-  sklavenitis-resolver-only:
-    if: github.event.inputs.chain == 'sklavenitis-resolver-only'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npx prisma generate
-      - run: node src/scripts/resolve-pending-matches.mjs
-        env:
-          CHAIN: sklavenitis
-          SOURCE: web
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-
-  mymarket-offers:
-    if: github.event.schedule == '0 0 * * *' || github.event.inputs.chain == 'mymarket-offers'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npx prisma generate
-      - name: Run My Market adapter
-        run: node src/scripts/adapters/mymarket.mjs
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          PACE_MS: '600'
-      - name: Run LLM resolver on My Market pending
-        # My Market lacks GTIN. The analytics JSON gives us a populated brand
-        # for nearly every offer, so the resolver matches at ~90% confidence.
-        run: node src/scripts/resolve-pending-matches.mjs
-        env:
-          CHAIN: mymarket
-          SOURCE: web
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-
-  mymarket-resolver-only:
-    if: github.event.inputs.chain == 'mymarket-resolver-only'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npx prisma generate
-      - run: node src/scripts/resolve-pending-matches.mjs
-        env:
-          CHAIN: mymarket
-          SOURCE: web
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
