@@ -13,6 +13,8 @@ import { listPendingMatches } from "@/actions/admin/list-pending-matches";
 import { approvePendingMatch } from "@/actions/admin/approve-pending-match";
 import { rejectPendingMatch } from "@/actions/admin/reject-pending-match";
 import { createSkuFromPending } from "@/actions/admin/create-sku-from-pending";
+import { bulkRejectPendingMatches } from "@/actions/admin/bulk-reject-pending-matches";
+import { bulkApprovePendingMatches } from "@/actions/admin/bulk-approve-pending-matches";
 import { setFeatured } from "@/actions/admin/set-featured";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 
@@ -113,6 +115,8 @@ export function AdminPanel({ onBack }) {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingRowState, setPendingRowState] = useState({});
   const [pendingFilterSM, setPendingFilterSM] = useState("masoutis");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMinConf, setBulkMinConf] = useState(90);
   const [productDetail, setProductDetail] = useState(null);
 
   const showMsg = (text, type = "success") => {
@@ -216,6 +220,36 @@ export function AdminPanel({ onBack }) {
       setPending((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== row.id), total: Math.max(0, p.total - 1) }));
     } else {
       showMsg(res.error || "Reject failed", "error");
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (pendingFilterSM === "all") { showMsg("Διάλεξε ένα supermarket πρώτα", "error"); return; }
+    if (!window.confirm(`Διαγραφή ΟΛΩΝ των γραμμών (~${pending.total}) στο queue του ${pendingFilterSM};`)) return;
+    setBulkBusy(true);
+    const res = await bulkRejectPendingMatches({ supermarket: pendingFilterSM });
+    setBulkBusy(false);
+    if (res.success) {
+      showMsg(`Απορρίφθηκαν ${res.rejected} γραμμές (απομένουν ${res.remaining})`);
+      loadPending();
+    } else {
+      showMsg(res.error || "Bulk reject failed", "error");
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (pendingFilterSM === "all") { showMsg("Διάλεξε ένα supermarket πρώτα", "error"); return; }
+    const conf = Number(bulkMinConf);
+    if (!Number.isFinite(conf) || conf < 50 || conf > 100) { showMsg("Confidence 50–100", "error"); return; }
+    if (!window.confirm(`Approve όλες τις γραμμές του ${pendingFilterSM} με aiConfidence ≥ ${conf}%;`)) return;
+    setBulkBusy(true);
+    const res = await bulkApprovePendingMatches({ supermarket: pendingFilterSM, minConfidence: conf });
+    setBulkBusy(false);
+    if (res.success) {
+      showMsg(`✓ Approved ${res.approved} · skipped ${res.skipped} · remaining ${res.remaining}`);
+      loadPending();
+    } else {
+      showMsg(res.error || "Bulk approve failed", "error");
     }
   };
 
@@ -501,7 +535,7 @@ export function AdminPanel({ onBack }) {
 
           {tab === "review" && (
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <select value={pendingFilterSM} onChange={(e) => setPendingFilterSM(e.target.value)} style={{ ...inp, maxWidth: 200 }}>
                   <option value="all">Όλα τα supermarkets</option>
                   {SUPERMARKETS.map(sm => <option key={sm.id} value={sm.id}>{sm.name}</option>)}
@@ -509,6 +543,39 @@ export function AdminPanel({ onBack }) {
                 <button onClick={loadPending} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 RELOAD</button>
                 <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{pending.total} σε εκκρεμότητα</div>
               </div>
+
+              {pendingFilterSM !== "all" && pending.total > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#fff8f0", border: "1px solid #ffd8a8", borderRadius: 10, marginBottom: 18, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#8a4b00" }}>Μαζικά για {pendingFilterSM}:</span>
+                  <label style={{ fontSize: 11, color: G.muted, display: "flex", alignItems: "center", gap: 6 }}>
+                    Approve με conf ≥
+                    <input
+                      type="number"
+                      min={50}
+                      max={100}
+                      step={1}
+                      value={bulkMinConf}
+                      onChange={(e) => setBulkMinConf(Number(e.target.value) || 0)}
+                      style={{ ...inp, width: 60, padding: "4px 6px", fontSize: 11 }}
+                    />
+                    %
+                  </label>
+                  <button
+                    onClick={handleBulkApprove}
+                    disabled={bulkBusy}
+                    style={{ background: "#2d6a4f", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: bulkBusy ? "wait" : "pointer", fontWeight: 700, fontSize: 11 }}
+                  >
+                    {bulkBusy ? "..." : "✓ Bulk approve"}
+                  </button>
+                  <button
+                    onClick={handleBulkReject}
+                    disabled={bulkBusy}
+                    style={{ background: "#fff", border: `1px solid ${G.red}`, color: G.red, borderRadius: 8, padding: "6px 12px", cursor: bulkBusy ? "wait" : "pointer", fontWeight: 700, fontSize: 11, marginLeft: "auto" }}
+                  >
+                    ✗ Reject all ({pending.total})
+                  </button>
+                </div>
+              )}
 
               {pendingLoading ? (
                 <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση...</div>
