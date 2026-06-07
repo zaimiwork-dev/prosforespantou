@@ -4,15 +4,53 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-07)
+## ⚡ Pick up here (2026-06-07 afternoon, mid-product-feedback session)
 
-**Status (morning of 2026-06-07): 5 chains live, ~7,133 active Discounts. ~19,687 canonical Products. The overnight resolver runs from 2026-06-06/07 partially backfilled: mymarket up to 1,649 web Discounts, sklavenitis still at 17 (its resolver step never ran — root cause below). Pipeline ops were refactored 2026-06-07: adapter and resolver jobs are now SEPARATE in GitHub Actions, with one combined daily resolvers job at 04:00 UTC (350-min budget, sequential continue-on-error). PendingMatch backlog being cleared by a local sequential resolver run (~4h foreground). Cross-chain comparison + price history + honest "actually cheap?" verdict + shopping-list cheaper-chain hints + real top-deals carousel all shipped. Email delivery wired through Resend (still needs `RESEND_API_KEY` in Vercel).**
+**Status: 5 chains live (Kritikos, Masoutis, AB, My Market, Sklavenitis) + Lidl rewired this morning. Active Discounts ~7,300 and climbing as the backlog resolver works through ~7,000 PendingMatch rows in background. Backend pipeline is solid; UI/UX layer is the focus this afternoon after honest product feedback from the user (paraphrased: "the website feels ~40% finished").**
 
-### What bit us yesterday (2026-06-06/07)
+### User feedback session (2026-06-07 afternoon — READ THIS FIRST)
+
+The user pushed back on backend-checklist optimism and gave concrete UX issues. Per-issue status:
+
+| # | Issue user raised | Status | Detail |
+|---|---|---|---|
+| 1 | `'wolt'` chip leaking on cards | ✅ shipped `7c1d7c3` | Filter to user-facing sources in DiscountCard. |
+| 2 | Homepage looks half-empty (5 chains "Σύντομα") | ✅ shipped `7c1d7c3` | SupermarketTiles splits into live + dimmed "Σύντομα κοντά μας" row. |
+| 3 | Kritikos shows "no discount" on most items | ✅ shipped `a0931c6` | **Real root cause was different than I first thought.** Kritikos uses `offerType: "super"` for what their UI labels "SUPER ΤΙΜΗ" — there's no `webSticker`/`mobileSticker` field at all (always absent in their API). 85%+ of Kritikos pantry offers are `super`-typed with no strikethrough. Adapter now maps `offerType: "super"` → `description: "SUPER ΤΙΜΗ"`, and DiscountCard renders description as the badge when no % is available. Backfill running in background; tomorrow's 02:00 UTC cron will fully catch up. |
+| 4 | Default sort should be hot/popular items, not `createdAt DESC` | ❌ **NEXT** | Combine click telemetry + discountPercent into a hotness score. Apply as default sort on homepage + supermarket pages. ~2-3h. Identified as highest user-felt improvement. |
+| 5 | Categories wrong — most items end up in "Άλλο" or wrong bucket | ❌ pending | Current code collapses each chain's 100+ native categories into 17 hardcoded Greek buckets, losing nuance. Right fix: pass chain's original category through verbatim; rebuild CategoryGrid dynamically from what actually exists in DB. ~3-4h. |
+| 6 | Category icons are "random garbage" | ❌ pending | Icons live in `src/lib/constants.js` / `CategoryGrid.js`. Cosmetic but visible. Depends on asset decisions. |
+| 7 | My Market % missing on most items | ❌ pending | Adapter sets `originalPrice: null` deliberately because the listing card shows only the offer price. Analytics JSON has `price` field which is the regular price → could compute % from that when it differs. ~30 min. |
+| 8 | Tier-3 chains (Bazaar, Galaxias, Market In, Discount Markt) all empty | Won't-fix this session | Marked Tier 3 in CONTEXT (no public API). 3-5h recon each. Defer; #5 of homepage tile split already hides them. |
+
+**Methodology corrections from this session (carry forward):**
+- Don't trust DB counts before verifying the chain's source actually exposes the field you're assuming. I claimed "Kritikos shows 9% with % because the source doesn't have strikethrough" when really the source has `offerType: "super"` we just weren't reading.
+- For UI changes, actually run the dev server and verify visually — I've been shipping based on `npm run build` passing, which only checks types. The user notices the visual gap; the build doesn't.
+- When the user's gut conflicts with my data analysis, the user is usually right about reality and I should re-investigate, not defend my numbers.
+
+### Today's commits (2026-06-07)
+
+```
+a0931c6 fix(ingest): kritikos offerType=super → "SUPER ΤΙΜΗ" description
+7c1d7c3 fix(ui): hide internal source labels, surface chain sticker text, declutter supermarket tiles
+5056551 feat(admin): bulk approve and bulk reject for the Review Queue
+42f7d58 docs: CONTEXT + .gitignore for Lidl adapter
+c33ef7a feat(ingest): lidl chain-direct adapter via flyer OCR
+42ae324 docs: pickup-here reflects 2026-06-07 state and workflow split
+3e74f28 fix(workflow): split adapter and resolver into separate jobs
+```
+
+### What's running in background right now
+
+- **Local resolver backlog** (started morning of 2026-06-07): chains through `ab → masoutis → sklavenitis → mymarket`. ~4h total. Progress to date: AB queue mostly rejected as low-confidence (private-label catalog gap), Masoutis at ~350/984, Sklavenitis growing fast (49 → 443 → more).
+- **Local Kritikos backfill** (started 2026-06-07 afternoon): re-running adapter to write `description: "SUPER ΤΙΜΗ"` on existing `offerType: super` rows. Output dropped to log file due to Windows stdout buffering — verify by querying `description IS NOT NULL` count.
+- Both are independent of the new daily 04:00 UTC `resolvers` GH Actions job that lands tomorrow.
+
+### What bit us this morning (2026-06-06/07) — kept for context
 
 The old workflow chained adapter + resolver in a single 90-min GH Actions job. mymarket-offers at 00:00 UTC kicked off a first-day resolver pass over 5,134 PendingMatch rows — at PACE_MS=2000 that's ~170 min of LLM calls, way over the 90-min job timeout, so the whole job got cancelled. sklavenitis-offers at 01:00 UTC then **failed at the adapter step** (transient — adapter works fine locally now), which meant its resolver step was skipped too.
 
-**Fix (committed 2026-06-07):** workflow rewritten so adapter jobs only scrape + DB-ingest (60-min budget), and a single combined `resolvers` job runs daily at 04:00 UTC with a 350-min budget, processing every chain's PendingMatch queue sequentially with `continue-on-error: true` so a stuck chain doesn't block the rest. See [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
+**Fix (committed `3e74f28`):** workflow rewritten so adapter jobs only scrape + DB-ingest (60-min budget), and a single combined `resolvers` job runs daily at 04:00 UTC with a 350-min budget, processing every chain's PendingMatch queue sequentially with `continue-on-error: true` so a stuck chain doesn't block the rest. See [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
 
 ### The shape of things now
 
