@@ -109,6 +109,9 @@ function toOfferItem(p) {
   const img = p.images?.primary && p.images?.baseUrl
     ? `${p.images.baseUrl}${p.images.primary}`
     : null;
+  // The chain prints a sticker on the product card ("-25%", "1+1", "ΧΑΜΗΛΗ ΤΙΜΗ",
+  // "ΜΟΝΟ 2,99€", etc) which is what the user reads in-store. It's the most
+  // honest single label we have when beginPrice==finalPrice (ΜΟΝΟ-style offers).
   const sticker = (p.webSticker || p.mobileSticker || '').trim();
 
   return {
@@ -121,6 +124,9 @@ function toOfferItem(p) {
     unit: (p.quantity || '').trim() || null,
     category: p.category?.name?.trim() || 'Άλλο',
     imageUrl: img,
+    // `description` is rendered by DiscountCard as a fallback badge when there's
+    // no strikethrough discount to display a percentage from.
+    description: sticker || null,
     offerType: (p.offerType && p.offerType !== 'none') ? p.offerType : (sticker || null),
   };
 }

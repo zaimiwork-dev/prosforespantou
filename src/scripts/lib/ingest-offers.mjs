@@ -128,6 +128,10 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     validFrom,
     validUntil,
     imageUrl: item.imageUrl || null,
+    // Adapters use `description` for chain-printed sticker text ("-25%",
+    // "1+1", "ΧΑΜΗΛΗ ΤΙΜΗ", weight/pack size, etc). The UI surfaces this as
+    // a fallback badge when discountPercent is null.
+    description: item.description || null,
     storeId,
     productId,
     supermarket: chain,

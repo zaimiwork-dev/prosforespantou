@@ -43,7 +43,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   // Sources are attached by lib/group-deals.js when the same product has
   // active rows in multiple pipelines (web + leaflet). Falls back to the
   // single-row source when the helper hasn't been run.
-  const sources = d.sources && d.sources.length > 0 ? d.sources : (d.source ? [d.source] : []);
+  // We only chip the user-facing sources — 'wolt' is an internal
+  // collection-method label (rows scraped from Wolt's strikethrough pricing)
+  // and shouldn't leak into the UI as a tag.
+  const USER_FACING_SOURCES = new Set(['web', 'leaflet', 'manual']);
+  const rawSources = d.sources && d.sources.length > 0 ? d.sources : (d.source ? [d.source] : []);
+  const sources = rawSources.filter((s) => USER_FACING_SOURCES.has(s));
   const sourceLabel = (s) => (s === 'web' ? 'Εβδομαδιαία' : s === 'leaflet' ? 'Φυλλάδιο' : s === 'manual' ? 'Manual' : s);
 
   const displayName = d.product?.name || d.productName || d.product_name;
@@ -103,7 +108,13 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
         {pct > 0 ? (
           <div className="discount-badge">-{pct}%</div>
         ) : !originalPrice ? (
-          <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
+          // Prefer the chain's printed sticker text ("-25%", "1+1", "ΧΑΜΗΛΗ
+          // ΤΙΜΗ") over a generic ΜΟΝΟ when we have it — way more honest.
+          d.description && d.description.length <= 24 ? (
+            <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>{d.description.toUpperCase()}</div>
+          ) : (
+            <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
+          )
         ) : null}
         
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
