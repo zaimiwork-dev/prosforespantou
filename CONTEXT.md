@@ -4,9 +4,15 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-04, end of session)
+## ⚡ Pick up here (2026-06-07)
 
-**Status (end of 2026-06-05): 5 chains live, ~5,290 active Discounts + ~8,000 PendingMatch awaiting first overnight resolver pass (Sklavenitis 2,877 + My Market 5,134). After tomorrow's 00:00–03:00 UTC GH Actions runs land, expect ~12,000 active Discounts across 5 chains. ~19,687 canonical Products. Pipeline self-running on Vercel Cron + GitHub Actions. Cross-chain comparison + price history + honest "actually cheap?" verdict + shopping-list cheaper-chain hints + real top-deals carousel all shipped. Email delivery wired through Resend (still needs `RESEND_API_KEY` in Vercel).**
+**Status (morning of 2026-06-07): 5 chains live, ~7,133 active Discounts. ~19,687 canonical Products. The overnight resolver runs from 2026-06-06/07 partially backfilled: mymarket up to 1,649 web Discounts, sklavenitis still at 17 (its resolver step never ran — root cause below). Pipeline ops were refactored 2026-06-07: adapter and resolver jobs are now SEPARATE in GitHub Actions, with one combined daily resolvers job at 04:00 UTC (350-min budget, sequential continue-on-error). PendingMatch backlog being cleared by a local sequential resolver run (~4h foreground). Cross-chain comparison + price history + honest "actually cheap?" verdict + shopping-list cheaper-chain hints + real top-deals carousel all shipped. Email delivery wired through Resend (still needs `RESEND_API_KEY` in Vercel).**
+
+### What bit us yesterday (2026-06-06/07)
+
+The old workflow chained adapter + resolver in a single 90-min GH Actions job. mymarket-offers at 00:00 UTC kicked off a first-day resolver pass over 5,134 PendingMatch rows — at PACE_MS=2000 that's ~170 min of LLM calls, way over the 90-min job timeout, so the whole job got cancelled. sklavenitis-offers at 01:00 UTC then **failed at the adapter step** (transient — adapter works fine locally now), which meant its resolver step was skipped too.
+
+**Fix (committed 2026-06-07):** workflow rewritten so adapter jobs only scrape + DB-ingest (60-min budget), and a single combined `resolvers` job runs daily at 04:00 UTC with a 350-min budget, processing every chain's PendingMatch queue sequentially with `continue-on-error: true` so a stuck chain doesn't block the rest. See [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
 
 ### The shape of things now
 
@@ -33,16 +39,16 @@ PendingMatch rows are cleared by the LLM resolver
 - Per-chain adapters: [src/scripts/adapters/](src/scripts/adapters/).
 - LLM resolver: [src/scripts/resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) — runs as a separate pass over PendingMatch rows. Uses `PendingMatch.brand` (schema added 2026-05-27) for brand-aware matching on chains that strip brand from display name (AB).
 
-### Per-chain status (2026-06-04)
+### Per-chain status (2026-06-07 morning)
 
 | Chain | Adapter | Active Discounts | Notes |
 |---|---|---|---|
-| **Kritikos** | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) ✅ | **2,867 (web)** | 100% barcode-matched via canonical scrape. Daily 02:00 UTC on GitHub Actions. Filter uses `offerType !== 'none'` (Kritikos default = "none"; real offers are amount/super/percentage). |
-| **Masoutis** | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) ✅ | **2,015** (180 web + 1,835 leaflet) | Daily 06:00 UTC web + weekly Thu 06:30 UTC leaflet, both on Vercel Cron. Leaflet adds the bulk via `Itemcode=0,2`. |
-| **AB Vasilopoulos** | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) ✅ | **255 (web)** | Daily 03:00 UTC on GitHub Actions, immediately followed by resolver in same job. Resolver gets ~70% resolution rate when brand is present in PendingMatch (vs 1.5% before brand column added 2026-05-27). |
-| **My Market** | [adapters/mymarket.mjs](src/scripts/adapters/mymarket.mjs) ✅ | **65 today + 5,134 pending resolver** (9 web + 56 wolt) | Adapter shipped 2026-06-05. First full run ingested 5,134 offers → 9 cache-hit Discounts + 5,134 PendingMatch waiting for first resolver pass. Expected ~4,600 active web Discounts after resolver (~90% resolution rate observed on smoke sample). Daily 00:00 UTC on GitHub Actions, immediately followed by resolver. HTML scrape of `/offers?page=N`. The /offers landing mixes ~5,276 products sorted offers-first; we keep only cards with `selling-unit-row.is-on-offer`. Brand is included in the per-card `data-google-analytics-item-value` JSON blob → highest-fidelity brand-aware matching of any chain so far. UA gotcha: mymarket.gr blocks old Chrome 120 UA → adapter uses Chrome 131 (update if 429s appear). `PACE_MS` env var (default 600ms) throttles requests. Weekly Sun 04:00 UTC canonical via `my-market` venue slug still runs for catalog growth. |
-| **Sklavenitis** | [adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) ✅ | **49 today, 2,877 pending resolver** (17 web + 32 wolt) | Adapter shipped 2026-06-05. Daily 01:00 UTC on GitHub Actions, immediately followed by resolver. HTML scrape of `/sylloges/prosfores/?pg=N` (Knockout.js front-end, server-rendered cards). No GTIN exposed — resolver relies on brand baked into rawName (90% resolution on first sample of 20). Full active count climbs to ~2,500 once resolver clears the queue overnight. Weekly Sun 05:00 UTC canonical via `sklavenitis-gerakas` venue slug still runs for catalog growth. |
-| **Lidl** | [api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) ⚠️ | unknown — last run unclear | Existing Vercel Cron (Thu 07:00 UTC) does Groq vision OCR on the printed leaflet. Writes Discounts directly without going through ingest-offers (no matching, no source isolation). **TODO: rewire through new pipeline.** |
+| **Kritikos** | [adapters/kritikos.mjs](src/scripts/adapters/kritikos.mjs) ✅ | **2,868 (web)** | 100% barcode-matched via canonical scrape. Daily 02:00 UTC on GitHub Actions. Filter uses `offerType !== 'none'` (Kritikos default = "none"; real offers are amount/super/percentage). |
+| **Masoutis** | [adapters/masoutis.mjs](src/scripts/adapters/masoutis.mjs) ✅ | **2,224** (190 web + 199 wolt + 1,835 leaflet) | Daily 06:00 UTC web + weekly Thu 06:30 UTC leaflet, both on Vercel Cron. Masoutis run's PendingMatch (984 rows) now picked up by combined `resolvers` cron job at 04:00 UTC. |
+| **AB Vasilopoulos** | [adapters/ab.mjs](src/scripts/adapters/ab.mjs) ✅ | **284** (243 web + 41 wolt) | Daily 03:00 UTC adapter on GitHub Actions; resolver moved to combined 04:00 UTC job (2026-06-07 refactor). Resolver gets ~70% resolution rate when brand is present in PendingMatch (vs 1.5% before brand column added 2026-05-27). 180 PendingMatch rows still queued; most look like private-label / brand-less items the catalog doesn't have. |
+| **My Market** | [adapters/mymarket.mjs](src/scripts/adapters/mymarket.mjs) ✅ | **1,708** (1,649 web + 59 wolt) | Adapter shipped 2026-06-05. ~5,134 offers ingested per cycle; first-day resolver pass got to ~1,649 of 5,134 before the cancelled GH Actions job — 3,294 still queued, being cleared by local backlog run 2026-06-07. Daily 00:00 UTC adapter, resolver in combined 04:00 UTC job. HTML scrape of `/offers?page=N`. The /offers landing mixes ~5,276 products sorted offers-first; we keep only cards with `selling-unit-row.is-on-offer`. Brand is included in the per-card `data-google-analytics-item-value` JSON blob → highest-fidelity brand-aware matching of any chain so far. UA gotcha: mymarket.gr blocks old Chrome 120 UA → adapter uses Chrome 131 (update if 429s appear). `PACE_MS` env var (default 600ms) throttles requests. Weekly Sun 05:30 UTC canonical via `my-market` venue slug. |
+| **Sklavenitis** | [adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) ✅ | **49** (17 web + 32 wolt) | Adapter shipped 2026-06-05. First-day resolver never ran (the original chained sklavenitis-offers job failed at the adapter step — transient — and the resolver step was skipped). 2,877 PendingMatch being cleared by local backlog run 2026-06-07. Daily 01:00 UTC adapter, resolver in combined 04:00 UTC job. HTML scrape of `/sylloges/prosfores/?pg=N` (Knockout.js front-end, server-rendered cards). No GTIN exposed — resolver relies on brand baked into rawName (90% resolution on first sample of 20). |
+| **Lidl** | [api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) ⚠️ | **0** today — pipeline appears broken | Existing Vercel Cron (Thu 07:00 UTC) does Groq vision OCR on the printed leaflet. Writes Discounts directly without going through ingest-offers (no matching, no source isolation). **TODO: rewire through new pipeline.** Current 0-count suggests last run produced no rows OR deactivated everything; needs investigation alongside the rewire. |
 | **Bazaar / Galaxias / Market In / Discount Markt** | none | 0 | Tier 3 — no public API explored. Future leaflet-OCR via the same path as Lidl. |
 
 ### Sustainability tiers (decided 2026-05-26, still current)
@@ -53,7 +59,8 @@ PendingMatch rows are cleared by the LLM resolver
 
 ### Known immediate debt
 
-1. **Chain coverage gap closing.** Kritikos 2,867 ✅, Sklavenitis ~2,895 pending resolution ✅, Masoutis 2,015 ✅, My Market first chain-direct run in progress 2026-06-05 ✅, AB 255 ✅. Last big rewire is Lidl pipeline (currently bypasses ingest-offers). ~2h.
+1. **PendingMatch backlog clearing.** As of 2026-06-07 morning: sklavenitis=2,877, mymarket=3,294, masoutis=984, ab=180, kritikos=8 (total ~7,343). Local sequential resolver run started 2026-06-07 ~11:48 EEST (~4h foreground). After it lands + tomorrow's 04:00 resolver, expect ~12,000 active Discounts.
+2. **Chain coverage gap closing.** Kritikos 2,868 ✅, Masoutis 2,224 ✅, My Market 1,708 (growing) ✅, Sklavenitis 49 (resolver backlog being cleared) ✅, AB 284 ✅. Last big rewire is Lidl pipeline (currently bypasses ingest-offers AND appears to have 0 active rows). ~2h.
 2. **1,172 PendingMatch rows accumulated.** Mostly genuine catalog gaps (personal care, niche brands) but bulk-approve admin UI would clear them faster than per-item clicks. Roadmap item.
 3. **Lidl pipeline doesn't use ingest-offers.** Writes Discounts directly, bypasses matching/cache/PriceSnapshot. Rewire is ~2h.
 4. **AB persisted-query hash will eventually break.** Manual recovery via [probe-ab-offers-capture.mjs](src/scripts/probe-ab-offers-capture.mjs) + edit `PQ_HASH` constant. Auto-recovery script not built.
@@ -108,15 +115,16 @@ Pre-agreed sequence:
 - `/api/cron/scrape-masoutis` — daily 06:00 UTC (web offers)
 - `/api/cron/scrape-masoutis?source=leaflet` — Thu 06:30 UTC (leaflet)
 
-**GitHub Actions** ([.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml)) — for adapters that exceed Vercel's 300s timeout:
-- daily 00:00 UTC — `mymarket-offers` + resolver (chained in same job)
-- daily 01:00 UTC — `sklavenitis-offers` + resolver (chained in same job)
+**GitHub Actions** ([.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml)) — for adapters that exceed Vercel's 300s timeout. **Adapters and resolvers are separated as of 2026-06-07** so a slow first-day resolver can't cancel its adapter, and so the resolver always gets its own timeout budget.
+- daily 00:00 UTC — `mymarket-offers` (adapter only, 60-min budget)
+- daily 01:00 UTC — `sklavenitis-offers` (adapter only, 60-min budget)
 - daily 02:00 UTC — `kritikos-offers`
-- daily 03:00 UTC — `ab-offers` + resolver (chained in same job)
-- weekly Sun 04:00 UTC — `mymarket-canonical` (Wolt)
+- daily 03:00 UTC — `ab-offers` (adapter only, 60-min budget)
+- daily 04:00 UTC — `resolvers` (combined: ab → sklavenitis → mymarket → masoutis sequentially, `continue-on-error: true` per step, 350-min budget)
 - weekly Sun 05:00 UTC — `sklavenitis-canonical` (Wolt)
+- weekly Sun 05:30 UTC — `mymarket-canonical` (Wolt)
 - weekly Sun 06:00 UTC — `kritikos-canonical` (catalog refresh)
-- Workflow_dispatch trigger for manual re-runs of any chain.
+- Workflow_dispatch trigger for manual re-runs of any chain — including `resolvers-all`, `masoutis-resolver-only`, and per-chain `*-resolver-only` jobs.
 - Required GitHub repo secrets: `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`. Active since 2026-05-27.
 
 ### Carryover from earlier sessions
@@ -491,6 +499,7 @@ Reads are tagged by string (match existing names in each action — grep before 
 - [x] **Real top-deals carousel (2026-06-05)** — [getTopDealsCached](src/actions/get-active-deals.ts) now actually ranks by `discountPercent DESC` (with `originalPrice IS NOT NULL` per §4.1 strict view) and applies a per-chain cap of 2 over an 80-row pool for diversity, falling back to over-cap fills if not enough chains are eligible. Was previously ordering by `createdAt DESC` — a known mislabel.
 - [x] **Sklavenitis chain-direct adapter (2026-06-05)** — [src/scripts/adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs). Pure-HTML scrape of `/sylloges/prosfores/?pg=N` (Knockout.js front-end but offer cards are server-rendered) → cheerio. No GTIN, no strikethrough — all offers are ΜΟΝΟ-style. Brand is embedded in rawName (e.g. "PUMMARO Ντομάτα…") which gives resolver ~90% resolution rate without a separate brand column. Daily 01:00 UTC GitHub Actions job runs adapter + resolver in sequence; pickups ~2,895 offers per cycle, ~2,500 expected to land as Discounts after first resolver pass.
 - [x] **My Market chain-direct adapter (2026-06-05)** — [src/scripts/adapters/mymarket.mjs](src/scripts/adapters/mymarket.mjs). HTML scrape of `/offers?page=N`. The /offers landing mixes all ~5,276 products sorted offers-first; we filter to cards with `selling-unit-row.is-on-offer`. Per-card `data-google-analytics-item-value` JSON gives name + brand + category structured, so brand is populated on virtually every offer. Daily 00:00 UTC GitHub Actions job. **Anti-bot quirk:** mymarket.gr returns 429 on Chrome 120 UA — adapter sets Chrome 131. `PACE_MS` env tunes throttling (default 600ms ≈ 1.6 req/s).
+- [x] **Workflow split (2026-06-07)** — adapter and resolver jobs separated in [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml). Adapters keep 60-min budget and only scrape + DB-ingest. One combined `resolvers` job runs daily 04:00 UTC with 350-min budget, processes every chain sequentially with `continue-on-error: true`. Reason: 2026-06-06/07 the chained 90-min mymarket-offers job got cancelled by its 5,134-row first-day resolver pass, and the sklavenitis-offers chained job failed at the adapter step so its resolver step never ran. New design isolates failures: a bad adapter or a long resolver no longer poisons the next day.
 - [x] **Credential rotation tooling exercised (2026-05-27)** — Groq + Supabase DB passwords rotated successfully without downtime.
 
 ---
