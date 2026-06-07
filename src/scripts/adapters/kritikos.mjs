@@ -109,10 +109,19 @@ function toOfferItem(p) {
   const img = p.images?.primary && p.images?.baseUrl
     ? `${p.images.baseUrl}${p.images.primary}`
     : null;
-  // The chain prints a sticker on the product card ("-25%", "1+1", "ΧΑΜΗΛΗ ΤΙΜΗ",
-  // "ΜΟΝΟ 2,99€", etc) which is what the user reads in-store. It's the most
-  // honest single label we have when beginPrice==finalPrice (ΜΟΝΟ-style offers).
-  const sticker = (p.webSticker || p.mobileSticker || '').trim();
+
+  // Kritikos's offerType is the label the chain itself renders on the card:
+  //   "super"      → "SUPER ΤΙΜΗ" (most common — no strikethrough, just a
+  //                  bold red bar saying "SUPER ΤΙΜΗ" in their UI)
+  //   "amount"     → strikethrough price cut in euros
+  //   "percentage" → strikethrough price cut as a percent
+  // For amount/percentage the strikethrough math already produces a -X% badge,
+  // so we leave description null and let DiscountCard render the percent. For
+  // super we surface the actual Kritikos label so it doesn't fall back to a
+  // generic ΜΟΝΟ. webSticker / mobileSticker are absent in their API; the
+  // "SUPER ΤΙΜΗ" text is rendered by the chain frontend purely off offerType.
+  let description = null;
+  if (p.offerType === 'super') description = 'SUPER ΤΙΜΗ';
 
   return {
     name: (p.name || '').trim(),
@@ -124,10 +133,8 @@ function toOfferItem(p) {
     unit: (p.quantity || '').trim() || null,
     category: p.category?.name?.trim() || 'Άλλο',
     imageUrl: img,
-    // `description` is rendered by DiscountCard as a fallback badge when there's
-    // no strikethrough discount to display a percentage from.
-    description: sticker || null,
-    offerType: (p.offerType && p.offerType !== 'none') ? p.offerType : (sticker || null),
+    description,
+    offerType: (p.offerType && p.offerType !== 'none') ? p.offerType : null,
   };
 }
 
