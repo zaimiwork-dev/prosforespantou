@@ -36,6 +36,7 @@ on:
     - cron: '0 2 * * *'   # daily 02:00 UTC — Kritikos offers
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
+    - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis canonical (Wolt)
     - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market canonical (Wolt)
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
@@ -50,11 +51,13 @@ on:
           - ab-offers
           - sklavenitis-offers
           - mymarket-offers
+          - lidl-offers
           - resolvers-all
           - ab-resolver-only
           - sklavenitis-resolver-only
           - mymarket-resolver-only
           - masoutis-resolver-only
+          - lidl-resolver-only
           - mymarket-canonical
           - sklavenitis-canonical
           - kritikos-canonical
@@ -183,12 +186,30 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      - name: Resolve Masoutis pending
+      - name: Resolve Masoutis pending (web)
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
           CHAIN: masoutis
           SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Resolve Masoutis pending (leaflet)
+        continue-on-error: true
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: masoutis
+          SOURCE: leaflet
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Resolve Lidl pending (leaflet)
+        continue-on-error: true
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: lidl
+          SOURCE: leaflet
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -269,6 +290,49 @@ jobs:
         env:
           CHAIN: masoutis
           SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  lidl-offers:
+    # Weekly Thu 06:00 UTC + manual `lidl-offers`. Discovers the current
+    # food-nonfood flyer via lidl-hellas.gr, then OCRs each page (~30-60 pages)
+    # via Groq vision. Item-rate dominated by Groq's per-call latency + PACE_MS
+    # (default 4s) — full flyer takes ~5–10 min.
+    if: github.event.schedule == '0 6 * * 4' || github.event.inputs.chain == 'lidl-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Run Lidl adapter
+        run: node src/scripts/adapters/lidl.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  lidl-resolver-only:
+    if: github.event.inputs.chain == 'lidl-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: lidl
+          SOURCE: leaflet
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
