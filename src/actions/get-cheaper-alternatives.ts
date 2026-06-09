@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
+import { samePack } from '@/lib/packaging';
 
 export interface CheaperAlternative {
   discountId: string;
@@ -31,6 +32,7 @@ export async function getCheaperAlternatives(
           select: {
             id: true,
             productId: true,
+            productName: true,
             discountedPrice: true,
             supermarket: true,
             product: { select: { id: true, barcode: true } },
@@ -76,6 +78,7 @@ export async function getCheaperAlternatives(
           select: {
             id: true,
             productId: true,
+            productName: true,
             discountedPrice: true,
             supermarket: true,
             product: { select: { name: true } },
@@ -102,6 +105,8 @@ export async function getCheaperAlternatives(
             for (const c of byProductId.get(pid) ?? []) {
               if (c.supermarket === s.supermarket) continue;
               if (c.discountedPrice >= s.discountedPrice) continue;
+              // Like-for-like pack only — don't call a 12-pack "cheaper" than a single.
+              if (!samePack(s.productName, c.productName)) continue;
               if (!best || c.discountedPrice < best.discountedPrice) best = c;
             }
           }

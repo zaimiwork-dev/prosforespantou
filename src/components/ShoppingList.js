@@ -69,7 +69,11 @@ export function ShoppingList({ isOpen, onClose }) {
     if (!text) return;
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Η λίστα με τις προσφορές μου', text, url: window.location.origin });
+        // Pass text only — NOT url. When both are present most share targets
+        // (Messenger/Viber/WhatsApp, desktop) keep the url and drop the text,
+        // so the user ends up sharing just the bare site link instead of the
+        // list. The site link is already appended inside the share text.
+        await navigator.share({ title: 'Η λίστα με τις προσφορές μου', text });
       } catch (err) { console.error('Error sharing:', err); }
     } else {
       await navigator.clipboard.writeText(text);

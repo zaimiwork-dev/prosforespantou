@@ -51,7 +51,9 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const sources = rawSources.filter((s) => USER_FACING_SOURCES.has(s));
   const sourceLabel = (s) => (s === 'web' ? 'Εβδομαδιαία' : s === 'leaflet' ? 'Φυλλάδιο' : s === 'manual' ? 'Manual' : s);
 
-  const displayName = d.product?.name || d.productName || d.product_name;
+  // Raw offer name first: it matches this offer's price/pack ("9+3 Δώρο");
+  // the canonical product.name can be a single-unit variant.
+  const displayName = d.productName || d.product_name || d.product?.name;
   let displayImage = d.product?.imageUrl || d.imageUrl || d.image_url;
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;

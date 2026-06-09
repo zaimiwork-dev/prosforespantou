@@ -62,7 +62,9 @@ export function ProductModal({ product, onClose, onAdd }) {
   const discountedPrice = product.discountedPrice ?? product.discounted_price;
   const originalPrice   = product.originalPrice   ?? product.original_price;
   const discountPercent = product.discountPercent ?? product.discount_percent;
-  const displayName     = product.product?.name   || product.productName || product.product_name;
+  // Raw offer name first: it matches this offer's price/pack ("9+3 Δώρο");
+  // the canonical product.name can be a single-unit variant.
+  const displayName     = product.productName || product.product_name || product.product?.name;
   let displayImage      = product.product?.imageUrl || product.imageUrl || product.image_url;
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;

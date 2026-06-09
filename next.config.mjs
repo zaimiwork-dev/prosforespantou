@@ -34,6 +34,27 @@ const nextConfig = {
         port: '',
         pathname: '/w4ve/kritikos/**',
       },
+      // Chain image hosts used by Discount.imageUrl / Product.imageUrl. Without
+      // these, next/image (offer detail page, shopping list, modal) 400s and
+      // shows a broken image, even though plain-<img> cards render fine.
+      {
+        protocol: 'https',
+        hostname: 'cdn.mymarket.gr',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 's1.sklavenitis.gr',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.ab.gr',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {

@@ -32,6 +32,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 import { computeHotScore } from '../lib/hotness.ts';
 import { categorize } from '../lib/categories.ts';
+import { samePack } from '../lib/packaging.ts';
 
 const CHAIN = process.env.CHAIN;
 const SOURCE = process.env.SOURCE || 'web';
@@ -243,7 +244,7 @@ async function run() {
     prisma.store.upsert({ where: { name: storeName }, create: { name: storeName }, update: {} })
   );
 
-  let resolved = 0, stillPending = 0, errors = 0, brandRejects = 0, hallucinations = 0, lowConf = 0;
+  let resolved = 0, stillPending = 0, errors = 0, brandRejects = 0, hallucinations = 0, lowConf = 0, packRejects = 0;
 
   for (let i = 0; i < pending.length; i++) {
     const pm = pending[i];
@@ -290,6 +291,11 @@ async function run() {
             const got = cand.name.split(/\s+/)[0];
             rejectReason = `brand mismatch ('${expected}' vs '${got}')`;
             brandRejects++;
+          } else if (!samePack(pm.rawName, cand.name)) {
+            // Pack-size guard: never match a multipack/multibuy to a single
+            // unit (or vice versa) — it makes a 12-pack price read as a single.
+            rejectReason = `pack mismatch ('${pm.rawName}' vs '${cand.name}')`;
+            packRejects++;
           } else {
             chosenProductId = llm.suggestedProductId;
           }
@@ -417,7 +423,7 @@ async function run() {
 
   console.log(`\n🏁 Resolver finished for chain="${CHAIN}" source="${SOURCE}"${DRY_RUN ? ' (DRY_RUN)' : ''}`);
   console.log(`   ✅ resolved:       ${resolved}`);
-  console.log(`   ⚠️  still pending:  ${stillPending} (low-conf=${lowConf} brand-rej=${brandRejects} hallucination=${hallucinations})`);
+  console.log(`   ⚠️  still pending:  ${stillPending} (low-conf=${lowConf} brand-rej=${brandRejects} pack-rej=${packRejects} hallucination=${hallucinations})`);
   console.log(`   ❌ errors:         ${errors}`);
 
   await prisma.$disconnect();

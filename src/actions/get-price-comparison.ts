@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
+import { samePack } from '@/lib/packaging';
 
 export async function getPriceComparison(discountId: string) {
   return await Sentry.withServerActionInstrumentation(
@@ -14,6 +15,7 @@ export async function getPriceComparison(discountId: string) {
           select: {
             id: true,
             productId: true,
+            productName: true,
             product: { select: { barcode: true } },
           },
         });
@@ -48,10 +50,14 @@ export async function getPriceComparison(discountId: string) {
           },
           include: { store: true, product: true },
           orderBy: { discountedPrice: 'asc' },
-          take: 8,
+          take: 16,
         });
 
-        return others.map((d) => ({
+        // Only compare like-for-like pack sizes. A 12-pack offer sharing a
+        // canonical product with single units must not be priced against them.
+        const sameSize = others.filter((d) => samePack(source.productName, d.productName)).slice(0, 8);
+
+        return sameSize.map((d) => ({
           ...d,
           validFrom: d.validFrom.toISOString(),
           validUntil: d.validUntil.toISOString(),
