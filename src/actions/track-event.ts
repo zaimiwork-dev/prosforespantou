@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { CLICK_WEIGHT } from '@/lib/hotness';
 
 const schema = z.object({
   eventType: z.enum(['deal_click', 'leaflet_click', 'list_add']),
@@ -63,6 +64,19 @@ export async function trackEvent(input: unknown) {
           userAgent,
         },
       });
+
+      // Bump the deal's popularity signal so it climbs the hot sort immediately.
+      // CLICK_WEIGHT mirrors the per-click term in computeHotScore; the nightly
+      // recompute then re-derives hotScore authoritatively (windowed clicks).
+      if (d.eventType === 'deal_click' && d.discountId) {
+        await prisma.discount.update({
+          where: { id: d.discountId },
+          data: {
+            clickCount: { increment: 1 },
+            hotScore: { increment: CLICK_WEIGHT },
+          },
+        }).catch(() => {}); // a deleted/expired discount shouldn't fail tracking
+      }
       return { success: true };
     } catch (error) {
       Sentry.captureException(error);

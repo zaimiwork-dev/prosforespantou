@@ -28,10 +28,11 @@ export default async function SupermarketPage({ params }) {
   await pruneExpiredDatelessLeaflets();
 
   const now = new Date();
-  // Cap the initial server payload to the 500 best-discounted deals. Without
-  // a cap, chains with thousands of active deals (Kritikos: 2,760) ship a
-  // multi-megabyte RSC payload to mobile users on every page load. The full
-  // catalog is reachable via the in-page search, which calls a paginated
+  // Cap the initial server payload to the 500 hottest deals. Without a cap,
+  // chains with thousands of active deals (Kritikos: 2,760) ship a
+  // multi-megabyte RSC payload to mobile users on every page load. Ordered by
+  // hotScore so the cap keeps the deals the page defaults to showing first; the
+  // full catalog is reachable via the in-page search, which calls a paginated
   // server action (`searchDeals(query, supermarket)`) for queries ≥ 2 chars.
   const [deals, totalCount, leaflet] = await Promise.all([
     prisma.discount.findMany({
@@ -41,7 +42,7 @@ export default async function SupermarketPage({ params }) {
         validUntil: { gt: now },
       },
       include: { store: true, leaflet: true, product: true },
-      orderBy: [{ discountPercent: "desc" }, { validUntil: "asc" }],
+      orderBy: [{ hotScore: "desc" }, { validUntil: "asc" }],
       take: 500,
     }),
     prisma.discount.count({

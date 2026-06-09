@@ -16,6 +16,7 @@ import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 const PAGE_SIZE = 24;
 
 const SORTS = [
+  { id: "hot",       label: "🔥 Δημοφιλή" },
   { id: "expiring",  label: "Λήγουν σύντομα" },
   { id: "discount",  label: "Μεγαλύτερη έκπτωση" },
   { id: "price_asc", label: "Τιμή: χαμηλή → υψηλή" },
@@ -33,7 +34,7 @@ export default function DealsClient({ initial }) {
 
   const [selectedSMs, setSelectedSMs] = useState(() => initial.supermarkets || []);
   const [activeCategory, setActiveCategory] = useState(initial.category || "all");
-  const [sortBy, setSortBy] = useState(initial.sort || "expiring");
+  const [sortBy, setSortBy] = useState(initial.sort || "hot");
 
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -80,7 +81,7 @@ export default function DealsClient({ initial }) {
     const url = new URL(window.location);
     if (selectedSMs.length > 0) url.searchParams.set("supermarket", selectedSMs.join(",")); else url.searchParams.delete("supermarket");
     if (activeCategory !== "all") url.searchParams.set("category", activeCategory); else url.searchParams.delete("category");
-    if (sortBy !== "expiring") url.searchParams.set("sort", sortBy); else url.searchParams.delete("sort");
+    if (sortBy !== "hot") url.searchParams.set("sort", sortBy); else url.searchParams.delete("sort");
     window.history.replaceState({}, "", url);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSMsKey, activeCategory, sortBy, preferredStores]);
@@ -92,7 +93,7 @@ export default function DealsClient({ initial }) {
   const handleClearFilters = () => {
     setSelectedSMs([]);
     setActiveCategory("all");
-    setSortBy("expiring");
+    setSortBy("hot");
   };
 
   const toggleSM = (id) => {

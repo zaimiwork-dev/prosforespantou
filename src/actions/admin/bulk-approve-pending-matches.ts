@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { requireAdmin } from '@/lib/session';
 import { revalidateTag } from 'next/cache';
 import * as Sentry from '@sentry/nextjs';
+import { computeHotScore } from '@/lib/hotness';
 
 // Same mapping the single-row approve uses. Keep in sync.
 const SM_MAPPING: Record<string, string> = {
@@ -81,6 +82,14 @@ export async function bulkApprovePendingMatches(input: unknown) {
               orderBy: { updatedAt: 'desc' },
             });
 
+            const hotScore = computeHotScore({
+              productName: pending.rawName,
+              description: null,
+              discountPercent: null,
+              createdAt: existing ? existing.createdAt : now,
+              clicks: existing ? existing.clickCount : 0,
+            });
+
             if (existing) {
               await prisma.discount.update({
                 where: { id: existing.id },
@@ -93,6 +102,7 @@ export async function bulkApprovePendingMatches(input: unknown) {
                   validFrom: now,
                   validUntil: nextWeek,
                   isActive: true,
+                  hotScore,
                 },
               });
             } else {
@@ -110,6 +120,7 @@ export async function bulkApprovePendingMatches(input: unknown) {
                   isActive: true,
                   productId: pending.suggestedProductId,
                   source: 'web',
+                  hotScore,
                 },
               });
             }

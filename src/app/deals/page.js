@@ -19,7 +19,7 @@ export default async function DealsPage({ searchParams }) {
     .map((s) => s.trim())
     .filter((s) => VALID_SM_IDS.has(s));
   const category = typeof params?.category === "string" ? params.category : "all";
-  const sort = typeof params?.sort === "string" ? params.sort : "expiring";
+  const sort = typeof params?.sort === "string" ? params.sort : "hot";
 
   const { deals, total } = await getActiveDeals(
     INITIAL_LIMIT,

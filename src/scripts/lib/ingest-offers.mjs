@@ -8,6 +8,7 @@
 // See src/scripts/adapters/CONTRACT.md for the OfferItem shape.
 
 import 'dotenv/config';
+import { computeHotScore } from '../../lib/hotness.ts';
 
 // Chain slug → Store.name (must match what's already in the DB).
 const SM_MAPPING = {
@@ -142,10 +143,19 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
   const existing = await prisma.discount.findFirst({
     where: { productId, supermarket: chain, source },
   });
+  // hotScore at write time uses clicks=0 for new rows or the existing lifetime
+  // clickCount on update; the daily recompute cron is the authoritative pass.
+  const hotScore = computeHotScore({
+    productName: data.productName,
+    description: data.description,
+    discountPercent,
+    createdAt: existing ? existing.createdAt : now,
+    clicks: existing ? existing.clickCount : 0,
+  });
   if (existing) {
-    await prisma.discount.update({ where: { id: existing.id }, data });
+    await prisma.discount.update({ where: { id: existing.id }, data: { ...data, hotScore } });
   } else {
-    await prisma.discount.create({ data });
+    await prisma.discount.create({ data: { ...data, hotScore } });
   }
 
   // PriceSnapshot — only when the price actually changed (idempotent).

@@ -6,17 +6,19 @@ import { unstable_cache } from 'next/cache';
 const getDefaultDeals = unstable_cache(
   async (limit: number) => {
     const now = new Date();
-    const where = { 
-      isActive: true, 
-      validUntil: { gt: now } 
+    const where = {
+      isActive: true,
+      validUntil: { gt: now }
     };
-    
+
     const [deals, total] = await Promise.all([
-      prisma.discount.findMany({ 
-        where, 
-        include: { store: true, leaflet: true, product: true }, 
-        orderBy: { validUntil: 'asc' }, 
-        take: limit 
+      prisma.discount.findMany({
+        where,
+        include: { store: true, leaflet: true, product: true },
+        // Default sort = fylladio-style hotness (KVI/brand/mechanic + clicks +
+        // recency). validUntil breaks ties. See src/lib/hotness.ts.
+        orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }],
+        take: limit
       }),
       prisma.discount.count({ where }),
     ]);
@@ -31,12 +33,14 @@ import * as Sentry from "@sentry/nextjs";
 /**
  * Fetches active discounts from the database with filtering and pagination.
  */
-type SortBy = 'expiring' | 'discount' | 'newest';
+type SortBy = 'hot' | 'expiring' | 'discount' | 'newest';
 
 const orderByFor = (sortBy: SortBy): any => {
   if (sortBy === 'discount') return [{ discountPercent: { sort: 'desc', nulls: 'last' } }, { validUntil: 'asc' }];
   if (sortBy === 'newest') return { createdAt: 'desc' };
-  return { validUntil: 'asc' };
+  if (sortBy === 'expiring') return { validUntil: 'asc' };
+  // 'hot' (default): merchandising rank, validUntil breaks ties.
+  return [{ hotScore: 'desc' }, { validUntil: 'asc' }];
 };
 
 export async function getActiveDeals(
@@ -44,12 +48,12 @@ export async function getActiveDeals(
   offset = 0,
   supermarketId = 'all',
   category = 'all',
-  sortBy: SortBy = 'expiring',
+  sortBy: SortBy = 'hot',
   preferredSMs?: string[]
 ) {
   return await Sentry.withServerActionInstrumentation('getActiveDeals', { recordResponse: true }, async () => {
     try {
-      if (supermarketId === 'all' && category === 'all' && offset === 0 && sortBy === 'expiring' && (!preferredSMs || preferredSMs.length === 0)) {
+      if (supermarketId === 'all' && category === 'all' && offset === 0 && sortBy === 'hot' && (!preferredSMs || preferredSMs.length === 0)) {
         return await getDefaultDeals(limit);
       }
 
@@ -104,16 +108,17 @@ const getTopDealsCached = unstable_cache(
       take: 2,
     });
 
+    // Pool ranked by hotScore (KVI/brand/mechanic + clicks + recency), not raw
+    // %. This frees the widget from the ~5% of deals that carry a discountPercent
+    // (previously Kritikos+AB only) so all chains can surface here.
     const pool = await prisma.discount.findMany({
       where: {
         isActive: true,
         validUntil: { gt: now },
-        discountPercent: { not: null, gt: 0 },
-        originalPrice: { not: null },
         id: { notIn: featured.map(f => f.id) },
       },
       include: { store: true, leaflet: true, product: true },
-      orderBy: [{ discountPercent: 'desc' }, { validUntil: 'asc' }],
+      orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }],
       take: 80,
     });
 

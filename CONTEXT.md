@@ -4,6 +4,12 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-09, working the product-feedback list)
+
+**2026-06-09 update:** Feedback item #4 (default sort = hotness) shipped — see the table row below. New schema fields `Discount.hotScore` + `Discount.clickCount` (db push done), scoring in [src/lib/hotness.ts](src/lib/hotness.ts), recomputed daily as the last step of the GH Actions `resolvers` job ([src/scripts/recompute-hotness.mjs](src/scripts/recompute-hotness.mjs)). **NOT yet committed** — working tree has the change. **Next from the feedback list: #5 categories overhaul, then #7 My Market %.** The KVI/brand lists in hotness.ts are explicitly user-editable — if rankings feel off, tune those.
+
+---
+
 ## ⚡ Pick up here (2026-06-07 afternoon, mid-product-feedback session)
 
 **Status: 5 chains live (Kritikos, Masoutis, AB, My Market, Sklavenitis) + Lidl rewired this morning. Active Discounts ~7,300 and climbing as the backlog resolver works through ~7,000 PendingMatch rows in background. Backend pipeline is solid; UI/UX layer is the focus this afternoon after honest product feedback from the user (paraphrased: "the website feels ~40% finished").**
@@ -17,7 +23,7 @@ The user pushed back on backend-checklist optimism and gave concrete UX issues. 
 | 1 | `'wolt'` chip leaking on cards | ✅ shipped `7c1d7c3` | Filter to user-facing sources in DiscountCard. |
 | 2 | Homepage looks half-empty (5 chains "Σύντομα") | ✅ shipped `7c1d7c3` | SupermarketTiles splits into live + dimmed "Σύντομα κοντά μας" row. |
 | 3 | Kritikos shows "no discount" on most items | ✅ shipped `a0931c6` | **Real root cause was different than I first thought.** Kritikos uses `offerType: "super"` for what their UI labels "SUPER ΤΙΜΗ" — there's no `webSticker`/`mobileSticker` field at all (always absent in their API). 85%+ of Kritikos pantry offers are `super`-typed with no strikethrough. Adapter now maps `offerType: "super"` → `description: "SUPER ΤΙΜΗ"`, and DiscountCard renders description as the badge when no % is available. Backfill running in background; tomorrow's 02:00 UTC cron will fully catch up. |
-| 4 | Default sort should be hot/popular items, not `createdAt DESC` | ❌ **NEXT** | Combine click telemetry + discountPercent into a hotness score. Apply as default sort on homepage + supermarket pages. ~2-3h. Identified as highest user-felt improvement. |
+| 4 | Default sort should be hot/popular items, not `createdAt DESC` | ✅ shipped 2026-06-09 | **Built as fylladio-style merchandising, not "clicks + %".** Reality check first killed the naive formula: clicks ≈ 20/14d (pre-launch noise) and only ~5% of deals carry a `discountPercent`, so neither can be the workhorse. Instead `Discount.hotScore` = KVI-staple boost + headline-brand boost + deal-mechanic boost ("1+1"/"ΔΩΡΟ"/"SUPER ΤΙΜΗ"/%) + recent-click boost + recency, matched by **keyword on product name** (the 348-value category field is too fragmented to use). Lists live in [src/lib/hotness.ts](src/lib/hotness.ts) — editable; they encode "what Greek shoppers care about". Now the default sort on `/deals`, supermarket pages, and the homepage top-deals widget. Verified: top reads like a real leaflet (beer 5+1, Pampers, Coca-Cola, ΟΛΥΜΠΟΣ/ΙΟΝ/BRAVO/ΝΟΥΝΟΥ). Click signal wired but ~0 until launch — grows into a true popularity rank as traffic arrives. **Not done: chain interleave** (top tends kritikos-heavy) — polish follow-up. |
 | 5 | Categories wrong — most items end up in "Άλλο" or wrong bucket | ❌ pending | Current code collapses each chain's 100+ native categories into 17 hardcoded Greek buckets, losing nuance. Right fix: pass chain's original category through verbatim; rebuild CategoryGrid dynamically from what actually exists in DB. ~3-4h. |
 | 6 | Category icons are "random garbage" | ❌ pending | Icons live in `src/lib/constants.js` / `CategoryGrid.js`. Cosmetic but visible. Depends on asset decisions. |
 | 7 | My Market % missing on most items | ❌ pending | Adapter sets `originalPrice: null` deliberately because the listing card shows only the offer price. Analytics JSON has `price` field which is the regular price → could compute % from that when it differs. ~30 min. |

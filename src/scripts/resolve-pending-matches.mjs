@@ -30,6 +30,7 @@ import 'dotenv/config';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
+import { computeHotScore } from '../lib/hotness.ts';
 
 const CHAIN = process.env.CHAIN;
 const SOURCE = process.env.SOURCE || 'web';
@@ -352,10 +353,19 @@ async function run() {
           source: SOURCE,
           isActive: true,
         };
+        // originalPrice is null here (ΜΟΝΟ-style), so % contributes 0 — score
+        // rides on KVI/brand/mechanic + clicks; daily cron is authoritative.
+        const hotScore = computeHotScore({
+          productName: pm.rawName,
+          description: null,
+          discountPercent: null,
+          createdAt: existing ? existing.createdAt : now,
+          clicks: existing ? existing.clickCount : 0,
+        });
         if (existing) {
-          await prisma.discount.update({ where: { id: existing.id }, data: discountData });
+          await prisma.discount.update({ where: { id: existing.id }, data: { ...discountData, hotScore } });
         } else {
-          await prisma.discount.create({ data: discountData });
+          await prisma.discount.create({ data: { ...discountData, hotScore } });
         }
 
         // MatchCache — next adapter run for the same rawName hits this and skips the LLM.

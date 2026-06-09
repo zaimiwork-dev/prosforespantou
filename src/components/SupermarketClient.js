@@ -111,7 +111,9 @@ function expandSearch(query) {
 
 function sortDeals(deals, sortBy) {
   const copy = [...deals];
-  if (sortBy === "discount") {
+  if (sortBy === "hot") {
+    copy.sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0));
+  } else if (sortBy === "discount") {
     copy.sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0));
   } else if (sortBy === "newest") {
     copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -122,7 +124,7 @@ function sortDeals(deals, sortBy) {
 }
 
 export default function SupermarketClient({ sm, initialDeals, totalCount, leaflet }) {
-  const [sortBy, setSortBy] = useState("discount");
+  const [sortBy, setSortBy] = useState("hot");
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);

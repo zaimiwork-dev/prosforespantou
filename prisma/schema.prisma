@@ -104,6 +104,13 @@ model Discount {
   featuredUntil   DateTime? @map("featured_until")
   featuredLabel   String?  @map("featured_label")
   source          String   @default("web") // "web" | "leaflet" | "manual"
+  // Merchandising rank (fylladio-style): KVI/brand/mechanic/% + clicks + recency.
+  // Computed at write (src/lib/hotness.ts) and recomputed daily by the
+  // recompute-hotness cron. Default sort for the public deal lists.
+  hotScore        Float    @default(0) @map("hot_score")
+  // Lifetime deal_click count; bumped in track-event, used as the popularity
+  // signal in the daily hotScore recompute (windowed there, cumulative here).
+  clickCount      Int      @default(0) @map("click_count")
   product         Product? @relation(fields: [productId], references: [id])
   leaflet         Leaflet? @relation(fields: [leafletId], references: [id])
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -118,6 +125,7 @@ model Discount {
   @@index([isActive, supermarket, validUntil])
   @@index([isActive, category, validUntil])
   @@index([source])
+  @@index([isActive, validUntil, hotScore])
   @@map("discounts")
 }
 

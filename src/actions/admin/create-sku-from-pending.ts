@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { requireAdmin } from '@/lib/session';
 import { revalidateTag } from 'next/cache';
 import * as Sentry from '@sentry/nextjs';
+import { computeHotScore } from '@/lib/hotness';
 
 const SM_MAPPING: Record<string, string> = {
   ab: 'AB Vassilopoulos',
@@ -91,6 +92,13 @@ export async function createSkuFromPending(input: unknown) {
           isActive: true,
           productId: newProduct.id,
           source: 'web',
+          hotScore: computeHotScore({
+            productName: pending.rawName,
+            description: null,
+            discountPercent,
+            createdAt: now,
+            clicks: 0,
+          }),
         },
       });
 

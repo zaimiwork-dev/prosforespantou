@@ -1,7 +1,8 @@
 'use client';
 
 const OPTIONS = [
-  { id: "discount", label: "Καλύτερη έκπτωση", icon: "🔥" },
+  { id: "hot", label: "Δημοφιλή", icon: "🔥" },
+  { id: "discount", label: "Καλύτερη έκπτωση", icon: "🏷️" },
   { id: "expiring", label: "Τελειώνουν σύντομα", icon: "⏰" },
   { id: "newest", label: "Νεότερες", icon: "✨" },
 ];

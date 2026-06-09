@@ -213,6 +213,15 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Recompute hotScore (default-sort ranking)
+        # Runs last so scores reflect every Discount the resolvers just wrote,
+        # plus the day's recent-window clicks + recency decay. Authoritative
+        # pass over per-write estimates. See src/lib/hotness.ts.
+        continue-on-error: true
+        run: node src/scripts/recompute-hotness.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
   ab-resolver-only:
     if: github.event.inputs.chain == 'ab-resolver-only'

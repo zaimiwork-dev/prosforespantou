@@ -7,6 +7,7 @@ import { revalidateTag } from 'next/cache';
 import { discountInputSchema } from '@/lib/validations/discount-input';
 import * as Sentry from "@sentry/nextjs";
 import { sendAlertEmail } from '@/lib/email';
+import { computeHotScore } from '@/lib/hotness';
 
 const SM_MAPPING: Record<string, string> = {
   ab: 'AB Vassilopoulos',
@@ -141,6 +142,13 @@ export async function createDiscount(input: unknown) {
           isFeatured: data.isFeatured,
           featuredUntil: data.featuredUntil,
           featuredLabel: data.featuredLabel,
+          hotScore: computeHotScore({
+            productName: data.productName,
+            description: data.description,
+            discountPercent: data.discountPercent,
+            createdAt: new Date(),
+            clicks: 0,
+          }),
         },
       });
 
