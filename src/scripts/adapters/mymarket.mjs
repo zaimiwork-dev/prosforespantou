@@ -101,20 +101,57 @@ function extractItemsFromHtml(html) {
     }
     if (!analytics?.name) return;
 
-    // Skip non-offer cards. The chain marks real offers with is-on-offer on the
-    // selling-unit-row inside the card footer.
+    // Two kinds of My Market offer:
+    //   (a) PACKAGED — `.selling-unit-row.is-on-offer`, headline teaser price.
+    //   (b) WEIGHTED (meat/produce/deli) — row is `selling-unit-row !gap-[9px]`
+    //       (NOT is-on-offer) but it carries an "Αρχ. τιμή κιλού / Τελ. τιμή
+    //       κιλού" pair, i.e. a struck original → it IS on offer. The old
+    //       is-on-offer-only filter silently dropped this whole class (the
+    //       leaflet's entire fresh-food ΠΡΟΣΦΟΡΑ section).
     const $row = $art.find('.selling-unit-row.is-on-offer').first();
-    if (!$row.length) return;
 
-    // Display price = current offer price.
-    const $price = $row.find('.teaser-display-price').first();
-    const whole = $price.find('.teaser-display-price-whole').first().text().trim();
-    const frac = $price.find('.teaser-display-price-fraction').first().text().trim();
+    // Parse the per-kilo "Αρχ./Τελ. τιμή" pair if present (weighted offers).
+    let archi = null, teli = null;
+    $art.find('.measure-label-wrapper').each((_i, w) => {
+      const t = $(w).text();
+      if (/Αρχ\. τιμή/.test(t)) archi = parseEurNumber(t);
+      else if (/Τελ\. τιμή/.test(t)) teli = parseEurNumber(t);
+    });
+    const hasArchTeli = Number.isFinite(archi) && Number.isFinite(teli) && archi > teli && teli > 0;
+    const isWeightedOffer = !$row.length && hasArchTeli;
+
+    // Keep only real offers; a plain regular-price row (no is-on-offer, no
+    // struck original) is skipped.
+    if (!$row.length && !isWeightedOffer) return;
+
     let price = null;
-    if (whole) price = parseFloat(`${whole}.${frac || '00'}`);
-    if (!Number.isFinite(price) || price <= 0) {
-      // Fallback to analytics JSON price.
-      price = parseEurNumber(analytics.price);
+    let originalPrice = null;
+
+    if ($row.length) {
+      // PACKAGED: headline teaser price.
+      const $price = $row.find('.teaser-display-price').first();
+      const whole = $price.find('.teaser-display-price-whole').first().text().trim();
+      const frac = $price.find('.teaser-display-price-fraction').first().text().trim();
+      if (whole) price = parseFloat(`${whole}.${frac || '00'}`);
+      if (!Number.isFinite(price) || price <= 0) price = parseEurNumber(analytics.price);
+      if (!Number.isFinite(price) || price <= 0) return;
+
+      // Original price via discount PERCENT (scale-invariant), back-applied to
+      // the displayed price — the two scales don't always line up.
+      let pct = null;
+      if (hasArchTeli) {
+        pct = 1 - teli / archi;
+      } else {
+        const orig = parseEurNumber($art.find('span.line-through').first().text().trim());
+        if (Number.isFinite(orig) && orig > price && orig / price <= 3) pct = 1 - price / orig;
+      }
+      if (pct != null && pct > 0.01 && pct < 0.95) {
+        originalPrice = Math.round((price / (1 - pct)) * 100) / 100;
+      }
+    } else {
+      // WEIGHTED: per-kilo final + original come straight from the label pair.
+      price = teli;
+      originalPrice = archi;
     }
     if (!Number.isFinite(price) || price <= 0) return;
 
@@ -138,6 +175,7 @@ function extractItemsFromHtml(html) {
       analyticsId: String(analytics.id || ''),
       name: String(analytics.name).trim(),
       price,
+      originalPrice,
       brand: analytics.brand?.trim() || null,
       category: nativeCategoryFromAnalytics(analytics),
       imageUrl,
@@ -155,7 +193,7 @@ function toOfferItem(raw) {
   return {
     name: raw.name,
     price: raw.price,
-    originalPrice: null,
+    originalPrice: raw.originalPrice ?? null,
     chainItemcode: raw.variantSku,
     barcode: null,
     brand: raw.brand,
