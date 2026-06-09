@@ -16,6 +16,10 @@ export interface CheaperAlternative {
 
 const InputSchema = z.array(z.string().uuid()).max(100);
 
+// Ignore trivially-small differences — a 6-cent "cheaper elsewhere" is noise.
+// Only surface an alternative that saves at least this much.
+const MIN_SAVINGS = 0.10;
+
 export async function getCheaperAlternatives(
   discountIds: string[]
 ): Promise<Record<string, CheaperAlternative | null>> {
@@ -104,7 +108,7 @@ export async function getCheaperAlternatives(
           for (const pid of matched) {
             for (const c of byProductId.get(pid) ?? []) {
               if (c.supermarket === s.supermarket) continue;
-              if (c.discountedPrice >= s.discountedPrice) continue;
+              if (s.discountedPrice - c.discountedPrice < MIN_SAVINGS) continue;
               // Like-for-like pack only — don't call a 12-pack "cheaper" than a single.
               if (!samePack(s.productName, c.productName)) continue;
               if (!best || c.discountedPrice < best.discountedPrice) best = c;

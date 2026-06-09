@@ -119,7 +119,7 @@ export function ShoppingList({ isOpen, onClose }) {
                       <span>{sm?.name || g.smId}</span>
                       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{g.subtotal.toFixed(2)}€</span>
                     </div>
-                    {savings >= 0.05 && (
+                    {savings >= 0.10 && (
                       <div className="list-group-savings">
                         💡 Με αλλαγή καταστήματος σε αυτά τα προϊόντα γλιτώνεις έως <b>{savings.toFixed(2)}€</b>
                       </div>
@@ -146,7 +146,7 @@ export function ShoppingList({ isOpen, onClose }) {
                             <div className="list-item-body">
                               <h4 className="list-item-name">{name}</h4>
                               <div className="list-item-price">{(price * (item.quantity || 1)).toFixed(2)}€</div>
-                              {alt && alt.savings >= 0.05 && (
+                              {alt && alt.savings >= 0.10 && (
                                 <a
                                   href={`/offer/${alt.discountId}`}
                                   className="cheaper-chip"
@@ -183,7 +183,7 @@ export function ShoppingList({ isOpen, onClose }) {
               <span className="lbl">Συνολικό κόστος</span>
               <span className="val">{total.toFixed(2)}€</span>
             </div>
-            {totalSavings >= 0.05 && (
+            {totalSavings >= 0.10 && (
               <div className="drawer-savings">
                 Με αλλαγή καταστημάτων η λίστα γίνεται έως <b>{totalSavings.toFixed(2)}€</b> φθηνότερη
               </div>

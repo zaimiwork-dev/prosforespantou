@@ -11,6 +11,7 @@ import { getSessionId } from '@/lib/session-id';
 import { getPriceComparison } from '@/actions/get-price-comparison';
 import { getPriceHistory } from '@/actions/get-price-history';
 import { PriceHistory } from './PriceHistory';
+import { hiResImage } from '@/lib/images';
 
 export function ProductModal({ product, onClose, onAdd }) {
   const [qty, setQty] = useState(1);
@@ -65,7 +66,7 @@ export function ProductModal({ product, onClose, onAdd }) {
   // Raw offer name first: it matches this offer's price/pack ("9+3 Δώρο");
   // the canonical product.name can be a single-unit variant.
   const displayName     = product.productName || product.product_name || product.product?.name;
-  let displayImage      = product.product?.imageUrl || product.imageUrl || product.image_url;
+  let displayImage      = hiResImage(product.product?.imageUrl || product.imageUrl || product.image_url);
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
   }

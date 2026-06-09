@@ -8,6 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { PriceHistory } from "@/components/PriceHistory";
+import { hiResImage } from "@/lib/images";
 
 export default function OfferClientContent({ offer, comparison = [], history = null }) {
   const { items, addItem } = useShoppingListStore();
@@ -28,7 +29,7 @@ export default function OfferClientContent({ offer, comparison = [], history = n
   };
 
   const daysLeft = getDaysLeft(offer.validUntil);
-  const displayImage = offer.imageUrl || offer.product?.imageUrl;
+  const displayImage = hiResImage(offer.imageUrl || offer.product?.imageUrl);
   const displayName = offer.productName || offer.product?.name;
   const displayDescription = offer.description || offer.product?.description;
   const discountedPrice = Number(offer.discountedPrice);
