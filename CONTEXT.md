@@ -21,7 +21,9 @@ Living snapshot of what the project is, how data flows, and where things live. R
 | `abb057e` | **Category leak class fix.** Pure-Latin keywords now match on WORD BOUNDARIES (kills `ion`→"protectION" [212 items!], `pet`→"PETit", `rum`→"seRUM", `lacta`→"LACTAcyd", `cola`→"choCOLAte"). Greek stems stay substring. Added `categorizeTrace()` + [src/scripts/audit-categories.mjs](src/scripts/audit-categories.mjs). |
 
 ### Current category state (after all backfills)
-Άλλο ≈ 1,200 (~12%), 17 departments populated, audit reports **0 Latin-substring leaks**, Κατοικίδια/Κάβα verified clean. `audit-categories.mjs` is the tool to re-check after any keyword edit.
+Άλλο ≈ **733 (~7%)** after the native→department alias map (2026-06-11), down from ~1,216. 17 departments populated, audit reports **0 Latin-substring leaks**, Κατοικίδια/Κάβα verified clean. `audit-categories.mjs` is the tool to re-check after any keyword edit.
+
+**Native→department alias map (2026-06-11).** [src/lib/categories.ts](src/lib/categories.ts) now has `NATIVE_ALIASES` — ~95 of the chains' own category labels mapped straight to departments, applied as a high-precision step BEFORE keyword matching. Keys are normalized at load (write labels verbatim). It both rescues Άλλο rows AND fixes name-keyword misfires (e.g. "Γαλάκτωμα"/"Body Milk" body-lotions were stuck in dairy via the `γαλα` stem; "Καθαρισμός Προσώπου" face-cleanser was in Καθαρισμού; denture care was in Αρτοποιία). Only UNAMBIGUOUS labels included — polysemous ones (Λευκά, Υγρό, Ενηλίκων, Pants, Γεμιστά, Multipack) deliberately fall through to name matching. Backfilled 872 rows, idempotent. `categorizeTrace` reports `via:'native-alias'`. **Still open:** Masoutis/Sklavenitis/AB have null native, so Latin/English-named items (e.g. "Body Oil Intense Tan Spray") still miss → next category win.
 
 ### New/changed architecture this sprint (know these)
 - **Schema:** `Discount.hotScore Float`, `Discount.clickCount Int`, `Discount.subcategory String?` (all `db push`ed, live).

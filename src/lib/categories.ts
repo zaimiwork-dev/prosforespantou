@@ -182,6 +182,138 @@ const COMPILED = RULES.map((r) => ({
   terms: r.terms.map((term) => ({ term, test: buildMatcher(term) })),
 }));
 
+// Native-category alias map. Chains expose their own category labels, which are
+// a far cleaner signal than guessing from the product name — so when a row
+// carries one of these EXACT native labels we map it straight to a department,
+// BEFORE any keyword matching. This both rescues "Άλλο" rows the name couldn't
+// place AND corrects name-keyword misfires (the dairy 'γαλα' stem was eating
+// "Γαλάκτωμα"/"Body Milk" body-lotions; the cleaning 'καθαρισμ' stem was eating
+// "Καθαρισμός Προσώπου" face-cleansers; denture care landed in Αρτοποιία).
+//
+// Only UNAMBIGUOUS labels belong here. Polysemous ones whose meaning flips by
+// chain/context — Λευκά (white wine? cheese?), Υγρό, Ενηλίκων, Pants, Γεμιστά,
+// Multipack, Σε Φέτες, Διάφορες Γεύσεις — are deliberately left out so they
+// fall through to keyword matching on the product name.
+//
+// Keys are matched accent-insensitively (normalize()); write them verbatim as
+// the chain emits them. To retune: move a label, then re-run
+// recompute-categories.mjs. Audit with audit-categories.mjs.
+const NATIVE_ALIASES_RAW: Record<string, string> = {
+  // Προσωπική Φροντίδα
+  'Βαφές': 'Προσωπική Φροντίδα',
+  'Αφρόλουτρα': 'Προσωπική Φροντίδα',
+  'Αφρόλουτρα, Αφροντούς': 'Προσωπική Φροντίδα',
+  'Καθαρισμός Προσώπου': 'Προσωπική Φροντίδα',
+  'Κρέμες Προσώπου': 'Προσωπική Φροντίδα',
+  'Κρέμες': 'Προσωπική Φροντίδα',
+  'Κρέμες Χεριών': 'Προσωπική Φροντίδα',
+  'Hair Spray': 'Προσωπική Φροντίδα',
+  'Μάσκες': 'Προσωπική Φροντίδα',
+  'After Shave, Κρέμες Ενυδάτωσης': 'Προσωπική Φροντίδα',
+  'Γαλάκτωμα': 'Προσωπική Φροντίδα',
+  'Γαλακτώματα, Κρέμες': 'Προσωπική Φροντίδα',
+  'Body Milk / Lotions': 'Προσωπική Φροντίδα',
+  'Τεχνητή Οδοντοστοιχία': 'Προσωπική Φροντίδα',
+  'Τεχνητή Οδοντοστοιχεία': 'Προσωπική Φροντίδα',
+  // Κάβα
+  'Lager': 'Κάβα',
+  'Pils': 'Κάβα',
+  'Stout': 'Κάβα',
+  'Ale': 'Κάβα',
+  'Weiss': 'Κάβα',
+  'Ενεργειακά': 'Κάβα',
+  'Ερυθρά': 'Κάβα',
+  'Ροζέ': 'Κάβα',
+  'Γκαζόζα': 'Κάβα',
+  'Liqueur, Aperitif': 'Κάβα',
+  'Απεριτίφ': 'Κάβα',
+  'Τεκίλα': 'Κάβα',
+  'Ανθρακούχα Νερά': 'Κάβα',
+  'Ανθρακούχο': 'Κάβα',
+  'Μηλίτης': 'Κάβα',
+  'Αφρώδεις Οίνοι': 'Κάβα',
+  'Χωρίς Αλκοόλ': 'Κάβα',
+  'Alcohol Free': 'Κάβα',
+  'Μη Αλκοολούχα': 'Κάβα',
+  // Κατεψυγμένα
+  'Παγωτά': 'Κατεψυγμένα',
+  // Είδη Καθαρισμού & Σπιτιού
+  'Υγρά Πιάτων': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σκοροκτόνα': 'Είδη Καθαρισμού & Σπιτιού',
+  'Κατσαριδοκτόνα': 'Είδη Καθαρισμού & Σπιτιού',
+  'Εντομοαπωθητικά': 'Είδη Καθαρισμού & Σπιτιού',
+  'Εντομ/Τικα / Λοσιόν': 'Είδη Καθαρισμού & Σπιτιού',
+  'Ενισχυτικά Πλύσης, Σιδέρωμα': 'Είδη Καθαρισμού & Σπιτιού',
+  'Ενισχυτικά - Χρωμοπαγιδες': 'Είδη Καθαρισμού & Σπιτιού',
+  'Υγρά Ταμπλέτες': 'Είδη Καθαρισμού & Σπιτιού',
+  'Ταμπλέτες': 'Είδη Καθαρισμού & Σπιτιού',
+  'Χαρτοπετσέτες': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σφουγγαράκια, Συρματάκια': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σπογγοπετσέτες': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σύρματα': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σακούλες Σκουπιδιών': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σακούλες Τροφίμων': 'Είδη Καθαρισμού & Σπιτιού',
+  'Αποσκληρυντικό': 'Είδη Καθαρισμού & Σπιτιού',
+  'Αποσκληρυντικά': 'Είδη Καθαρισμού & Σπιτιού',
+  'Για το Μπάνιο': 'Είδη Καθαρισμού & Σπιτιού',
+  'Κουζίνας': 'Είδη Καθαρισμού & Σπιτιού',
+  'Κουζίνας, Λιποκαθαριστές': 'Είδη Καθαρισμού & Σπιτιού',
+  'Πατώματος, Παρκέ': 'Είδη Καθαρισμού & Σπιτιού',
+  'Γενικής Χρήσης': 'Είδη Καθαρισμού & Σπιτιού',
+  'Φαράσια': 'Είδη Καθαρισμού & Σπιτιού',
+  'Κοντάρια': 'Είδη Καθαρισμού & Σπιτιού',
+  'Τζάμια': 'Είδη Καθαρισμού & Σπιτιού',
+  'Τζαμιών': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σπιράλ / Κεριά': 'Είδη Καθαρισμού & Σπιτιού',
+  'Παγίδες': 'Είδη Καθαρισμού & Σπιτιού',
+  'Αποφρακτικά': 'Είδη Καθαρισμού & Σπιτιού',
+  'Κατά των Αλάτων': 'Είδη Καθαρισμού & Σπιτιού',
+  'Πλύσιμο Στο Χέρι': 'Είδη Καθαρισμού & Σπιτιού',
+  'Σκόνη': 'Είδη Καθαρισμού & Σπιτιού',
+  'Αρωματικά Χώρου, Κεριά': 'Είδη Καθαρισμού & Σπιτιού',
+  // Βρεφικά Είδη
+  'Περιποίηση Σώματος Βρέφους': 'Βρεφικά Είδη',
+  'Φροντίδα Μαλλιών Βρέφους': 'Βρεφικά Είδη',
+  // Είδη Παντοπωλείου
+  'Άλλες Πάστες': 'Είδη Παντοπωλείου',
+  'Κριθαράκι': 'Είδη Παντοπωλείου',
+  'Αραβοσιτέλαιο': 'Είδη Παντοπωλείου',
+  'Σπορέλαιο': 'Είδη Παντοπωλείου',
+  'Πυρηνέλαιο': 'Είδη Παντοπωλείου',
+  'Στέβια': 'Είδη Παντοπωλείου',
+  'Κύβοι, Ζωμοί': 'Είδη Παντοπωλείου',
+  'Ζωμοί Ψυγείου': 'Είδη Παντοπωλείου',
+  'Για Σαλάτες': 'Είδη Παντοπωλείου',
+  // Σνακ & Γλυκά
+  'Μπάρες Δημητριακών': 'Σνακ & Γλυκά',
+  'Μπάρες': 'Σνακ & Γλυκά',
+  'Nachos': 'Σνακ & Γλυκά',
+  'Digestive': 'Σνακ & Γλυκά',
+  'Χαλβάς, Παστέλια, Μαντολάτα': 'Σνακ & Γλυκά',
+  'Βουτήματα': 'Σνακ & Γλυκά',
+  'Κουβερτούρα': 'Σνακ & Γλυκά',
+  'Φυστικοβούτυρο': 'Σνακ & Γλυκά',
+  // Γαλακτοκομικά & Είδη Ψυγείου
+  'Φυτικά Ροφήματα': 'Γαλακτοκομικά & Είδη Ψυγείου',
+  'Βούτυρα': 'Γαλακτοκομικά & Είδη Ψυγείου',
+  // Πρωινό & Ροφήματα
+  'Κάψουλες': 'Πρωινό & Ροφήματα',
+  'Ελληνικός': 'Πρωινό & Ροφήματα',
+  // Τυριά & Αλλαντικά
+  'Τριμμένα': 'Τυριά & Αλλαντικά',
+  'Κρεμώδη': 'Τυριά & Αλλαντικά',
+  // Κρέας & Ψάρι
+  'Βοδινό': 'Κρέας & Ψάρι',
+  // Κονσέρβες
+  'Τοματοειδή': 'Κονσέρβες',
+};
+
+// Normalized lookup (accent-stripped lowercase keys), built once at load.
+const NATIVE_ALIASES = new Map<string, string>();
+for (const [label, dept] of Object.entries(NATIVE_ALIASES_RAW)) {
+  NATIVE_ALIASES.set(normalize(label), dept);
+}
+
 function matchRules(text: string): string | null {
   for (const rule of COMPILED) {
     if (rule.terms.some((tt) => tt.test(text))) return rule.dept;
@@ -197,6 +329,8 @@ export function categorizeTrace(name: string | null | undefined, nativeHint?: st
     return { dept: nativeHint, via: 'native-dept', term: null as string | null };
   }
   if (nativeHint && nativeHint !== 'Άλλο') {
+    const alias = NATIVE_ALIASES.get(normalize(nativeHint));
+    if (alias) return { dept: alias, via: 'native-alias', term: nativeHint };
     const n = normalize(nativeHint);
     for (const r of COMPILED) { const tt = r.terms.find((x) => x.test(n)); if (tt) return { dept: r.dept, via: 'native-kw', term: tt.term }; }
   }
@@ -210,7 +344,16 @@ export function categorize(name: string | null | undefined, nativeHint?: string 
   //    for sklavenitis/AB, admin-entered) — but not "Άλλο" (= "unknown").
   if (nativeHint && nativeHint !== 'Άλλο' && DEPT_SET.has(nativeHint)) return nativeHint;
 
-  // 2. A granular native label (kritikos "Κρεμοσάπουνα", "Με Βάση Καφέ", …) is
+  // 2. Exact native-label alias (NATIVE_ALIASES) — highest-precision signal:
+  //    the chain's own taxonomy mapped straight to a department, ahead of any
+  //    keyword guessing. Catches both unplaceable "Άλλο" labels and labels the
+  //    name keywords would misfile (e.g. "Γαλάκτωμα" body-lotion → dairy).
+  if (nativeHint && nativeHint !== 'Άλλο') {
+    const alias = NATIVE_ALIASES.get(normalize(nativeHint));
+    if (alias) return alias;
+  }
+
+  // 3. A granular native label (kritikos "Κρεμοσάπουνα", "Με Βάση Καφέ", …) is
   //    a cleaner signal than the product name, where scent/flavour words mislead
   //    ("ΜΕΛΙ ΓΑΛΑ" soap is not dairy). Match it first when present.
   if (nativeHint && nativeHint !== 'Άλλο') {
@@ -218,6 +361,6 @@ export function categorize(name: string | null | undefined, nativeHint?: string 
     if (byNative) return byNative;
   }
 
-  // 3. Fall back to the product name.
+  // 4. Fall back to the product name.
   return matchRules(normalize(name)) ?? 'Άλλο';
 }
