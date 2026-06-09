@@ -31,6 +31,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 import { computeHotScore } from '../lib/hotness.ts';
+import { categorize } from '../lib/categories.ts';
 
 const CHAIN = process.env.CHAIN;
 const SOURCE = process.env.SOURCE || 'web';
@@ -341,7 +342,11 @@ async function run() {
         });
         const discountData = {
           productName: pm.rawName,
-          category: llm.category || 'Άλλο',
+          // The LLM's category is a department-level guess → keep it as the
+          // subcategory hint and let the shared categorizer have final say
+          // (uniform with every other write path).
+          category: categorize(pm.rawName, llm.category),
+          subcategory: llm.category || null,
           discountedPrice: pm.rawPrice,
           originalPrice,
           validFrom: now,

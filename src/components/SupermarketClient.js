@@ -165,6 +165,15 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
     return () => { cancelled = true; clearTimeout(t); };
   }, [searchQuery, sm.id]);
 
+  // Per-department counts from the loaded deals — drives the dynamic grid so it
+  // only shows departments this chain actually has. Based on initialDeals
+  // (top-500 by hotScore); good enough to decide which tiles to show.
+  const categoryCounts = useMemo(() => {
+    const m = {};
+    for (const d of initialDeals) if (d.category) m[d.category] = (m[d.category] || 0) + 1;
+    return m;
+  }, [initialDeals]);
+
   const filtered = useMemo(() => {
     // When the user is searching, render the server results (they cover the
     // full catalog, not just the top-500 initialDeals). Otherwise filter the
@@ -303,7 +312,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
       </section>
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px" }}>
-        <CategoryGrid activeCategory={activeCategory} onSelect={setActiveCategory} />
+        <CategoryGrid activeCategory={activeCategory} onSelect={setActiveCategory} counts={categoryCounts} />
 
         <section>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 4px" }}>

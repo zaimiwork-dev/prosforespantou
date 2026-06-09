@@ -85,7 +85,13 @@ model Leaflet {
 model Discount {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productName     String   @map("product_name")
+  // Top-level department (one of lib/categories.ts DEPARTMENTS) — drives the
+  // CategoryGrid + filters. Assigned by the keyword categorizer at write time.
   category        String
+  // The chain's own native category label (kritikos "Ελαιόλαδο Έξτρα Παρθένο",
+  // mymarket analytics category, …), preserved for future subcategory drill-down.
+  // Null when the source exposes none (e.g. masoutis).
+  subcategory     String?
   originalPrice   Float?   @map("original_price")
   discountedPrice Float    @map("discounted_price")
   discountPercent Float?   @map("discount_percent")

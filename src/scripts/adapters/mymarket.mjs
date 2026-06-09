@@ -49,31 +49,14 @@ const HEADERS = {
   Referer: 'https://www.mymarket.gr/',
 };
 
-const TOP_CATEGORIES = {
-  'Φρούτα & Λαχανικά': 'Φρούτα & Λαχανικά',
-  'Κρεοπωλείο': 'Κρέας & Ψάρι',
-  'Κρεοπωλείο & Ιχθυοπωλείο': 'Κρέας & Ψάρι',
-  'Ψαρικά': 'Κρέας & Ψάρι',
-  'Γαλακτοκομικά': 'Γαλακτοκομικά & Είδη Ψυγείου',
-  'Τυριά & Αλλαντικά': 'Τυριά & Αλλαντικά',
-  'Κατεψυγμένα': 'Κατεψυγμένα',
-  'Παντοπωλείο': 'Είδη Παντοπωλείου',
-  'Αρτοζαχαροπλαστείο': 'Αρτοποιία',
-  'Καφές & Ροφήματα': 'Πρωινό & Ροφήματα',
-  'Σνακ & Γλυκά': 'Σνακ & Γλυκά',
-  'Κάβα': 'Κάβα',
-  'Προσωπική Φροντίδα': 'Προσωπική Φροντίδα',
-  'Βρεφικά Είδη': 'Βρεφικά Είδη',
-  'Φροντίδα για το Μωρό σας': 'Βρεφικά Είδη',
-  'Οικιακή Φροντίδα & Χαρτικά': 'Είδη Καθαρισμού & Σπιτιού',
-  'Κατοικίδια': 'Είδη Κατοικιδίων',
-};
-
-function categoryFromAnalytics(j) {
-  if (!j) return 'Άλλο';
-  const top = j.category;
-  if (top && TOP_CATEGORIES[top]) return TOP_CATEGORIES[top];
-  return 'Άλλο';
+// Most-specific native category the analytics blob carries. Kept verbatim as
+// the Discount.subcategory; the shared categorizer (lib/categories.ts) derives
+// the top-level department from name + this hint. We no longer pre-bucket here
+// (the old TOP_CATEGORIES map only mapped the coarse top level and dropped 41%
+// of items into "Άλλο").
+function nativeCategoryFromAnalytics(j) {
+  if (!j) return null;
+  return (j.category3 || j.category2 || j.category || '').trim() || null;
 }
 
 function parseGreekInt(s) {
@@ -156,7 +139,7 @@ function extractItemsFromHtml(html) {
       name: String(analytics.name).trim(),
       price,
       brand: analytics.brand?.trim() || null,
-      category: categoryFromAnalytics(analytics),
+      category: nativeCategoryFromAnalytics(analytics),
       imageUrl,
       offerNote,
     });

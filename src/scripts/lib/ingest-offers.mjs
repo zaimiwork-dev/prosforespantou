@@ -9,6 +9,7 @@
 
 import 'dotenv/config';
 import { computeHotScore } from '../../lib/hotness.ts';
+import { categorize } from '../../lib/categories.ts';
 
 // Chain slug → Store.name (must match what's already in the DB).
 const SM_MAPPING = {
@@ -120,9 +121,13 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     ? Math.round((1 - item.price / originalPrice) * 100)
     : null;
 
+  // The adapter's item.category is the chain's native label → keep it as the
+  // subcategory and derive the top-level department from name + native hint.
+  const nativeCat = item.category || null;
   const data = {
     productName: item.name,
-    category: item.category || 'Άλλο',
+    category: categorize(item.name, nativeCat),
+    subcategory: nativeCat,
     discountedPrice: item.price,
     originalPrice,
     discountPercent,
