@@ -4,15 +4,46 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-09, working the product-feedback list)
+## ⚡ Pick up here (2026-06-10 — product-feedback + bug-fix sprint done, all pushed)
 
-**2026-06-09 update:** Worked the whole product-feedback list. **#4 (hotness sort), #5 (categories overhaul), #6 (icons), #7 (My Market %) all resolved** — see the table rows below.
-- **#4 committed** as `5c73189` (hotScore default sort).
-- **#5/#6 NOT yet committed** — working tree has: new `Discount.subcategory` (db push done), keyword categorizer [src/lib/categories.ts](src/lib/categories.ts), backfill [recompute-categories.mjs](src/scripts/recompute-categories.mjs), dynamic CategoryGrid. Άλλο 34%→9%.
-- **#7** closed as won't-fix (source has no regular price — premise was wrong).
-- Both [src/lib/hotness.ts](src/lib/hotness.ts) and [src/lib/categories.ts](src/lib/categories.ts) have **user-editable keyword lists** — retune if rankings/categories feel off, then re-run the matching recompute script.
-- **Gotcha learned:** [recompute-categories.mjs](src/scripts/recompute-categories.mjs) was non-idempotent — running it twice overwrote kritikos' native subcategory with the computed department. Fixed (never treats a department as native). Kritikos was restored by re-running its adapter.
-- **Next:** the remaining feedback items are done; pick up chain-interleave polish on the hot sort (top tends kritikos-heavy), or new roadmap work (mobile/Capacitor per PHASES).
+**Everything below is committed AND pushed to `origin/main`.** The whole 2026-06-07 product-feedback list (#1–#7) is resolved, plus a round of user-reported bugs and a deep category cleanup. Working tree clean.
+
+### What shipped this sprint (newest commit last)
+| commit | what |
+|---|---|
+| `5c73189` | **#4 Hotness default sort.** New `Discount.hotScore` + `clickCount`. Fylladio-style score (KVI/brand/deal-mechanic + recent clicks + recency) in [src/lib/hotness.ts](src/lib/hotness.ts). Default sort on /deals, supermarket pages, homepage top-deals widget. Daily recompute = last step of GH `resolvers` job ([recompute-hotness.mjs](src/scripts/recompute-hotness.mjs)). |
+| `4b529ce` | **#5 Categories overhaul.** Keyword categorizer [src/lib/categories.ts](src/lib/categories.ts) → 17 stable departments; chain's native label kept in new `Discount.subcategory`. Backfill [recompute-categories.mjs](src/scripts/recompute-categories.mjs). |
+| `4730937` | **#7 My Market price differences (REOPENED — I was wrong twice).** Web `/offers` DOES publish originals; two bugs hid them: weighted ΠΡΟΣΦΟΡΑ items used `selling-unit-row !gap-[9px]` (not `is-on-offer`) so the adapter dropped the whole fresh-food section; packaged offers never read the struck original. Adapter now reads both (per-kilo "Αρχ./Τελ. τιμή κιλού" pair for weighted; scale-invariant % for packaged). |
+| `5f6480a` | **3 bugs:** (a) broken detail/modal/list images — added cdn.mymarket.gr, s1.sklavenitis.gr, www.ab.gr to next.config remotePatterns; (b) share-list shared only the URL — dropped `url` from `navigator.share`; (c) **multipack mismatch** — [src/lib/packaging.ts](src/lib/packaging.ts) `packCount`/`samePack`; cards/modal show raw `productName` first; comparison actions filter to same-pack; resolver rejects multipack↔single. |
+| `a360e24` | Blurry detail images → [src/lib/images.js](src/lib/images.js) `hiResImage()` upgrades My Market `medium`→`original` on detail+modal only. Cheaper-alternative min savings 5c→**10c**. |
+| `5817ab4` | **#6 icons → emoji** ([CategoryIcon.js](src/components/CategoryIcon.js)). |
+| `3e72f2b` | Category leak fix #1 (Κάβα) + **fixed [recompute-categories.mjs](src/scripts/recompute-categories.mjs) no-op** (it was passing the current category back as the hint, which categorize() trusts → backfill never re-evaluated rows with null subcategory). |
+| `abb057e` | **Category leak class fix.** Pure-Latin keywords now match on WORD BOUNDARIES (kills `ion`→"protectION" [212 items!], `pet`→"PETit", `rum`→"seRUM", `lacta`→"LACTAcyd", `cola`→"choCOLAte"). Greek stems stay substring. Added `categorizeTrace()` + [src/scripts/audit-categories.mjs](src/scripts/audit-categories.mjs). |
+
+### Current category state (after all backfills)
+Άλλο ≈ 1,200 (~12%), 17 departments populated, audit reports **0 Latin-substring leaks**, Κατοικίδια/Κάβα verified clean. `audit-categories.mjs` is the tool to re-check after any keyword edit.
+
+### New/changed architecture this sprint (know these)
+- **Schema:** `Discount.hotScore Float`, `Discount.clickCount Int`, `Discount.subcategory String?` (all `db push`ed, live).
+- **Pure helper libs** (strip-safe, imported by both .ts actions and .mjs scripts): [hotness.ts](src/lib/hotness.ts), [categories.ts](src/lib/categories.ts), [packaging.ts](src/lib/packaging.ts), [images.js](src/lib/images.js). **All three keyword lists (hotness/categories) are user-editable — retune then re-run the matching `recompute-*.mjs` and `audit-categories.mjs`.**
+- **categorize(name, native)** waterfall: trust native if it's already a valid department → else keyword-match native → else keyword-match name → Άλλο. Native-keyword-first beats misleading scent/flavour words in the name.
+- Score/category computed at every write (ingest-offers, resolver, admin paths); recompute scripts are backfills/daily-refresh.
+
+### Gotchas burned into this sprint (don't repeat)
+1. **Don't generalize "the source doesn't expose X" from one sampled page.** I twice wrongly closed My Market %; the user's leaflet screenshot proved a whole item class (weighted fresh-food) was being dropped. Sample multiple pages / item types.
+2. **Substring keyword matching leaks** — short Latin tokens match inside words (`ion`/`pet`/`rum`/`cola`). Latin terms are now word-bounded; if you add Greek stems, watch for collisions like `γατ`→"μπουγατσάκια" (the audit only catches Latin). Run `audit-categories.mjs` after edits.
+3. **recompute-categories.mjs must pass only the true native hint**, never the current `category` (categorize trusts a valid-dept hint → silent no-op).
+4. Re-running an adapter (kritikos/mymarket) is the way to repopulate granular `subcategory` + apply adapter fixes to live data; it's the same as the daily cron, safe to run manually.
+
+### Next candidates (nothing urgent — pick with the user)
+1. **Native→department alias map** — biggest remaining category win. Map reliable chains' native labels (kritikos "Εμφιαλωμένα Νερά" → Κάβα, mymarket "Κρεοπωλείο" → Κρέας) directly, bypassing name-guessing → shrinks Άλλο and prevents most remaining mismatches. The user explicitly asked about trusting native categories more.
+2. **Chain-interleave** on the hot sort — the top tends kritikos-heavy. Cap N-in-a-row per chain.
+3. Keep whittling **Άλλο** (~12%) via keyword lists, OR fold it into #1.
+4. My Market weighted ΠΡΟΣΦΟΡΑ items mostly sit in **PendingMatch** (fresh meat/produce not in canonical catalog) — they convert to visible discounts as the resolver runs; some fresh cuts stay pending until catalog grows.
+5. Per PHASES: mobile UX audit → Capacitor wrap → App Store.
+
+### Price history honest state (user asked)
+Real recorded prices, daily cadence, but young: oldest snapshot ~2026-04-26 (~44d), most products 1–2 points, only ~1,900 have ≥3 points (the minimum to draw the chart). Already a 90-day window on detail page + modal; deepens automatically. 90d is the right window — don't extend (a 10-month-old price would mislead the "is this cheap?" verdict).
 
 ---
 
