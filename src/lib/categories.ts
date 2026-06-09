@@ -108,11 +108,17 @@ const RULES: { dept: string; terms: string[] }[] = [
     'ροφημα κακαο', 'κακαο', 'nesquik', 'στιγμιαιος', 'φακελακια τσαι',
   ] },
   { dept: 'Κάβα', terms: [
-    'μπυρα', 'beer', 'κρασι', 'wine', 'οινος', 'ουζο', 'τσιπουρο', 'βοτκα', 'vodka',
-    'ουισκι', 'whisky', 'whiskey', 'gin', 'τζιν', 'ρουμι', 'rum', 'λικερ', 'σαμπανι',
+    // NOTE: short Latin tokens are space-padded so they match whole words only.
+    // Bare substrings caused false hits: 'gin'→"oriGINal", 'rum'→"seRUM",
+    // 'tonic'→"isoTONIC", 'νερο'/'νερου'→"ροδόΝΕΡΟ"/"αποσκληρυντικό ΝΕΡΟΥ".
+    // 'beer' (→"orzene BEER recipes σαμπουάν") and 'energy' (→"nivea/fa ENERGY
+    // boost/gel" cosmetics) are dropped — Greek drinks use μπύρα / explicit
+    // "energy drink", so the bare words only cause cosmetic false positives.
+    'μπυρα', 'κρασι', 'wine', 'οινος', 'ουζο', 'τσιπουρο', 'βοτκα', 'vodka',
+    'ουισκι', 'whisky', 'whiskey', ' gin ', 'τζιν', 'ρουμι', ' rum ', 'λικερ', 'σαμπανι',
     'αναψυκτικ', 'coca', 'cola', 'pepsi', 'σπριτ', 'sprite', 'fanta', 'χυμο', 'χυμος',
-    'νερο ', 'νερου', 'εμφιαλωμεν', 'σοδα', 'tonic', 'ενεργειακο ποτο', 'ice tea',
-    'αναψυκτικα', 'μεταλλικο νερο', 'energy', 'monster', 'red bull',
+    'εμφιαλωμεν', 'σοδα', ' tonic', 'ενεργειακο ποτο', 'energy drink', 'ice tea',
+    'αναψυκτικα', 'μεταλλικο νερο', 'φυσικο νερο', 'επιτραπεζιο νερο', 'monster', 'red bull',
   ] },
   { dept: 'Προσωπική Φροντίδα', terms: [
     'σαμπουαν', 'shampoo', 'αφρολουτρο', 'οδοντοκρεμα', 'οδοντοβουρτσ', 'στοματικο',
