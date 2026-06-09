@@ -50,8 +50,13 @@ const RULES: { dept: string; terms: string[] }[] = [
     'βρεφικη', 'baby', 'βρεφικο γαλα', 'κρεμα αλλαγης', 'πιπιλ', 'μπιμπερο',
   ] },
   { dept: 'Είδη Κατοικιδίων', terms: [
-    'σκυλ', 'γατ', 'pet', 'κατοικιδ', 'κροκετ', 'whiskas', 'friskies', 'pedigree',
-    'felix', 'τροφη σκυλ', 'τροφη γατ', 'αμμος γατ',
+    // 'pet' removed — matched "PETit"/"risPET" and the "PET" bottle plastic.
+    // Rely on Greek pet words + brands instead.
+    // 'γατ' (cat) tightened to declensions — bare 'γατ' matched "μπουΓΑΤσάκια".
+    'σκυλ', 'γατα', 'γατε', 'γατο', 'γατω', 'κατοικιδ', 'κροκετ', 'ζωοτροφ', 'σκυλου',
+    'τροφη σκυλ', 'τροφη γατ', 'αμμος γατ',
+    'whiskas', 'friskies', 'pedigree', 'felix', 'sheba', 'catisfactions',
+    'dreamies', 'kitekat', 'royal canin', 'perfect fit', 'purina', 'vitakraft',
   ] },
   { dept: 'Κατεψυγμένα', terms: [
     'κατεψυγ', 'παγωτο', 'καταψυξ', 'frozen', 'κατεψ.', 'φιλετο μπακαλιαρου κατεψ',
@@ -84,7 +89,7 @@ const RULES: { dept: string; terms: string[] }[] = [
     'ξηρους καρπους', 'ξηροι καρποι', 'φιστικ', 'αμυγδαλ', 'καρυδ', 'σταφιδ', 'κρακερ',
     'cracker', 'γλυκο κουταλιου', 'κρουασαν', 'croissant', 'κεικ', 'cake', 'ζελε',
     'λουκουμ', 'μπαρα δημητρ', 'πραλιν', 'νουγκατ', 'γκοφρ', 'kinder', 'ferrero',
-    'lacta', 'ion ', 'oreo', 'merenda', 'choco', 'σοκολατακ',
+    'lacta', 'oreo', 'merenda', 'chocolate', 'σοκολατακ',
   ] },
   { dept: 'Γαλακτοκομικά & Είδη Ψυγείου', terms: [
     'γαλα', 'γιαουρτ', 'yogurt', 'βουτυρο', 'μαργαριν', 'αυγα', 'κρεμα γαλακτος',
@@ -103,7 +108,7 @@ const RULES: { dept: string; terms: string[] }[] = [
     'αβοκαντο', 'μανιταρ', 'ραπανακ', 'παντζαρ',
   ] },
   { dept: 'Πρωινό & Ροφήματα', terms: [
-    'καφε', 'nescafe', 'espresso', 'καπουτσιν', 'φραπε', 'δημητριακα', 'cornflakes',
+    'καφε', 'nescafe', 'espresso', 'nespresso', 'καπουτσιν', 'φραπε', 'δημητριακα', 'cornflakes',
     'κουακερ', 'βρωμη', 'μελι', 'μαρμελαδ', 'ταχιν', 'φιστικοβουτυρ', 'τσαι', 'tea',
     'ροφημα κακαο', 'κακαο', 'nesquik', 'στιγμιαιος', 'φακελακια τσαι',
   ] },
@@ -115,9 +120,9 @@ const RULES: { dept: string; terms: string[] }[] = [
     // boost/gel" cosmetics) are dropped — Greek drinks use μπύρα / explicit
     // "energy drink", so the bare words only cause cosmetic false positives.
     'μπυρα', 'κρασι', 'wine', 'οινος', 'ουζο', 'τσιπουρο', 'βοτκα', 'vodka',
-    'ουισκι', 'whisky', 'whiskey', ' gin ', 'τζιν', 'ρουμι', ' rum ', 'λικερ', 'σαμπανι',
+    'ουισκι', 'whisky', 'whiskey', 'gin', 'τζιν', 'ρουμι', 'rum', 'λικερ', 'σαμπανι',
     'αναψυκτικ', 'coca', 'cola', 'pepsi', 'σπριτ', 'sprite', 'fanta', 'χυμο', 'χυμος',
-    'εμφιαλωμεν', 'σοδα', ' tonic', 'ενεργειακο ποτο', 'energy drink', 'ice tea',
+    'εμφιαλωμεν', 'σοδα', 'tonic', 'ενεργειακο ποτο', 'energy drink', 'ice tea',
     'αναψυκτικα', 'μεταλλικο νερο', 'φυσικο νερο', 'επιτραπεζιο νερο', 'monster', 'red bull',
   ] },
   { dept: 'Προσωπική Φροντίδα', terms: [
@@ -157,11 +162,47 @@ const RULES: { dept: string; terms: string[] }[] = [
  * @param name      product / deal name (primary signal)
  * @param nativeHint chain's native category label, if any (secondary signal)
  */
+// Pure-Latin tokens (single word, a–z/0–9) match on WORD BOUNDARIES so they
+// can't fire glued inside a bigger word — the recurring bug class: 'ion'→
+// "hydratION", 'pet'→"PETit", 'rum'→"seRUM", 'lacta'→"LACTAcyd", 'cola'→
+// "choCOLAte". Greek stems and multi-word/punctuated terms keep substring
+// matching, because we deliberately rely on prefixes there ('απορρυπαντικ',
+// 'σαμπουαν', 'red bull', "l'oreal").
+function buildMatcher(term: string): (text: string) => boolean {
+  const t = term.trim();
+  if (/^[a-z0-9]+$/.test(t)) {
+    const re = new RegExp(`(^|[^a-z0-9])${t}([^a-z0-9]|$)`);
+    return (text) => re.test(text);
+  }
+  return (text) => text.includes(term);
+}
+
+const COMPILED = RULES.map((r) => ({
+  dept: r.dept,
+  terms: r.terms.map((term) => ({ term, test: buildMatcher(term) })),
+}));
+
 function matchRules(text: string): string | null {
-  for (const rule of RULES) {
-    if (rule.terms.some((t) => text.includes(t))) return rule.dept;
+  for (const rule of COMPILED) {
+    if (rule.terms.some((tt) => tt.test(text))) return rule.dept;
   }
   return null;
+}
+
+// Diagnostic mirror of categorize() that also reports HOW the decision was made
+// (which department, via native-department / native-keyword / name-keyword, and
+// the exact term). Used by the category audit script to hunt substring leaks.
+export function categorizeTrace(name: string | null | undefined, nativeHint?: string | null) {
+  if (nativeHint && nativeHint !== 'Άλλο' && DEPT_SET.has(nativeHint)) {
+    return { dept: nativeHint, via: 'native-dept', term: null as string | null };
+  }
+  if (nativeHint && nativeHint !== 'Άλλο') {
+    const n = normalize(nativeHint);
+    for (const r of COMPILED) { const tt = r.terms.find((x) => x.test(n)); if (tt) return { dept: r.dept, via: 'native-kw', term: tt.term }; }
+  }
+  const nm = normalize(name);
+  for (const r of COMPILED) { const tt = r.terms.find((x) => x.test(nm)); if (tt) return { dept: r.dept, via: 'name', term: tt.term }; }
+  return { dept: 'Άλλο', via: 'none', term: null as string | null };
 }
 
 export function categorize(name: string | null | undefined, nativeHint?: string | null): string {
