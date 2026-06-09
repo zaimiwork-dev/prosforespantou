@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
+import { computeVerdict } from '@/lib/price-verdict';
 
 export interface PricePoint {
   recordedAt: string;
@@ -45,7 +46,7 @@ const FALLBACK: PriceHistory = {
 // data points). Pass a slug to scope to one chain.
 export async function getPriceHistory(
   productId: string | null | undefined,
-  options: { days?: number; supermarket?: string | null } = {}
+  options: { days?: number; supermarket?: string | null; currentPrice?: number | null } = {}
 ): Promise<PriceHistory> {
   return await Sentry.withServerActionInstrumentation(
     'getPriceHistory',
@@ -69,23 +70,13 @@ export async function getPriceHistory(
         if (rows.length === 0) return FALLBACK;
 
         const prices = rows.map((r) => r.price);
-        const min = Math.min(...prices);
-        const max = Math.max(...prices);
-        const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
-        const current = prices[prices.length - 1];
 
-        // Verdict — compare current to window min/avg. Tolerances tuned to be
-        // honest: "lowest" only when truly at min, "high" when clearly above.
-        const epsilon = 0.01;
-        const overMin = current - min;
-        const overMinPct = min > 0 ? (overMin / min) * 100 : 0;
-
-        let verdict: PriceHistory['verdict'];
-        if (overMin <= epsilon) verdict = 'lowest';
-        else if (overMinPct <= 5) verdict = 'good';
-        else if (current < avg) verdict = 'fair';
-        else if (current <= avg + epsilon) verdict = 'meh';
-        else verdict = 'high';
+        // The verdict must judge the price the shopper actually sees. Prefer the
+        // explicit offer price; fall back to the latest snapshot only when the
+        // caller doesn't pass one. (Judging the last snapshot of a cross-chain
+        // series is what produced false "lowest price" badges — see lib/price-verdict.)
+        const current = options.currentPrice ?? prices[prices.length - 1];
+        const v = computeVerdict(current, prices);
 
         return {
           points: rows.map((r) => ({
@@ -93,12 +84,12 @@ export async function getPriceHistory(
             price: r.price,
             supermarket: r.supermarket,
           })),
-          min,
-          max,
-          avg: Math.round(avg * 100) / 100,
+          min: v.min,
+          max: v.max,
+          avg: v.avg,
           current,
-          verdict,
-          percentAboveMin: Math.round(overMinPct * 10) / 10,
+          verdict: v.verdict,
+          percentAboveMin: v.percentAboveMin,
           daysCovered: days,
         };
       } catch (error) {

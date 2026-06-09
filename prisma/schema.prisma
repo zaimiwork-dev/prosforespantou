@@ -117,6 +117,12 @@ model Discount {
   // Lifetime deal_click count; bumped in track-event, used as the popularity
   // signal in the daily hotScore recompute (windowed there, cumulative here).
   clickCount      Int      @default(0) @map("click_count")
+  // Honest price verdict for THIS offer vs the product's 90-day price history
+  // ('lowest' | 'good' | 'fair' | 'meh' | 'high'). Only positive verdicts are
+  // surfaced as a badge (lib/price-verdict.ts). Precomputed by
+  // recompute-price-verdicts.mjs (daily) so card lists need no per-row query;
+  // null until the next recompute pass. Detail/modal compute it live instead.
+  priceVerdict    String?  @map("price_verdict")
   product         Product? @relation(fields: [productId], references: [id])
   leaflet         Leaflet? @relation(fields: [leafletId], references: [id])
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)

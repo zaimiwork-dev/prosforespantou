@@ -84,7 +84,8 @@ export default async function OfferPage({ params }) {
 
   const [comparison, history] = await Promise.all([
     getPriceComparison(id),
-    getPriceHistory(offer.productId, { days: 90 }),
+    // Judge the verdict against THIS offer's price, not the last snapshot.
+    getPriceHistory(offer.productId, { days: 90, currentPrice: Number(offer.discountedPrice) }),
   ]);
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://prosforespantou.gr";

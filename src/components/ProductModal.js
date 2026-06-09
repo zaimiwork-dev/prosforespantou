@@ -43,7 +43,10 @@ export function ProductModal({ product, onClose, onAdd }) {
       .then((rows) => { if (!cancelled) setComparison(rows || []); })
       .catch(() => {});
     if (productId) {
-      getPriceHistory(productId, { days: 90 })
+      // Pass THIS offer's price so the verdict judges what the shopper sees,
+      // not the last (possibly cross-chain) snapshot.
+      const offerPrice = Number(product.discountedPrice ?? product.discounted_price);
+      getPriceHistory(productId, { days: 90, currentPrice: Number.isFinite(offerPrice) ? offerPrice : null })
         .then((h) => { if (!cancelled) setHistory(h); })
         .catch(() => {});
     }

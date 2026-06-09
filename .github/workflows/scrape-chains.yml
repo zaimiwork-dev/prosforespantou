@@ -222,6 +222,15 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Recompute price verdicts (honest "good deal" card badges)
+        # Each new daily snapshot can flip an offer's verdict (e.g. a product
+        # reaching its 3rd point becomes eligible). Idempotent. See
+        # src/lib/price-verdict.ts.
+        continue-on-error: true
+        run: node src/scripts/recompute-price-verdicts.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
   ab-resolver-only:
     if: github.event.inputs.chain == 'ab-resolver-only'

@@ -7,6 +7,11 @@ import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
+import { isPositiveVerdict } from '@/lib/price-verdict';
+
+// Honest "good deal" labels — only positive verdicts ever reach the card
+// (lib/price-verdict.ts gates on >=3 points + real price spread).
+const VERDICT_LABEL = { lowest: '🔥 Χαμηλότερη τιμή', good: '✅ Καλή τιμή' };
 
 function daysLeft(dateStr) {
   if (!dateStr) return null;
@@ -68,6 +73,8 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const startsLabel = validFrom && new Date(validFrom).getTime() > Date.now()
     ? `Ξεκινά ${formatShortDate(validFrom)}`
     : null;
+
+  const showVerdict = isPositiveVerdict(d.priceVerdict);
 
   return (
     <div
@@ -173,6 +180,21 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
                 {sourceLabel(s)}
               </span>
             ))}
+          </div>
+        )}
+
+        {showVerdict && (
+          <div style={{
+            display: 'inline-block',
+            background: '#dcfce7',
+            color: '#166534',
+            fontSize: 10,
+            fontWeight: 800,
+            padding: '2px 7px',
+            borderRadius: 6,
+            marginBottom: 6,
+          }}>
+            {VERDICT_LABEL[d.priceVerdict]}
           </div>
         )}
 
