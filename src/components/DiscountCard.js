@@ -13,9 +13,9 @@ import { isPositiveVerdict } from '@/lib/price-verdict';
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
 const VERDICT_LABEL = { lowest: '🔥 Χαμηλότερη τιμή', good: '✅ Καλή τιμή' };
 
-function daysLeft(dateStr) {
+function daysLeft(dateStr, nowMs) {
   if (!dateStr) return null;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = new Date(nowMs); today.setHours(0, 0, 0, 0);
   const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0);
   return Math.round((exp - today) / 86400000);
 }
@@ -28,6 +28,9 @@ function formatShortDate(dateStr) {
 
 export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const [imgFailed, setImgFailed] = useState(false);
+  // Snapshot the clock once per mount: expiry labels don't need sub-mount
+  // freshness, and an impure Date.now() in render defeats memoization.
+  const [nowMs] = useState(() => Date.now());
 
   const discountedPrice = d.discountedPrice ?? d.discounted_price;
   const originalPrice   = d.originalPrice   ?? d.original_price;
@@ -64,13 +67,13 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
   }
 
-  const dLeft = daysLeft(validUntil);
+  const dLeft = daysLeft(validUntil, nowMs);
   const urgent = dLeft !== null && dLeft >= 0 && dLeft <= 2;
   const expiryLabel = urgent
     ? (dLeft === 0 ? "Λήγει σήμερα" : dLeft === 1 ? "Λήγει αύριο" : `Λήγει σε ${dLeft} μέρες`)
     : validUntil ? `Έως ${formatShortDate(validUntil)}` : null;
 
-  const startsLabel = validFrom && new Date(validFrom).getTime() > Date.now()
+  const startsLabel = validFrom && new Date(validFrom).getTime() > nowMs
     ? `Ξεκινά ${formatShortDate(validFrom)}`
     : null;
 

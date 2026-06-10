@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useShoppingListStore } from '@/lib/store';
 import { SUPERMARKETS } from '@/lib/constants';
 
 export function PreferredStoresSheet({ isOpen, onClose }) {
-  const { preferredStores, togglePreferred, clearPreferred } = useShoppingListStore();
-  const [local, setLocal] = useState(preferredStores);
-
-  useEffect(() => {
-    if (isOpen) {
-      setLocal(preferredStores);
-    }
-  }, [preferredStores, isOpen]);
-
+  // Mount the sheet fresh on every open so the draft state starts from the
+  // saved selection — no setState-inside-effect syncing.
   if (!isOpen) return null;
+  return <PreferredStoresSheetInner onClose={onClose} />;
+}
+
+function PreferredStoresSheetInner({ onClose }) {
+  const { preferredStores, togglePreferred } = useShoppingListStore();
+  const [local, setLocal] = useState(preferredStores);
 
   const toggle = (id) =>
     setLocal((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));

@@ -17,9 +17,9 @@ function formatDate(dateStr) {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
-function daysLeft(dateStr) {
+function daysLeft(dateStr, nowMs) {
   if (!dateStr) return null;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = new Date(nowMs); today.setHours(0, 0, 0, 0);
   const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0);
   return Math.round((exp - today) / 86400000);
 }
@@ -31,6 +31,9 @@ function daysLeft(dateStr) {
 export function OfferDetails({ offer, comparison = [], history = null, onAdd, compact = false }) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  // One clock snapshot per mount — date labels don't need live ticking, and an
+  // impure Date.now() during render defeats memoization.
+  const [nowMs] = useState(() => Date.now());
 
   const discountedPrice = Number(offer.discountedPrice ?? offer.discounted_price);
   const originalPrice = offer.originalPrice ?? offer.original_price
@@ -54,7 +57,7 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
     ? Math.round((1 - discountedPrice / originalPrice) * 100)
     : null);
 
-  const dLeft = daysLeft(offer.validUntil);
+  const dLeft = daysLeft(offer.validUntil, nowMs);
   const expiryUrgent = dLeft !== null && dLeft >= 0 && dLeft <= 2;
   const expiryLabel = dLeft === null ? '—'
     : dLeft < 0 ? 'Έχει λήξει'
@@ -64,7 +67,7 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
     : `Σε ${dLeft} ημέρες`;
   const validFromFull = formatDate(offer.validFrom ?? offer.valid_from);
   const validUntilFull = formatDate(offer.validUntil ?? offer.valid_until);
-  const notStartedYet = offer.validFrom ? new Date(offer.validFrom).getTime() > Date.now() : false;
+  const notStartedYet = offer.validFrom ? new Date(offer.validFrom).getTime() > nowMs : false;
 
   const handleAdd = () => {
     trackEvent({

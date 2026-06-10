@@ -13,21 +13,39 @@ import { getPriceHistory } from '@/actions/get-price-history';
 
 // Bottom-sheet quick view of an offer. All content comes from OfferDetails —
 // the same component the /offer/[id] page renders — so the two surfaces can't
-// drift. This wrapper owns: the sheet chrome, the shareable URL (pushState to
-// /offer/[id] so back-button closes and the link is copy-able), and the
-// client-side comparison/history fetches the server page gets for free.
+// drift.
+//
+// Split in two on purpose:
+// - ProductSheet (always mounted) owns the shareable URL: pushState to
+//   /offer/[id] so back-button closes and the link is copy-able. It must stay
+//   mounted across opens — if this effect lived in a keyed/remounting child,
+//   StrictMode's mount→cleanup→mount cycle would run history.back() against
+//   the fresh pushState and the async popstate would close the sheet on open.
+// - ProductSheetInner (keyed per offer) owns comparison/history fetch state,
+//   which starts fresh per offer via the key instead of setState resets.
 export function ProductSheet({ product, onClose, onAdd }) {
+  useEffect(() => {
+    if (!product) return;
+    window.history.pushState({ offerSheet: product.id }, '', `/offer/${product.id}`);
+    const onPop = () => onClose();
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if (window.history.state?.offerSheet === product.id) {
+        window.history.back();
+      }
+    };
+  }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!product) return null;
+  return <ProductSheetInner key={product.id} product={product} onClose={onClose} onAdd={onAdd} />;
+}
+
+function ProductSheetInner({ product, onClose, onAdd }) {
   const [comparison, setComparison] = useState([]);
   const [history, setHistory] = useState(null);
 
   useEffect(() => {
-    if (!product) return;
-    setComparison([]);
-    setHistory(null);
-    window.history.pushState({ offerSheet: product.id }, '', `/offer/${product.id}`);
-    const onPop = () => onClose();
-    window.addEventListener('popstate', onPop);
-
     let cancelled = false;
     const productId = product.productId || product.product?.id;
     getPriceComparison(product.id)
@@ -40,17 +58,8 @@ export function ProductSheet({ product, onClose, onAdd }) {
         .then((h) => { if (!cancelled) setHistory(h); })
         .catch(() => {});
     }
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('popstate', onPop);
-      if (window.history.state?.offerSheet === product.id) {
-        window.history.back();
-      }
-    };
-  }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!product) return null;
+    return () => { cancelled = true; };
+  }, [product.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sm = SUPERMARKETS.find((s) => s.id === (product.supermarket || product.supermarket_id));
   const displayName = product.productName || product.product_name || product.product?.name;
@@ -80,17 +89,7 @@ export function ProductSheet({ product, onClose, onAdd }) {
         </button>
       }
     >
-      <OfferDetails
-        offer={product}
-        comparison={comparison}
-        history={history}
-        onAdd={(d) => {
-          // list_add tracking lives inside OfferDetails; here we only need the
-          // store write.
-          onAdd(d);
-        }}
-        compact
-      />
+      <OfferDetails offer={product} comparison={comparison} history={history} onAdd={onAdd} compact />
       <Link href={`/offer/${product.id}`} className="modal-link" onClick={(e) => {
         // Full navigation, not the pushState'd URL — let Next render the page.
         e.preventDefault();
