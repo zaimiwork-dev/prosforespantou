@@ -47,7 +47,7 @@ function normalize(s: string | null | undefined): string {
 const RULES: { dept: string; terms: string[] }[] = [
   { dept: 'Βρεφικά Είδη', terms: [
     'βρεφικ', 'πανες', 'πανα ', 'pampers', 'babylino', 'μωρομαντηλ', 'μωρου',
-    'βρεφικη', 'baby', 'βρεφικο γαλα', 'κρεμα αλλαγης', 'πιπιλ', 'μπιμπερο',
+    'βρεφικη', 'baby', 'βρεφικο γαλα', 'κρεμα αλλαγης', 'πιπιλ', 'μπιμπερο', 'babycare',
   ] },
   { dept: 'Είδη Κατοικιδίων', terms: [
     // 'pet' removed — matched "PETit"/"risPET" and the "PET" bottle plastic.
@@ -73,6 +73,7 @@ const RULES: { dept: string; terms: string[] }[] = [
     'μπριζολ', 'φιλετο', 'σνιτσελ', 'μπιφτεκ', 'σουβλακ', 'γυρο', 'λουκανικα νωπ',
     'ψαρι', 'ψαρια', 'σολομος', 'salmon', 'γαριδ', 'καλαμαρ', 'χταποδ', 'μπακαλιαρ',
     'τσιπουρα', 'λαβρακ', 'πεστροφ', 'γαλοπουλα νωπ', 'κουνελι', 'συκωτ',
+    'θραψαλο', 'γαμπαρ',
   ] },
   { dept: 'Σαλάτες & Αλοιφές', terms: [
     'σαλατα', 'τζατζικ', 'μελιτζανοσαλατ', 'ταραμοσαλατ', 'ταραμα', 'τυροσαλατ',
@@ -82,6 +83,10 @@ const RULES: { dept: string; terms: string[] }[] = [
     'κονσερβ', 'τονος', 'σαρδελ', 'σκουμπρι κονσ', 'πελτε', 'πασσατα', 'passata',
     'τοματα κονσ', 'τοματακι αποφλ', 'αποφλοιωμεν', 'φασολια κονσ', 'καλαμποκι κονσ',
     'αρακας κονσ', 'φασολακια κονσ', 'ντοματα συσκευασ',
+    // processed/jarred tomato (AB names them "Τομάτα Τριμμένη/Περαστή/Στον
+    // Τρίφτη" — fresh 'ντοματ' keyword never matched the accented "Τομάτα").
+    'pummaro', 'τοματα τριμ', 'τοματα ψιλοκομ', 'τοματα περαστ', 'τοματα στον τριφτ',
+    'περαστη στο μυλ',
   ] },
   { dept: 'Σνακ & Γλυκά', terms: [
     'σοκολατ', 'chocolate', 'μπισκοτ', 'γκοφρετ', 'wafer', 'τσιπς', 'chips', 'πατατακ',
@@ -98,14 +103,14 @@ const RULES: { dept: string; terms: string[] }[] = [
   ] },
   { dept: 'Αρτοποιία', terms: [
     'ψωμι', 'αρτος', 'τοστ', 'φρυγανι', 'κριτσιν', 'παξιμαδ', 'τσουρεκ', 'σταρενι',
-    'πιτα ', 'πιτες', 'λαγανα', 'ντακος', 'ζυμαρι πιτας', 'αρτιδια',
+    'πιτα ', 'πιτες', 'λαγανα', 'ντακος', 'ζυμαρι πιτας', 'αρτιδια', 'ψωμακ',
   ] },
   { dept: 'Φρούτα & Λαχανικά', terms: [
     'φρουτ', 'λαχανικ', 'μηλο', 'μηλα', 'μπανανα', 'πορτοκαλ', 'λεμον', 'μανταριν',
     'ντοματ', 'πατατ', 'κρεμμυδ', 'σκορδ', 'μαρουλ', 'αγγουρ', 'καροτ', 'μπροκολ',
     'κουνουπιδ', 'πιπερι', 'μελιτζαν', 'κολοκυθ', 'σπανακ', 'μαϊνταν', 'ανηθ', 'σελιν',
     'φραουλ', 'σταφυλ', 'αχλαδ', 'ροδακιν', 'βερικοκ', 'πεπον', 'καρπουζ', 'ακτινιδ',
-    'αβοκαντο', 'μανιταρ', 'ραπανακ', 'παντζαρ',
+    'αβοκαντο', 'μανιταρ', 'ραπανακ', 'παντζαρ', 'κερασ', 'τοματιν',
   ] },
   { dept: 'Πρωινό & Ροφήματα', terms: [
     'καφε', 'nescafe', 'espresso', 'nespresso', 'καπουτσιν', 'φραπε', 'δημητριακα', 'cornflakes',
@@ -138,6 +143,12 @@ const RULES: { dept: string; terms: string[] }[] = [
     'schwarzkopf', 'gliss', 'elvive', 'koleston', 'excellence creme', 'diadermine',
     'bioten', 'dove', 'rexona', 'veet', 'tena', 'kotex', 'always', 'tampax',
     'gillette', 'wilkinson', 'κολωνια', 'αρωμα', 'eau de', 'βαφη',
+    // English/Latin brands + product words the Greek lists missed (null-native
+    // chains: masoutis/sklavenitis/ab name-only). carroten/noxzema=suncare,
+    // wellaflex=hairspray, hansaplast=plasters, septona/dermasoft=cotton+wipes.
+    'carroten', 'noxzema', 'wellaflex', 'hansaplast', 'septona', 'dermasoft',
+    'after shave', 'aftershave', 'old spice', 'wet hankies', 'hankies',
+    'cotton buds', 'μπατονετ', 'εσωρουχ',
   ] },
   { dept: 'Είδη Καθαρισμού & Σπιτιού', terms: [
     'απορρυπαντικ', 'πλυντηριου', 'υγρο πιατων', 'σκονη πλυσιματος', 'μαλακτικο ρουχ',
@@ -148,12 +159,19 @@ const RULES: { dept: string; terms: string[] }[] = [
     // brands + abbreviations seen in the data
     'bref', 'sani ', 'zewa', 'χ.υγειας', 'χ. υγειας', 'χ/υγειας', 'ariel', 'skip ',
     'dixan', 'vanish', 'klinex', 'finish', 'calgon', 'ajax', 'cif ', 'wc ', 'pods',
+    // laundry colour-catchers / moth+insect / bleach + paper-goods brands the
+    // name-only chains expose (χρωμοπαγιδ=colour catcher, λευκαντικ=bleach).
+    'χρωμοπαγιδ', 'σκοροκτον', 'λευκαντικ', 'χαρτοπετσετ', 'colour catcher',
+    'color catcher', 'catcher', 'raid', 'airwick', 'air wick', 'vapona', 'teza',
+    'beckmann', 'fairy', 'k2r', 'softex', 'sanitas',
   ] },
   { dept: 'Είδη Παντοπωλείου', terms: [
     'ελαιολαδο', 'λαδι', 'ηλιελαιο', 'ζυμαρικ', 'μακαρον', 'σπαγγετ', 'πεννες', 'πενες', 'κοφτο',
     'ρυζι', 'αλευρι', 'ζαχαρη', 'αλατι', 'ξυδι', 'σαλτσα', 'κετσαπ', 'μαγιονεζ',
     'μουσταρδα', 'μπαχαρικ', 'οσπρια', 'φακες', 'φασολια', 'ρεβυθ', 'φαβα', 'κους κους',
     'πληγουρι', 'κορν φλαουρ', 'μαγειρικ', 'ζωμος', 'κυβος', 'σος', 'μπεικιν', 'γλυκαντικ',
+    // pasta + pantry brands/nouns the name-only chains expose
+    'misko', 'knorr', 'penne', 'ταλιατελ', 'φιδες', 'κριθαρακ',
   ] },
 ];
 
@@ -215,6 +233,11 @@ const NATIVE_ALIASES_RAW: Record<string, string> = {
   'Body Milk / Lotions': 'Προσωπική Φροντίδα',
   'Τεχνητή Οδοντοστοιχία': 'Προσωπική Φροντίδα',
   'Τεχνητή Οδοντοστοιχεία': 'Προσωπική Φροντίδα',
+  // Hair/face oils & serums — the 'λαδι' (cooking-oil) keyword was dragging
+  // these whole native sections into Παντοπωλείου.
+  'Λάδια, Serum, Θεραπείες': 'Προσωπική Φροντίδα',
+  'Λάδι / Μάσκα': 'Προσωπική Φροντίδα',
+  'Λάδι / Πούδρα': 'Προσωπική Φροντίδα',
   // Κάβα
   'Lager': 'Κάβα',
   'Pils': 'Κάβα',
