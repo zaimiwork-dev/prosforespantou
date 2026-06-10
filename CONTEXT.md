@@ -4,9 +4,20 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-10 — pipeline observability SHIPPED)
+## ⚡ Pick up here (2026-06-11 — observability + display-first unmatched offers SHIPPED)
 
-**Context:** user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the #1 gap was that **nobody is watching it** (a dead adapter would go unnoticed for weeks). This sprint shipped the watching.
+**Context:** user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the two gaps were **nobody watching it** and **~4k scraped offers invisible** (no Discount written when matching fails). Both shipped, in two commits.
+
+### Slice ② — display-first unmatched offers (2026-06-11)
+
+- **`Discount.chainItemcode`** (new column + `@@unique([supermarket, source, chainItemcode])`) — the chain SKU is now the offer's dedup identity; `(productId, chain, source)` is the legacy fallback.
+- **[ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs):** unmatched items still go to PendingMatch but are ALSO written as visible **productless Discounts** (chain's real name/price/image/dates; comparison/history light up after matching). `ingestOffers({ showUnmatched })` defaults true; **Lidl passes `false`** (vision-OCR data unreviewed — flip after eyeballing the first real run). `IngestRun.unmatchedShown` records the count.
+- **Claim, don't duplicate:** [resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) + admin approve/bulk-approve/create-sku now `updateMany({...productName, productId: null} → { productId })` FIRST — claiming preserves the adapter's real dates/originalPrice (the resolver's synthetic now+14d data is legacy-path only). Single approve also applies the admin's category; bulk deliberately doesn't (would clobber adapter categories with 'Άλλο').
+- **Winner-takes-row + honest snapshots (bonus bug fix):** 183 masoutis products have 2+ itemcode mappings (stale mis-matches) — the two SKUs used to alternate overwriting one row: **visible price flip-flopped between runs and every flip wrote a bogus PriceSnapshot** (polluting the honest-pricing history!). Now: first SKU per run owns the row, later ones skip (report warns with count); snapshots only write when THIS offer's stored price moved. **Verified: two back-to-back masoutis runs → second run priceChanges=0** (was 47/47 before). The 183 mis-mappings themselves still deserve an audit (samePack-based) — future task.
+- **UI:** zero changes needed — OfferDetails falls back to CategoryIcon for missing images, getPriceComparison returns [] for productless, PriceComparison/PriceHistory render null on empty. Verified at 390px (offer page + listing screenshots).
+- Masoutis now shows **+54 offers** immediately; mymarket/sklavenitis/ab/kritikos backlogs (~3.9k) become visible on each chain's next scheduled run — **no backfill script on purpose** (PendingMatch rows lack source/dates/itemcode; adapter re-runs write full-fidelity rows within 24h).
+
+### Slice ① — pipeline observability (2026-06-10)
 
 **What shipped (one commit):**
 - **`IngestRun` flight recorder** — new table (db-pushed); [ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) records every real run (incl. zero-item aborts; dry runs skipped) with `priceChanges` = PriceSnapshots written that run (the per-chain "how much actually changed" signal for future cadence tuning).
@@ -20,7 +31,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 **Decision made (user asked about scrape scheduling):** keep daily polling — adapters hit free chain JSON endpoints (no LLM in adapters; Groq only sees never-before-seen items via the resolver), so daily costs ~nothing. Aligning to assumed per-chain offer cycles would save nothing and risk missing mid-cycle changes; `priceChanges` per run now records each chain's real cadence so this can be revisited with data.
 
-**Next candidates (assessment ranked):** ② display-first unmatched offers (~4k PendingMatch rows = scraped-but-invisible offers; `Discount.productId` is already nullable — needs a stable dedup key, e.g. `chainItemcode` column on Discount); ③ verify Lidl's first run Thu + AB recon (246 active offers looks like the ΜΟΝΟ-subset problem); ④ scripts cleanup + CLAUDE.md de-drift (still documents the OLD fetcher→extractor→matcher pipeline as canonical); search relevance; `.js→.tsx` PR; Capacitor.
+**Next candidates (assessment ranked):** ③ verify Lidl's first run Thu 06:00 UTC (then decide `showUnmatched` for it) + AB recon (246 active offers looks like the ΜΟΝΟ-subset problem); ④ scripts cleanup + CLAUDE.md de-drift (still documents the OLD fetcher→extractor→matcher pipeline as canonical); audit the 183 multi-itemcode mis-mappings (samePack-based); search relevance; `.js→.tsx` PR; Capacitor.
 
 ---
 

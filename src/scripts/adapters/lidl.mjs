@@ -265,7 +265,10 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limitPages = LIMIT_PAGE
     console.log('   no offers extracted — safety net in ingest-offers will skip deactivation');
   }
 
-  const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: allOffers, dryRun });
+  // showUnmatched off: names/prices here come from vision OCR, not a chain
+  // API — don't publish unmatched items unreviewed. Flip after eyeballing a
+  // real run's quality in the admin Review tab.
+  const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: allOffers, dryRun, showUnmatched: false });
   printReport(report);
   return report;
 }

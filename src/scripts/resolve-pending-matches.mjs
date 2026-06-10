@@ -342,41 +342,53 @@ async function run() {
       const originalPrice = null; // PendingMatch doesn't carry originalPrice; resolver assumes single-price (ΜΟΝΟ-style).
 
       await withDbRetry('write resolved', async () => {
-        // Discount upsert by (productId, chain, source)
-        const existing = await prisma.discount.findFirst({
-          where: { productId: chosenProductId, supermarket: CHAIN, source: SOURCE },
+        // Display-first: the ingest pipeline already wrote this offer as a
+        // visible productless Discount with the chain's REAL dates/image/
+        // original price. Claiming = just setting productId — overwriting the
+        // rest with resolver-synthesized data (now+14d, no original) would
+        // degrade the row.
+        const claimed = await prisma.discount.updateMany({
+          where: { supermarket: CHAIN, source: SOURCE, productName: pm.rawName, productId: null },
+          data: { productId: chosenProductId },
         });
-        const discountData = {
-          productName: pm.rawName,
-          // The LLM's category is a department-level guess → keep it as the
-          // subcategory hint and let the shared categorizer have final say
-          // (uniform with every other write path).
-          category: categorize(pm.rawName, llm.category),
-          subcategory: llm.category || null,
-          discountedPrice: pm.rawPrice,
-          originalPrice,
-          validFrom: now,
-          validUntil,
-          imageUrl: pm.imageUrl || null,
-          storeId: store.id,
-          productId: chosenProductId,
-          supermarket: CHAIN,
-          source: SOURCE,
-          isActive: true,
-        };
-        // originalPrice is null here (ΜΟΝΟ-style), so % contributes 0 — score
-        // rides on KVI/brand/mechanic + clicks; daily cron is authoritative.
-        const hotScore = computeHotScore({
-          productName: pm.rawName,
-          description: null,
-          discountPercent: null,
-          createdAt: existing ? existing.createdAt : now,
-          clicks: existing ? existing.clickCount : 0,
-        });
-        if (existing) {
-          await prisma.discount.update({ where: { id: existing.id }, data: { ...discountData, hotScore } });
-        } else {
-          await prisma.discount.create({ data: { ...discountData, hotScore } });
+        if (claimed.count === 0) {
+          // Legacy path — no productless row exists (pre-display-first
+          // backlog, or a showUnmatched-off chain like Lidl).
+          const existing = await prisma.discount.findFirst({
+            where: { productId: chosenProductId, supermarket: CHAIN, source: SOURCE },
+          });
+          const discountData = {
+            productName: pm.rawName,
+            // The LLM's category is a department-level guess → keep it as the
+            // subcategory hint and let the shared categorizer have final say
+            // (uniform with every other write path).
+            category: categorize(pm.rawName, llm.category),
+            subcategory: llm.category || null,
+            discountedPrice: pm.rawPrice,
+            originalPrice,
+            validFrom: now,
+            validUntil,
+            imageUrl: pm.imageUrl || null,
+            storeId: store.id,
+            productId: chosenProductId,
+            supermarket: CHAIN,
+            source: SOURCE,
+            isActive: true,
+          };
+          // originalPrice is null here (ΜΟΝΟ-style), so % contributes 0 — score
+          // rides on KVI/brand/mechanic + clicks; daily cron is authoritative.
+          const hotScore = computeHotScore({
+            productName: pm.rawName,
+            description: null,
+            discountPercent: null,
+            createdAt: existing ? existing.createdAt : now,
+            clicks: existing ? existing.clickCount : 0,
+          });
+          if (existing) {
+            await prisma.discount.update({ where: { id: existing.id }, data: { ...discountData, hotScore } });
+          } else {
+            await prisma.discount.create({ data: { ...discountData, hotScore } });
+          }
         }
 
         // MatchCache — next adapter run for the same rawName hits this and skips the LLM.

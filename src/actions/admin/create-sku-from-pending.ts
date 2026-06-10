@@ -78,29 +78,39 @@ export async function createSkuFromPending(input: unknown) {
           ? Math.round(((originalPrice - pending.rawPrice) / originalPrice) * 100)
           : null;
 
-      await prisma.discount.create({
-        data: {
-          storeId: store.id,
-          supermarket: pending.supermarket,
-          productName: pending.rawName,
-          category,
-          originalPrice: originalPrice ?? null,
-          discountedPrice: pending.rawPrice,
-          discountPercent,
-          validFrom: now,
-          validUntil,
-          isActive: true,
-          productId: newProduct.id,
-          source: 'web',
-          hotScore: computeHotScore({
-            productName: pending.rawName,
-            description: null,
-            discountPercent,
-            createdAt: now,
-            clicks: 0,
-          }),
-        },
+      // Display-first: if the ingest pipeline already shows this offer as a
+      // productless Discount, claim it for the new SKU instead of creating a
+      // duplicate card.
+      const claimed = await prisma.discount.updateMany({
+        where: { supermarket: pending.supermarket, productName: pending.rawName, productId: null },
+        data: { productId: newProduct.id, category },
       });
+
+      if (claimed.count === 0) {
+        await prisma.discount.create({
+          data: {
+            storeId: store.id,
+            supermarket: pending.supermarket,
+            productName: pending.rawName,
+            category,
+            originalPrice: originalPrice ?? null,
+            discountedPrice: pending.rawPrice,
+            discountPercent,
+            validFrom: now,
+            validUntil,
+            isActive: true,
+            productId: newProduct.id,
+            source: 'web',
+            hotScore: computeHotScore({
+              productName: pending.rawName,
+              description: null,
+              discountPercent,
+              createdAt: now,
+              clicks: 0,
+            }),
+          },
+        });
+      }
 
       await prisma.priceSnapshot.create({
         data: {

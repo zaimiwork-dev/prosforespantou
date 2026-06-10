@@ -77,52 +77,62 @@ export async function bulkApprovePendingMatches(input: unknown) {
         for (const pending of candidates) {
           if (!pending.suggestedProductId) { skipped++; continue; }
           try {
-            const existing = await prisma.discount.findFirst({
-              where: { productId: pending.suggestedProductId, supermarket: pending.supermarket, source: 'web' },
-              orderBy: { updatedAt: 'desc' },
+            // Display-first: prefer claiming the productless Discount the
+            // ingest pipeline already shows — productId only; the bulk
+            // default category must not clobber the adapter-derived one.
+            const claimed = await prisma.discount.updateMany({
+              where: { supermarket: pending.supermarket, productName: pending.rawName, productId: null },
+              data: { productId: pending.suggestedProductId },
             });
 
-            const hotScore = computeHotScore({
-              productName: pending.rawName,
-              description: null,
-              discountPercent: null,
-              createdAt: existing ? existing.createdAt : now,
-              clicks: existing ? existing.clickCount : 0,
-            });
+            if (claimed.count === 0) {
+              const existing = await prisma.discount.findFirst({
+                where: { productId: pending.suggestedProductId, supermarket: pending.supermarket, source: 'web' },
+                orderBy: { updatedAt: 'desc' },
+              });
 
-            if (existing) {
-              await prisma.discount.update({
-                where: { id: existing.id },
-                data: {
-                  productName: pending.rawName,
-                  category,
-                  discountedPrice: pending.rawPrice,
-                  originalPrice: null,
-                  discountPercent: null,
-                  validFrom: now,
-                  validUntil: nextWeek,
-                  isActive: true,
-                  hotScore,
-                },
+              const hotScore = computeHotScore({
+                productName: pending.rawName,
+                description: null,
+                discountPercent: null,
+                createdAt: existing ? existing.createdAt : now,
+                clicks: existing ? existing.clickCount : 0,
               });
-            } else {
-              await prisma.discount.create({
-                data: {
-                  storeId: store.id,
-                  supermarket: pending.supermarket,
-                  productName: pending.rawName,
-                  category,
-                  originalPrice: null,
-                  discountedPrice: pending.rawPrice,
-                  discountPercent: null,
-                  validFrom: now,
-                  validUntil: nextWeek,
-                  isActive: true,
-                  productId: pending.suggestedProductId,
-                  source: 'web',
-                  hotScore,
-                },
-              });
+
+              if (existing) {
+                await prisma.discount.update({
+                  where: { id: existing.id },
+                  data: {
+                    productName: pending.rawName,
+                    category,
+                    discountedPrice: pending.rawPrice,
+                    originalPrice: null,
+                    discountPercent: null,
+                    validFrom: now,
+                    validUntil: nextWeek,
+                    isActive: true,
+                    hotScore,
+                  },
+                });
+              } else {
+                await prisma.discount.create({
+                  data: {
+                    storeId: store.id,
+                    supermarket: pending.supermarket,
+                    productName: pending.rawName,
+                    category,
+                    originalPrice: null,
+                    discountedPrice: pending.rawPrice,
+                    discountPercent: null,
+                    validFrom: now,
+                    validUntil: nextWeek,
+                    isActive: true,
+                    productId: pending.suggestedProductId,
+                    source: 'web',
+                    hotScore,
+                  },
+                });
+              }
             }
 
             await prisma.priceSnapshot.create({

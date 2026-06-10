@@ -123,6 +123,11 @@ model Discount {
   // recompute-price-verdicts.mjs (daily) so card lists need no per-row query;
   // null until the next recompute pass. Detail/modal compute it live instead.
   priceVerdict    String?  @map("price_verdict")
+  // The chain's own SKU for this offer — the stable dedup key that lets the
+  // ingest pipeline write offers BEFORE they're matched to a Product
+  // (display-first: productId null until the resolver/admin claims the row).
+  // Null on legacy rows and manual/resolver-created ones.
+  chainItemcode   String?  @map("chain_itemcode")
   product         Product? @relation(fields: [productId], references: [id])
   leaflet         Leaflet? @relation(fields: [leafletId], references: [id])
   store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -138,6 +143,7 @@ model Discount {
   @@index([isActive, category, validUntil])
   @@index([source])
   @@index([isActive, validUntil, hotScore])
+  @@unique([supermarket, source, chainItemcode])
   @@map("discounts")
 }
 
@@ -249,6 +255,9 @@ model IngestRun {
   scrapedItems Int      @default(0) @map("scraped_items")
   matched      Int      @default(0)
   reviewQueued Int      @default(0) @map("review_queued")
+  // Of the reviewQueued items, how many were still written as visible
+  // productless Discounts (display-first). 0 for chains with showUnmatched off.
+  unmatchedShown Int    @default(0) @map("unmatched_shown")
   priceChanges Int      @default(0) @map("price_changes")
   deactivated  Int      @default(0)
   errors       Int      @default(0)

@@ -109,8 +109,14 @@ async function matchItem(prisma, item, chain, dryRun) {
 }
 
 // ── Write/update one Discount + a PriceSnapshot if the price moved ───────────
+// productId may be NULL (display-first): the offer is shown to users with the
+// chain's own data, and the resolver/admin claims the row with a productId
+// later. The chain's SKU is the dedup key for these rows — without it a
+// productless offer can't be written (no stable identity across runs).
 async function writeOffer(prisma, item, productId, storeId, chain, source, runStart) {
   const now = new Date();
+  const chainItemcode = item.chainItemcode != null ? String(item.chainItemcode) : null;
+  if (!productId && !chainItemcode) return { snapshotWritten: false, skipped: true };
   const validFrom = item.validFrom ? new Date(item.validFrom) : now;
   const validUntil = item.validUntil
     ? new Date(item.validUntil)
@@ -142,12 +148,34 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     productId,
     supermarket: chain,
     source,
+    chainItemcode,
     isActive: true,
   };
 
-  const existing = await prisma.discount.findFirst({
-    where: { productId, supermarket: chain, source },
-  });
+  // Dedup: the chain's SKU is the strongest identity (works with or without a
+  // product match); fall back to (productId, chain, source) for legacy rows
+  // written before chainItemcode existed.
+  let existing = chainItemcode
+    ? await prisma.discount.findFirst({
+        where: { supermarket: chain, source, chainItemcode },
+      })
+    : null;
+  if (!existing && productId) {
+    existing = await prisma.discount.findFirst({
+      where: { productId, supermarket: chain, source },
+    });
+  }
+
+  // Two chain SKUs mapped to one productId (usually a stale mis-mapping, e.g.
+  // pack-size variants) used to take turns overwriting the same row — the
+  // visible price flip-flopped between runs and every flip wrote a bogus
+  // PriceSnapshot. First writer this run owns the row; later SKUs are skipped.
+  if (
+    existing && chainItemcode && existing.chainItemcode &&
+    existing.chainItemcode !== chainItemcode && existing.updatedAt >= runStart
+  ) {
+    return { snapshotWritten: false, skipped: true, sharedRow: true };
+  }
   // hotScore at write time uses clicks=0 for new rows or the existing lifetime
   // clickCount on update; the daily recompute cron is the authoritative pass.
   const hotScore = computeHotScore({
@@ -163,22 +191,32 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     await prisma.discount.create({ data: { ...data, hotScore } });
   }
 
-  // PriceSnapshot — only when the price actually changed (idempotent).
-  const last = await prisma.priceSnapshot.findFirst({
-    where: { productId, supermarket: chain },
-    orderBy: { recordedAt: 'desc' },
-  });
-  if (!last || last.price !== item.price) {
-    await prisma.priceSnapshot.create({
-      data: { productId, supermarket: chain, price: item.price, isDiscounted: !!originalPrice },
+  // PriceSnapshot — only when THIS offer's stored price actually moved
+  // (guards against shared-productId rows re-recording each other's price).
+  // Snapshots hang off the Product, so productless offers get history only
+  // once they're claimed.
+  const priceMoved = !existing || existing.discountedPrice !== item.price;
+  if (productId && priceMoved) {
+    const last = await prisma.priceSnapshot.findFirst({
+      where: { productId, supermarket: chain },
+      orderBy: { recordedAt: 'desc' },
     });
-    return { snapshotWritten: true };
+    if (!last || last.price !== item.price) {
+      await prisma.priceSnapshot.create({
+        data: { productId, supermarket: chain, price: item.price, isDiscounted: !!originalPrice },
+      });
+      return { snapshotWritten: true };
+    }
   }
   return { snapshotWritten: false };
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
-export async function ingestOffers({ chain, source, items, dryRun = false }) {
+// showUnmatched: display-first — items with no Product match are still written
+// as visible productless Discounts (the chain's own name/price/image/dates),
+// alongside their PendingMatch row. Opt OUT for feeds whose item data isn't
+// trustworthy enough to publish unreviewed (e.g. Lidl's vision-OCR output).
+export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true }) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (source !== 'web' && source !== 'leaflet') throw new Error(`source must be 'web' or 'leaflet', got "${source}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
@@ -186,7 +224,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
   const report = {
     chain, source, scrapedItems: items.length,
     matched: 0, viaMapping: 0, viaBarcode: 0, viaCache: 0,
-    reviewQueued: 0, priceChanges: 0, errors: 0, deactivated: 0,
+    reviewQueued: 0, unmatchedShown: 0, priceChanges: 0, errors: 0, deactivated: 0,
     healthOk: true, warnings: [],
   };
 
@@ -202,7 +240,8 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
         data: {
           chain, source, startedAt: runStart,
           scrapedItems: report.scrapedItems, matched: report.matched,
-          reviewQueued: report.reviewQueued, priceChanges: report.priceChanges,
+          reviewQueued: report.reviewQueued, unmatchedShown: report.unmatchedShown,
+          priceChanges: report.priceChanges,
           deactivated: report.deactivated, errors: report.errors,
           healthOk: report.healthOk, warnings: report.warnings,
         },
@@ -252,6 +291,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
     }
 
     let idx = 0;
+    let sharedRowSkips = 0;
     for (const item of items) {
       idx++;
       try {
@@ -273,11 +313,21 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
             },
           });
           report.reviewQueued++;
+          // Display-first: the offer is real even before it's matched — write
+          // it as a productless Discount so users see it. The resolver/admin
+          // claims the row (sets productId) without touching what's shown.
+          if (showUnmatched) {
+            const { skipped } = await withDbRetry(`write unmatched ${item.name}`, () =>
+              writeOffer(prisma, item, null, store.id, chain, source, runStart)
+            );
+            if (!skipped) report.unmatchedShown++;
+          }
         } else {
-          const { snapshotWritten } = await withDbRetry(`write ${item.name}`, () =>
+          const { snapshotWritten, sharedRow } = await withDbRetry(`write ${item.name}`, () =>
             writeOffer(prisma, item, productId, store.id, chain, source, runStart)
           );
           if (snapshotWritten) report.priceChanges++;
+          if (sharedRow) sharedRowSkips++;
           report.matched++;
           if (via === 'mapping') report.viaMapping++;
           else if (via === 'barcode') report.viaBarcode++;
@@ -292,6 +342,13 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
       }
     }
     if (items.length >= 100) console.log('');
+
+    if (sharedRowSkips > 0) {
+      report.warnings.push(
+        `${sharedRowSkips} item(s) share a productId with another chain SKU (winner-takes-row this run). ` +
+        `Likely stale mis-mappings — audit ChainProductMapping for ${chain}.`
+      );
+    }
 
     // End-of-run deactivation — only when the health check is clean.
     if (report.healthOk) {
@@ -316,7 +373,7 @@ export function printReport(report) {
   console.log(`\n📊 Ingest report — ${report.chain} / ${report.source}`);
   console.log(`   scraped items:    ${report.scrapedItems}`);
   console.log(`   matched:          ${report.matched}  (mapping=${report.viaMapping} barcode=${report.viaBarcode} cache=${report.viaCache})`);
-  console.log(`   → Review Queue:   ${report.reviewQueued}`);
+  console.log(`   → Review Queue:   ${report.reviewQueued}  (shown unmatched: ${report.unmatchedShown})`);
   console.log(`   price changes:    ${report.priceChanges}`);
   console.log(`   deactivated:      ${report.deactivated}`);
   console.log(`   errors:           ${report.errors}`);

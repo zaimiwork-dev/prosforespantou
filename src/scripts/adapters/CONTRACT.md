@@ -27,6 +27,10 @@ await ingestOffers({
   source: 'web',            // 'web' | 'leaflet'  (which feed this came from)
   items: [ /* OfferItem[] — see below */ ],
   dryRun: false,            // optional — true = no DB writes, just report
+  showUnmatched: true,      // optional — false = unmatched items go ONLY to the
+                            // Review Queue, not to the public site. Turn off for
+                            // feeds whose data isn't trustworthy enough to
+                            // publish unreviewed (e.g. Lidl's vision-OCR output).
 });
 ```
 
@@ -54,12 +58,29 @@ For each item, in order — first hit wins:
 1. **`ChainProductMapping` lookup** `(chain, chainItemcode)` → known Product. Instant, no matching.
 2. **`Product.barcode` lookup** → canonical Product. Records a `ChainProductMapping` so step 1 hits next time.
 3. **`MatchCache` lookup** `(name, chain)` → Product matched by a previous LLM run.
-4. **No match** → row goes to the `PendingMatch` Review Queue. The pipeline never
-   invents a Product. (The LLM matcher is a separate, optional pass over the queue.)
+4. **No match** → row goes to the `PendingMatch` Review Queue **and** (display-first,
+   unless `showUnmatched: false`) is still written as a visible **productless
+   Discount** — users see the chain's own name/price/image/dates; cross-chain
+   comparison and price history light up only after the row is matched. The
+   pipeline never invents a Product. The LLM resolver / admin Review tab later
+   **claims** the row (sets `productId`) without touching what's shown.
 
-Then it writes/updates the `Discount`, writes a `PriceSnapshot` if the price moved,
-and at the end deactivates that chain's stale offers for this `source` —
-**unless the health check tripped** (see below).
+Then it writes/updates the `Discount` (deduped by `(chain, source, chainItemcode)`
+first, falling back to `(productId, chain, source)` for legacy rows), writes a
+`PriceSnapshot` if THIS offer's price moved, and at the end deactivates that
+chain's stale offers for this `source` — **unless the health check tripped**
+(see below).
+
+Two rules that exist because of real incidents:
+
+- **`chainItemcode` is the offer's identity.** A productless offer cannot be
+  written without one (no stable dedup key across runs). Use the chain's real
+  SKU; only hash the name as a last resort (see lidl.mjs).
+- **Winner-takes-row.** When two chain SKUs are mapped to the same `productId`
+  (usually a stale mis-mapping), the first item this run owns the Discount row
+  and later ones are skipped — otherwise the visible price flip-flops between
+  runs and every flip writes a bogus PriceSnapshot. The run report warns with
+  the count so mis-mappings can be audited.
 
 ## Safety rules baked into the shared pipeline
 

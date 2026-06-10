@@ -59,52 +59,63 @@ export async function approvePendingMatch(input: unknown) {
           ? Math.round(((originalPrice - pending.rawPrice) / originalPrice) * 100)
           : null;
 
-      const existing = await prisma.discount.findFirst({
-        where: { productId, supermarket: pending.supermarket, source: 'web' },
-        orderBy: { updatedAt: 'desc' },
+      // Display-first: the ingest pipeline may already show this offer as a
+      // productless Discount carrying the chain's real dates/prices/image.
+      // Claiming = set productId (and the admin's category pick) — rewriting
+      // the rest with synthesized dates would degrade the row.
+      const claimed = await prisma.discount.updateMany({
+        where: { supermarket: pending.supermarket, productName: pending.rawName, productId: null },
+        data: { productId, category },
       });
 
-      const hotScore = computeHotScore({
-        productName: pending.rawName,
-        description: null,
-        discountPercent,
-        createdAt: existing ? existing.createdAt : now,
-        clicks: existing ? existing.clickCount : 0,
-      });
+      if (claimed.count === 0) {
+        const existing = await prisma.discount.findFirst({
+          where: { productId, supermarket: pending.supermarket, source: 'web' },
+          orderBy: { updatedAt: 'desc' },
+        });
 
-      if (existing) {
-        await prisma.discount.update({
-          where: { id: existing.id },
-          data: {
-            productName: pending.rawName,
-            category,
-            discountedPrice: pending.rawPrice,
-            originalPrice: originalPrice ?? null,
-            discountPercent,
-            validFrom: now,
-            validUntil: nextWeek,
-            isActive: true,
-            hotScore,
-          },
+        const hotScore = computeHotScore({
+          productName: pending.rawName,
+          description: null,
+          discountPercent,
+          createdAt: existing ? existing.createdAt : now,
+          clicks: existing ? existing.clickCount : 0,
         });
-      } else {
-        await prisma.discount.create({
-          data: {
-            storeId: store.id,
-            supermarket: pending.supermarket,
-            productName: pending.rawName,
-            category,
-            originalPrice: originalPrice ?? null,
-            discountedPrice: pending.rawPrice,
-            discountPercent,
-            validFrom: now,
-            validUntil: nextWeek,
-            isActive: true,
-            productId,
-            source: 'web',
-            hotScore,
-          },
-        });
+
+        if (existing) {
+          await prisma.discount.update({
+            where: { id: existing.id },
+            data: {
+              productName: pending.rawName,
+              category,
+              discountedPrice: pending.rawPrice,
+              originalPrice: originalPrice ?? null,
+              discountPercent,
+              validFrom: now,
+              validUntil: nextWeek,
+              isActive: true,
+              hotScore,
+            },
+          });
+        } else {
+          await prisma.discount.create({
+            data: {
+              storeId: store.id,
+              supermarket: pending.supermarket,
+              productName: pending.rawName,
+              category,
+              originalPrice: originalPrice ?? null,
+              discountedPrice: pending.rawPrice,
+              discountPercent,
+              validFrom: now,
+              validUntil: nextWeek,
+              isActive: true,
+              productId,
+              source: 'web',
+              hotScore,
+            },
+          });
+        }
       }
 
       await prisma.priceSnapshot.create({
