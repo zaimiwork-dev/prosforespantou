@@ -71,3 +71,7 @@ resolver-backlog.log
 
 # local UX-review screenshots (scratch)
 screenshots/
+
+# local scratch
+.shots.mjs
+devserver.log
