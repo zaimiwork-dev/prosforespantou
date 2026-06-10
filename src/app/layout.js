@@ -1,4 +1,4 @@
-import { Inter, DM_Serif_Display } from "next/font/google";
+import { Inter, DM_Serif_Display, Outfit } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -12,6 +12,14 @@ const dmSerif = DM_Serif_Display({
   weight: "400",
   style: ["normal", "italic"],
   subsets: ["latin"],
+  display: "swap",
+});
+
+// Loaded once here (was injected as a render-blocking <link> on several pages —
+// see no-page-custom-font). Greek subset included; exposed as --font-outfit.
+const outfit = Outfit({
+  variable: "--font-outfit",
+  subsets: ["latin", "greek"],
   display: "swap",
 });
 
@@ -43,7 +51,7 @@ export default function RootLayout({ children }) {
       lang="el"
       data-theme="fresh"
       data-density="compact"
-      className={`${inter.variable} ${dmSerif.variable}`}
+      className={`${inter.variable} ${dmSerif.variable} ${outfit.variable}`}
     >
       <body>{children}</body>
     </html>

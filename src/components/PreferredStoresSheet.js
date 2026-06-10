@@ -60,7 +60,7 @@ export function PreferredStoresSheet({ isOpen, onClose }) {
           boxShadow: "-5px 0 25px rgba(0,0,0,0.1)",
           display: "flex",
           flexDirection: "column",
-          fontFamily: "'Outfit', sans-serif",
+          fontFamily: "var(--font-outfit), sans-serif",
         }}
       >
         {/* Header */}

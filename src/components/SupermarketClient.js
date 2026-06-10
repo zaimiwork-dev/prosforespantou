@@ -195,8 +195,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
   }, [initialDeals]);
 
   return (
-    <div style={{ background: "#f3f5f8", color: "#1c1e24", minHeight: "100vh", fontFamily: "'Outfit', sans-serif" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <div style={{ background: "#f3f5f8", color: "#1c1e24", minHeight: "100vh", fontFamily: "var(--font-outfit), sans-serif" }}>
 
       <SiteHeader cartCount={cart.length} onCartOpen={() => setIsCartOpen(true)} />
 

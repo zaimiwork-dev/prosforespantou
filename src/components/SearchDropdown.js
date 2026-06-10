@@ -1,7 +1,32 @@
 'use client';
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { SUPERMARKETS } from "@/lib/constants";
+
+// Optimized 40px thumbnail — was a raw <img> downloading the full-size product
+// image just to render it at 40px (real waste on mobile data). Falls back to a
+// cart glyph when there's no image or the host fails.
+function SearchThumb({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div style={{ width: 40, height: 40, borderRadius: 8, background: "#f3f5f8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+        🛒
+      </div>
+    );
+  }
+  return (
+    <Image
+      src={src}
+      alt={alt || ""}
+      width={40}
+      height={40}
+      onError={() => setFailed(true)}
+      style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0, background: "#f3f5f8" }}
+    />
+  );
+}
 
 const GREEKLISH_MAP = {
   th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ',
@@ -174,17 +199,7 @@ export function SearchDropdown({ query, deals, onSelect }) {
               onMouseEnter={(e) => (e.currentTarget.style.background = "#f8f9fb")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
             >
-              {deal.imageUrl ? (
-                <img
-                  src={deal.imageUrl}
-                  alt={deal.productName}
-                  style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0, background: "#f3f5f8" }}
-                />
-              ) : (
-                <div style={{ width: 40, height: 40, borderRadius: 8, background: "#f3f5f8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                  🛒
-                </div>
-              )}
+              <SearchThumb src={deal.imageUrl} alt={deal.productName} />
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#1c1e24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
