@@ -20,15 +20,34 @@ interface ShoppingItem {
   };
 }
 
+// A favourited product ("my staples"). Keyed by the canonical productId when
+// the offer is matched, else by name+chain — so an unmatched offer can still
+// be saved and keeps working once the resolver claims it.
+export interface FavoriteItem {
+  key: string;
+  productId: string | null;
+  productName: string;
+  supermarket?: string | null;
+}
+
+export function favoriteKeyFor(offer: { productId?: string | null; product_id?: string | null; productName?: string | null; product_name?: string | null; supermarket?: string | null; supermarket_id?: string | null }): string {
+  const pid = offer.productId ?? offer.product_id;
+  if (pid) return `p:${pid}`;
+  const name = offer.productName ?? offer.product_name ?? '';
+  return `n:${name.toLowerCase()}|${offer.supermarket ?? offer.supermarket_id ?? ''}`;
+}
+
 interface ShoppingListState {
   items: ShoppingItem[];
   preferredStores: string[];
+  favorites: FavoriteItem[];
   addItem: (product: any) => void;
   removeItem: (id: string) => void;
   decreaseItem: (id: string) => void;
   clearList: () => void;
   togglePreferred: (id: string) => void;
   clearPreferred: () => void;
+  toggleFavorite: (offer: any) => void;
   getShareText: () => string;
 }
 
@@ -37,6 +56,7 @@ export const useShoppingListStore = create<ShoppingListState>()(
     (set, get) => ({
       items: [],
       preferredStores: [],
+      favorites: [],
       
       addItem: (product) => set((state) => {
         const existing = state.items.find(i => i.id === product.id);
@@ -69,6 +89,20 @@ export const useShoppingListStore = create<ShoppingListState>()(
       })),
 
       clearPreferred: () => set({ preferredStores: [] }),
+
+      toggleFavorite: (offer) => set((state) => {
+        const key = favoriteKeyFor(offer);
+        if (state.favorites.some((f) => f.key === key)) {
+          return { favorites: state.favorites.filter((f) => f.key !== key) };
+        }
+        const fav: FavoriteItem = {
+          key,
+          productId: offer.productId ?? offer.product_id ?? null,
+          productName: offer.productName ?? offer.product_name ?? offer.product?.name ?? '',
+          supermarket: offer.supermarket ?? offer.supermarket_id ?? null,
+        };
+        return { favorites: [...state.favorites, fav] };
+      }),
 
       /**
        * Centralized logic to generate a professional share message.

@@ -16,6 +16,7 @@ const AdminAuth = dynamic(() => import("@/components/AdminPanel").then((m) => m.
 import { SiteHeader } from "@/components/SiteHeader";
 import { Hero } from "@/components/Hero";
 import { FeaturedCarousel } from "@/components/FeaturedCarousel";
+import { FavoritesRow } from "@/components/FavoritesRow";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { SupermarketTiles } from "@/components/SupermarketTiles";
 import { Icon } from "@/components/Icons";
@@ -57,7 +58,10 @@ function PublicSite({ initial, onAdmin }) {
       <main style={{ flex: 1 }}>
         <div className="container">
           {/* Deals first — a shopper opening the app daily should see savings
-              before navigation. Browsing by store/category moves below. */}
+              before navigation. Browsing by store/category moves below. The
+              user's own watchlist outranks everything when it has live hits. */}
+          <FavoritesRow onAdd={addItem} onSelect={setSelectedProduct} />
+
           <FeaturedCarousel
             title="Κορυφαίες προσφορές"
             sub="Ξεχωρίζουν αυτή την εβδομάδα"

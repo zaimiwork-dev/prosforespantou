@@ -10,6 +10,7 @@ import { ShoppingList } from "@/components/ShoppingList";
 import { PreferredStoresSheet } from "@/components/PreferredStoresSheet";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
+import { dedupeDeals } from "@/lib/dedupe-deals";
 import { Sheet } from "@/components/Sheet";
 import { Icon } from "@/components/Icons";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
@@ -218,7 +219,7 @@ export default function DealsClient({ initial }) {
           )}
 
           <DealGrid
-            deals={discounts}
+            deals={dedupeDeals(discounts)}
             loading={loading}
             loadingMore={loadingMore}
             hasMore={hasMore}

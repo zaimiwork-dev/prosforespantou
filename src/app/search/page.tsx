@@ -1,5 +1,6 @@
 import { searchDeals } from "@/actions/search-deals";
 import { SearchPage } from "@/components/SearchPage";
+import { dedupeDeals } from "@/lib/dedupe-deals";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q = "" } = await searchParams;
@@ -14,7 +15,7 @@ export default async function SearchRoute({ searchParams }: { searchParams: Prom
 
   const rawDeals = query.length >= 2 ? await searchDeals(query) : [];
 
-  const deals = rawDeals.map((d) => ({
+  const deals = dedupeDeals(rawDeals).map((d) => ({
     ...d,
     validFrom: d.validFrom?.toISOString?.() ?? d.validFrom,
     validUntil: d.validUntil?.toISOString?.() ?? d.validUntil,

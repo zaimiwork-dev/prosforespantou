@@ -4,6 +4,21 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-11 — obs + display-first + categories + ranking + search/UX SHIPPED)
+
+### Slices ④+⑤ — honest hotness protocol & search/UX overhaul (2026-06-11, after user feedback)
+
+**④ Ranking** (`9c1fb12`): user said top items felt random. Causes: 66 total clicks ×8 points let stray test-clicks pin a duster at #5; honest-pricing verdict ignored (a 'high'-verdict offer ranked #4); 357-row score ties collapsed into chain blocks. [hotness.ts](src/lib/hotness.ts) now: **verdict-aware** (lowest +8 / good +4 / high −6 — hot sort can never contradict the honesty badge), **log-dampened popularity** (log2(1+clicks)·7 + log2(1+list_adds)·10 — list_add is the stronger intent), **stable per-row jitter** [0,1.2) breaks tie plateaus deterministically, CLICK_WEIGHT 8→3. scrape-chains.yml recomputes **verdicts BEFORE hotness**. All public sorts end on `{id:'asc'}` (stable pagination). 9,580 rows rescored in prod. 10 tests.
+
+**⑤ Search + UX** (this commit), from the honest site review:
+- **Search relevance** — searching "γάλα" returned body lotions and honey-milk soaps before ANY milk (substring LIKE + ORDER BY expiry + LIMIT 50 cutoff). New [search-rank.ts](src/lib/search-rank.ts), shared by the server action AND the suggestion dropdown (killed the divergent inline copies): word-in-name > word-prefix > substring > description; **query category intent** via the catalog categorizer ("γάλα" → Γαλακτοκομικά rows boosted +50); hotScore = tiebreak only. SQL recall stage now over-fetches 300–400 by hotScore. Verified: γάλα → Μεβγάλ/ΝΟΥΝΟΥ/ΔΕΛΤΑ milk first, dropdown matches. 10 tests.
+- **Display dedupe** — same product showed twice (web+leaflet rows, AND same-name catalog dupes under two productIds). New [dedupe-deals.ts](src/lib/dedupe-deals.ts) collapses on BOTH keys (productId+chain, then name+chain; cheaper price wins the slot). Applied: getTopDeals (server), DealsClient, SupermarketClient, /search. ([group-deals.js](src/lib/group-deals.js) still does the richer source-tag merge in FeaturedCarousel.)
+- **Carousel freshness** — stable partition: offers with >24h of life lead; "Λήγει σήμερα" can't headline.
+- **Watchlist v1 ("Τα αγαπημένα σου")** — ⭐ toggle in [OfferDetails](src/components/OfferDetails.js) (sheet + page), favorites persisted in the zustand localStorage store (`favorites`, `toggleFavorite`, `favoriteKeyFor` — productId-keyed with name+chain fallback for unmatched offers), [get-favorite-deals.ts](src/actions/get-favorite-deals.ts) (public, zod, rate-limited, matches productIds across ALL chains), [FavoritesRow](src/components/FavoritesRow.js) renders ABOVE Κορυφαίες only when a favourite is live. Verified end-to-end with Playwright (star → row appears).
+- Dead store tiles: review flagged them, but the redesign already renders them as a dimmed non-link "Σύντομα κοντά μας" row — no change needed.
+
+---
+
 ## ⚡ Pick up here (2026-06-11 — observability + display-first + category overhaul SHIPPED)
 
 **All pushed to `origin/main`** (`4963545`, `c124970`, `fcbadbd`). Context: user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the two gaps were **nobody watching it** and **~4k scraped offers invisible** (no Discount written when matching fails). Both shipped. Then user reported the categories looked wrong → systematic leak hunt + engine fixes + 1,573-row backfill (slice ③).

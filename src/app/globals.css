@@ -1263,6 +1263,19 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 
 .od-cta-row { display: flex; gap: 10px; align-items: stretch; }
 .od-cta-row .qty-stepper { flex: none; }
+/* ⭐ favourite toggle — watchlist entry point */
+.od-fav {
+  flex: none;
+  width: 46px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.od-fav:hover { border-color: var(--ink-2); }
+.od-fav.active { color: #e8a13c; border-color: #e8a13c; background: #fff8ec; }
 .od-add {
   flex: 1; justify-content: center;
   background: var(--brand); color: var(--brand-ink);

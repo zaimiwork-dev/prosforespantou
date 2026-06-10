@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
+import { dedupeDeals } from '@/lib/dedupe-deals';
 
 const getDefaultDeals = unstable_cache(
   async (limit: number) => {
@@ -126,10 +127,21 @@ const getTopDealsCached = unstable_cache(
       take: 80,
     });
 
+    // Same product can hold one row per source (web+leaflet), and catalog
+    // dupes can hold the same name under two productIds — show one card.
+    // Stable partition: offers with >24h of life lead; a carousel headlining
+    // "Λήγει σήμερα" sells urgency but dies on the user the same evening.
+    const dayAway = now.getTime() + 24 * 3600_000;
+    const deduped = dedupeDeals(pool);
+    const ordered = [
+      ...deduped.filter((d) => d.validUntil.getTime() > dayAway),
+      ...deduped.filter((d) => d.validUntil.getTime() <= dayAway),
+    ];
+
     const need = limit - featured.length;
     const perChain = new Map<string, number>();
-    const picked: typeof pool = [];
-    for (const d of pool) {
+    const picked: typeof ordered = [];
+    for (const d of ordered) {
       if (picked.length >= need) break;
       const used = perChain.get(d.supermarket) || 0;
       if (used >= PER_CHAIN_CAP) continue;
@@ -137,7 +149,7 @@ const getTopDealsCached = unstable_cache(
       picked.push(d);
     }
     if (picked.length < need) {
-      const fill = pool.filter((d) => !picked.includes(d)).slice(0, need - picked.length);
+      const fill = ordered.filter((d) => !picked.includes(d)).slice(0, need - picked.length);
       picked.push(...fill);
     }
     return [...featured, ...picked];

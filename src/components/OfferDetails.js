@@ -10,6 +10,7 @@ import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { hiResImage } from '@/lib/images';
+import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -34,6 +35,9 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
   // One clock snapshot per mount — date labels don't need live ticking, and an
   // impure Date.now() during render defeats memoization.
   const [nowMs] = useState(() => Date.now());
+  const favorites = useShoppingListStore((s) => s.favorites);
+  const toggleFavorite = useShoppingListStore((s) => s.toggleFavorite);
+  const isFavorite = favorites.some((f) => f.key === favoriteKeyFor(offer));
 
   const discountedPrice = Number(offer.discountedPrice ?? offer.discounted_price);
   const originalPrice = offer.originalPrice ?? offer.original_price
@@ -137,6 +141,16 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
         </div>
 
         <div className="od-cta-row">
+          <button
+            type="button"
+            className={`od-fav${isFavorite ? ' active' : ''}`}
+            onClick={() => toggleFavorite(offer)}
+            aria-pressed={isFavorite}
+            aria-label={isFavorite ? 'Αφαίρεση από τα αγαπημένα' : 'Προσθήκη στα αγαπημένα'}
+            title={isFavorite ? 'Στα αγαπημένα — θα το βλέπεις στην αρχική όταν είναι σε προσφορά' : 'Παρακολούθησε αυτό το προϊόν'}
+          >
+            <Icon.Star size={18} filled={isFavorite} />
+          </button>
           <div className="qty-stepper" aria-label="Ποσότητα">
             <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1} aria-label="Μείωση">
               <Icon.Minus size={14} />

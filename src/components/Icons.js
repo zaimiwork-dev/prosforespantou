@@ -39,6 +39,11 @@ export const Icon = {
   Check: ({ size = 16 }) => (
     <svg {...base(size)} strokeWidth="2.4"><path d="m5 12 4.5 4.5L19 7" /></svg>
   ),
+  Star: ({ size = 16, filled = false }) => (
+    <svg {...base(size)} fill={filled ? "currentColor" : "none"} strokeWidth="1.8">
+      <path d="M12 3.2 14.7 9l6.1.6-4.6 4.1 1.3 6-5.5-3.2L6.5 19.7l1.3-6L3.2 9.6 9.3 9 12 3.2Z" />
+    </svg>
+  ),
   ChevronRight: ({ size = 14 }) => (
     <svg {...base(size)}><path d="m9 6 6 6-6 6" /></svg>
   ),

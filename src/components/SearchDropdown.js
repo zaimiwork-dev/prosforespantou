@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SUPERMARKETS } from "@/lib/constants";
+import { rankSearchResults } from "@/lib/search-rank";
 
 // Optimized 40px thumbnail — was a raw <img> downloading the full-size product
 // image just to render it at 40px (real waste on mobile data). Falls back to a
@@ -28,104 +29,10 @@ function SearchThumb({ src, alt }) {
   );
 }
 
-const GREEKLISH_MAP = {
-  th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ',
-  a: 'α', b: 'β', g: 'γ', d: 'δ', e: 'ε',
-  z: 'ζ', h: 'η', i: 'ι', k: 'κ', l: 'λ',
-  m: 'μ', n: 'ν', x: 'ξ', o: 'ο', p: 'π',
-  r: 'ρ', s: 'σ', t: 'τ', u: 'υ', y: 'υ',
-  f: 'φ', v: 'β', w: 'ω', q: 'κ',
-};
-
-function greeklish(text) {
-  const lower = text.toLowerCase();
-  let result = '';
-  let i = 0;
-  while (i < lower.length) {
-    const two = lower[i] + (lower[i + 1] ?? '');
-    if (GREEKLISH_MAP[two]) { result += GREEKLISH_MAP[two]; i += 2; }
-    else if (GREEKLISH_MAP[lower[i]]) { result += GREEKLISH_MAP[lower[i]]; i++; }
-    else { result += lower[i]; i++; }
-  }
-  return result;
-}
-
-const normalize = (s) =>
-  (s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-const SYNONYMS = [
-  ['gouda', 'γουδα', 'γκουντα'],
-  ['bacon', 'μπεικον', 'μπεηκον'],
-  ['edam', 'ενταμ'],
-  ['cheddar', 'τσενταρ'],
-  ['kelloggs', 'κελογκς'],
-  ['quaker', 'κουακερ'],
-  ['pampers', 'παμπερς']
-];
-
-function expandSearch(query) {
-  if (!query) return [];
-  const raw = query.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const terms = new Set([raw]);
-  
-  const isLatin = /^[a-zA-Z\s]+$/.test(raw);
-  if (isLatin) {
-    const greek = greeklish(raw).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    terms.add(greek);
-    
-    if (raw.includes('x')) terms.add(greek.replace(/ξ/g, 'χ'));
-    if (raw.includes('h')) {
-       terms.add(greek.replace(/η/g, 'χ'));
-       terms.add(greek.replace(/η/g, 'ι'));
-    }
-    if (raw.includes('u')) terms.add(greek.replace(/ου/g, 'υ'));
-    if (raw.includes('y')) terms.add(greek.replace(/υ/g, 'ι'));
-    if (raw.includes('w')) terms.add(greek.replace(/ω/g, 'ο'));
-    if (raw.includes('b')) terms.add(greek.replace(/β/g, 'μπ'));
-    if (raw.includes('d')) terms.add(greek.replace(/δ/g, 'ντ'));
-    if (raw.includes('g')) terms.add(greek.replace(/γ/g, 'γκ'));
-    if (raw.includes('c')) terms.add(greek.replace(/ψ/g, 'κ').replace(/τσ/g, 'κ'));
-  } else {
-    const grToLat = {
-      'α':'a', 'β':'v', 'γ':'g', 'δ':'d', 'ε':'e', 'ζ':'z', 'η':'h', 'θ':'th',
-      'ι':'i', 'κ':'k', 'λ':'l', 'μ':'m', 'ν':'n', 'ξ':'x', 'ο':'o', 'π':'p',
-      'ρ':'r', 'σ':'s', 'ς':'s', 'τ':'t', 'υ':'y', 'φ':'f', 'χ':'x', 'ψ':'ps', 'ω':'o'
-    };
-    let latin = '';
-    for (let i=0; i<raw.length; i++) {
-      latin += grToLat[raw[i]] || raw[i];
-    }
-    terms.add(latin);
-    
-    if (raw.includes('χ')) {
-      terms.add(latin.replace(/x/g, 'h'));
-      terms.add(latin.replace(/x/g, 'ch'));
-    }
-    if (raw.includes('η')) terms.add(latin.replace(/h/g, 'i'));
-    if (raw.includes('υ')) {
-      terms.add(latin.replace(/y/g, 'u'));
-      terms.add(latin.replace(/y/g, 'i'));
-    }
-    if (raw.includes('ω')) terms.add(latin.replace(/o/g, 'w'));
-    if (raw.includes('β')) terms.add(latin.replace(/v/g, 'b'));
-  }
-
-  const expanded = new Set();
-  for (const term of terms) {
-    expanded.add(term);
-    for (const group of SYNONYMS) {
-      for (const syn of group) {
-        if (term.includes(syn)) {
-          for (const s of group) {
-             expanded.add(term.replace(syn, s));
-          }
-        }
-      }
-    }
-  }
-  return Array.from(expanded);
-}
-
+// Matching + ranking live in lib/search-rank.ts — the SAME module the server
+// search action uses, so suggestions and the results page agree on what
+// "relevant" means (they previously had divergent inline copies that matched
+// bare substrings: typing "γάλα" suggested body lotions before milk).
 export function SearchDropdown({ query, deals, onSelect }) {
   const ref = useRef(null);
 
@@ -144,15 +51,7 @@ export function SearchDropdown({ query, deals, onSelect }) {
 
   if (!query || query.trim().length < 2) return null;
 
-  const expandedTerms = expandSearch(query);
-
-  const results = deals
-    .filter((d) => {
-       const name = normalize(d.productName);
-       const desc = normalize(d.description);
-       return expandedTerms.some(term => name.includes(term) || desc.includes(term));
-    })
-    .slice(0, 10);
+  const results = rankSearchResults(query, deals).slice(0, 10);
 
   const sm = (id) => SUPERMARKETS.find((s) => s.id === id);
 

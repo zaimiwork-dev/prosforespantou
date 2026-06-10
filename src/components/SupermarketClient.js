@@ -14,6 +14,7 @@ import { CATEGORIES } from "@/lib/constants";
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { searchDeals } from '@/actions/search-deals';
+import { dedupeDeals } from '@/lib/dedupe-deals';
 
 const GREEKLISH_MAP = {
   th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ',
@@ -199,12 +200,13 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
   const filtered = useMemo(() => {
     // When the user is searching, render the server results (they cover the
     // full catalog, not just the top-500 initialDeals). Otherwise filter the
-    // initial set by category and sort.
+    // initial set by category and sort. dedupeDeals collapses the web+leaflet
+    // rows of the same product into one card.
     const base = searchResults ?? initialDeals;
     const byCategory = activeCategory === "all"
       ? base
       : base.filter((d) => d.category === activeCategory);
-    return sortDeals(byCategory, sortBy);
+    return dedupeDeals(sortDeals(byCategory, sortBy));
   }, [initialDeals, searchResults, activeCategory, sortBy]);
 
   // Reset visible count when filters change
