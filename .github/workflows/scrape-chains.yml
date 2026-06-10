@@ -213,21 +213,23 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      - name: Recompute hotScore (default-sort ranking)
-        # Runs last so scores reflect every Discount the resolvers just wrote,
-        # plus the day's recent-window clicks + recency decay. Authoritative
-        # pass over per-write estimates. See src/lib/hotness.ts.
+      - name: Recompute price verdicts (honest "good deal" card badges)
+        # Each new daily snapshot can flip an offer's verdict (e.g. a product
+        # reaching its 3rd point becomes eligible). Idempotent. Runs BEFORE the
+        # hotScore pass because hotness folds the verdict in (good deals rise,
+        # over-priced ones sink). See src/lib/price-verdict.ts.
         continue-on-error: true
-        run: node src/scripts/recompute-hotness.mjs
+        run: node src/scripts/recompute-price-verdicts.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      - name: Recompute price verdicts (honest "good deal" card badges)
-        # Each new daily snapshot can flip an offer's verdict (e.g. a product
-        # reaching its 3rd point becomes eligible). Idempotent. See
-        # src/lib/price-verdict.ts.
+      - name: Recompute hotScore (default-sort ranking)
+        # Runs last so scores reflect every Discount the resolvers just wrote,
+        # fresh price verdicts, the day's recent-window clicks/list-adds, and
+        # recency decay. Authoritative over per-write estimates. See
+        # src/lib/hotness.ts.
         continue-on-error: true
-        run: node src/scripts/recompute-price-verdicts.mjs
+        run: node src/scripts/recompute-hotness.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}

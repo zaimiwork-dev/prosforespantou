@@ -16,8 +16,8 @@ const getDefaultDeals = unstable_cache(
         where,
         include: { store: true, leaflet: true, product: true },
         // Default sort = fylladio-style hotness (KVI/brand/mechanic + clicks +
-        // recency). validUntil breaks ties. See src/lib/hotness.ts.
-        orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }],
+        // verdict + recency). id last = fully deterministic pagination.
+        orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }, { id: 'asc' }],
         take: limit
       }),
       prisma.discount.count({ where }),
@@ -35,14 +35,16 @@ import * as Sentry from "@sentry/nextjs";
  */
 type SortBy = 'hot' | 'expiring' | 'discount' | 'newest' | 'price_asc' | 'price_desc';
 
+// Every sort ends on { id } so equal-key rows keep a stable order across
+// requests and pagination pages (Postgres otherwise returns ties arbitrarily).
 const orderByFor = (sortBy: SortBy): any => {
-  if (sortBy === 'discount') return [{ discountPercent: { sort: 'desc', nulls: 'last' } }, { validUntil: 'asc' }];
-  if (sortBy === 'newest') return { createdAt: 'desc' };
-  if (sortBy === 'expiring') return { validUntil: 'asc' };
-  if (sortBy === 'price_asc') return [{ discountedPrice: 'asc' }, { validUntil: 'asc' }];
-  if (sortBy === 'price_desc') return [{ discountedPrice: 'desc' }, { validUntil: 'asc' }];
-  // 'hot' (default): merchandising rank, validUntil breaks ties.
-  return [{ hotScore: 'desc' }, { validUntil: 'asc' }];
+  if (sortBy === 'discount') return [{ discountPercent: { sort: 'desc', nulls: 'last' } }, { validUntil: 'asc' }, { id: 'asc' }];
+  if (sortBy === 'newest') return [{ createdAt: 'desc' }, { id: 'asc' }];
+  if (sortBy === 'expiring') return [{ validUntil: 'asc' }, { id: 'asc' }];
+  if (sortBy === 'price_asc') return [{ discountedPrice: 'asc' }, { validUntil: 'asc' }, { id: 'asc' }];
+  if (sortBy === 'price_desc') return [{ discountedPrice: 'desc' }, { validUntil: 'asc' }, { id: 'asc' }];
+  // 'hot' (default): merchandising rank.
+  return [{ hotScore: 'desc' }, { validUntil: 'asc' }, { id: 'asc' }];
 };
 
 export async function getActiveDeals(
@@ -120,7 +122,7 @@ const getTopDealsCached = unstable_cache(
         id: { notIn: featured.map(f => f.id) },
       },
       include: { store: true, leaflet: true, product: true },
-      orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }],
+      orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }, { id: 'asc' }],
       take: 80,
     });
 

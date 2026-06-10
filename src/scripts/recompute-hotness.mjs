@@ -32,18 +32,27 @@ async function run() {
   const now = new Date();
   const since = new Date(now.getTime() - RECENT_DAYS * 86_400_000);
 
-  // Recent-window click counts per discount → the popularity signal.
-  const clickRows = await prisma.clickEvent.groupBy({
-    by: ['discountId'],
-    where: { eventType: 'deal_click', discountId: { not: null }, createdAt: { gt: since } },
-    _count: { _all: true },
-  });
+  // Recent-window click + list_add counts per discount → the popularity signal.
+  // list_add is the stronger intent (user committed the offer to their list).
+  const [clickRows, addRows] = await Promise.all([
+    prisma.clickEvent.groupBy({
+      by: ['discountId'],
+      where: { eventType: 'deal_click', discountId: { not: null }, createdAt: { gt: since } },
+      _count: { _all: true },
+    }),
+    prisma.clickEvent.groupBy({
+      by: ['discountId'],
+      where: { eventType: 'list_add', discountId: { not: null }, createdAt: { gt: since } },
+      _count: { _all: true },
+    }),
+  ]);
   const clicksById = new Map(clickRows.map((r) => [r.discountId, r._count._all]));
-  console.log(`📈 recent clicks (${RECENT_DAYS}d): ${clickRows.length} deals clicked`);
+  const addsById = new Map(addRows.map((r) => [r.discountId, r._count._all]));
+  console.log(`📈 recent (${RECENT_DAYS}d): ${clickRows.length} deals clicked, ${addRows.length} deals list-added`);
 
   const deals = await prisma.discount.findMany({
     where: { isActive: true, validUntil: { gt: now } },
-    select: { id: true, productName: true, description: true, discountPercent: true, createdAt: true, hotScore: true },
+    select: { id: true, productName: true, description: true, discountPercent: true, createdAt: true, hotScore: true, priceVerdict: true },
   });
   console.log(`🔢 active deals to score: ${deals.length}${DRY_RUN ? ' (DRY_RUN)' : ''}`);
 
@@ -59,6 +68,9 @@ async function run() {
         discountPercent: d.discountPercent,
         createdAt: d.createdAt,
         clicks: clicksById.get(d.id) || 0,
+        listAdds: addsById.get(d.id) || 0,
+        priceVerdict: d.priceVerdict,
+        jitterKey: d.id,
       });
       if (Math.abs((d.hotScore ?? 0) - score) < 0.01) { unchanged++; continue; }
       if (!DRY_RUN) {

@@ -24,13 +24,24 @@ export type HotInput = {
   // Click signal. At write time this is 0; the daily recompute passes a
   // recent-window count; track-event bumps the stored score directly.
   clicks?: number | null;
+  // Recent list_add count — a stronger intent signal than a click (the user
+  // committed the offer to their shopping list). Recompute-only.
+  listAdds?: number | null;
+  // Honest-pricing verdict (Discount.priceVerdict). Genuinely good prices rise,
+  // offers priced ABOVE their own history sink — "hot" must never contradict
+  // the honesty badge shown on the same card.
+  priceVerdict?: string | null;
+  // Stable tie-breaking jitter key (the discount id, recompute-only). Without
+  // it hundreds of no-click rows share one score and the list collapses into
+  // same-chain blocks ordered by expiry.
+  jitterKey?: string | null;
 };
 
 // Per-click immediate bump applied in track-event.ts (cheap, no recompute).
-// The daily recompute folds clicks in authoritatively with a recency window.
-export const CLICK_WEIGHT = 8;
-// Cap so one viral deal can't pin the top of the page forever.
-const MAX_CLICKS_COUNTED = 25;
+// Deliberately smaller than what one click is "worth" in the recompute — at
+// today's traffic a couple of stray clicks (often our own testing) must not
+// pin an item to the top; the nightly log-dampened recompute is authoritative.
+export const CLICK_WEIGHT = 3;
 
 // Lowercase + strip Greek/Latin accents so "ΕΛΑΙΟΛΑΔΟ" and "ελαιόλαδο" match.
 function normalize(s: string | null | undefined): string {
@@ -102,19 +113,49 @@ function recencyBoost(createdAt: Date | string | null | undefined): number {
   return Math.max(0, 2 - Math.max(0, days) * 0.2);
 }
 
+// Log-dampened popularity: the FIRST few interactions matter most, then each
+// extra one matters less. At low traffic this stops 3-4 stray clicks (often
+// our own browsing) from catapulting a random item over the curated signals;
+// at high traffic it stops one viral deal pinning the top forever.
+function popularityBoost(clicks: number, listAdds: number): number {
+  const c = Math.max(clicks, 0);
+  const a = Math.max(listAdds, 0);
+  return Math.log2(1 + c) * 7 + Math.log2(1 + a) * 10;
+}
+
+// Honest deal quality: surface what's genuinely cheap, demote offers priced
+// above their own 90-day history. Mirrors lib/price-verdict.ts levels.
+const VERDICT_BOOST: Record<string, number> = {
+  lowest: 8,
+  good: 4,
+  fair: 0,
+  meh: -2,
+  high: -6,
+};
+
+// Deterministic per-row jitter in [0, 1.2) — breaks the huge score plateaus
+// (hundreds of rows tie without it) into a stable shuffle that mixes chains.
+// Same key always yields the same value, so pagination/ordering is stable.
+function stableJitter(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 120) / 100;
+}
+
 export function computeHotScore(input: HotInput): number {
   const name = normalize(input.productName);
   const text = `${name} ${normalize(input.description)}`;
   const pct = input.discountPercent ?? 0;
-  const clicks = Math.min(Math.max(input.clicks ?? 0, 0), MAX_CLICKS_COUNTED);
 
   const score =
     kviBoost(name) +
     brandBoost(name) +
     mechanicBoost(text) +
     pct * 0.2 +
-    clicks * CLICK_WEIGHT +
-    recencyBoost(input.createdAt);
+    popularityBoost(input.clicks ?? 0, input.listAdds ?? 0) +
+    (VERDICT_BOOST[input.priceVerdict ?? ''] ?? 0) +
+    recencyBoost(input.createdAt) +
+    (input.jitterKey ? stableJitter(input.jitterKey) : 0);
 
   // Round to 2dp so the persisted value is stable/comparable.
   return Math.round(score * 100) / 100;
