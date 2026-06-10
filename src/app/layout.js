@@ -45,6 +45,8 @@ export const viewport = {
   themeColor: "#0F5132",
 };
 
+import { BottomNav } from "@/components/BottomNav";
+
 export default function RootLayout({ children }) {
   return (
     <html
@@ -53,7 +55,10 @@ export default function RootLayout({ children }) {
       data-density="compact"
       className={`${inter.variable} ${dmSerif.variable} ${outfit.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <BottomNav />
+      </body>
     </html>
   );
 }

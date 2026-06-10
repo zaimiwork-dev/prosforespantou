@@ -7,12 +7,23 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
   const { token } = await searchParams;
   
   if (!token) {
+    // Reached without an email link (e.g. typed the URL). Don't dead-end —
+    // explain what alerts are and route the visitor somewhere useful.
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <SiteHeader cartCount={0} />
-        <main style={{ flex: 1, padding: 40, textAlign: 'center' }}>
-          <h1 style={{ fontSize: 24, marginBottom: 16 }}>Διαχείριση Ειδοποιήσεων</h1>
-          <p style={{ color: '#666' }}>Λείπει το διακριτικό ασφαλείας. Παρακαλούμε χρησιμοποιήστε τον σύνδεσμο από το email επιβεβαίωσης.</p>
+        <main style={{ flex: 1, padding: '48px 20px', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
+          <h1 style={{ fontSize: 24, marginBottom: 12 }}>Ειδοποιήσεις προσφορών</h1>
+          <p style={{ color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 8 }}>
+            Γράψου στο newsletter από την αρχική σελίδα και θα σου στέλνουμε email
+            όταν προϊόντα που σε ενδιαφέρουν μπαίνουν σε προσφορά.
+          </p>
+          <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+            Αν έχεις ήδη γραφτεί, άνοιξε τη σελίδα αυτή από τον σύνδεσμο στο email
+            επιβεβαίωσης — εκεί γίνεται η διαχείριση των ειδοποιήσεών σου.
+          </p>
+          <a href="/deals" className="btn btn-primary">Δες τις προσφορές</a>
         </main>
         <Footer />
       </div>

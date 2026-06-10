@@ -76,4 +76,16 @@ export const Icon = {
       <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
     </svg>
   ),
+  Home: ({ size = 20 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="m3 10.5 9-7.5 9 7.5" />
+      <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+    </svg>
+  ),
+  Tag: ({ size = 20 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M3 3h8l10 10-8 8L3 11V3Z" />
+      <circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };

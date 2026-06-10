@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useShoppingListStore } from '@/lib/store';
 import { SUPERMARKETS } from '@/lib/constants';
 import { Icon } from './Icons';
@@ -100,6 +101,12 @@ export function ShoppingList({ isOpen, onClose }) {
             <div className="drawer-empty">
               <div className="empty-ico"><Icon.Bag size={24} /></div>
               <p>Η λίστα σου είναι άδεια</p>
+              <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '4px 0 0', maxWidth: 260 }}>
+                Πρόσθεσε προσφορές για να συγκρίνεις τιμές και να δεις πού συμφέρει.
+              </p>
+              <Link href="/deals" className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={onClose}>
+                Δες τις προσφορές
+              </Link>
             </div>
           ) : (
             <>
