@@ -184,22 +184,11 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
         )}
 
         {showVerdict && (
-          <div style={{
-            display: 'inline-block',
-            background: '#dcfce7',
-            color: '#166534',
-            fontSize: 10,
-            fontWeight: 800,
-            padding: '2px 7px',
-            borderRadius: 6,
-            marginBottom: 6,
-          }}>
-            {VERDICT_LABEL[d.priceVerdict]}
-          </div>
+          <div className="verdict-pill">{VERDICT_LABEL[d.priceVerdict]}</div>
         )}
 
         <div className="card-price-row">
-          <div>
+          <div className={originalPrice ? "has-discount" : undefined}>
             <div className="price">{discountedPrice?.toFixed(2)}€</div>
             {originalPrice && <div className="price-old">{originalPrice.toFixed(2)}€</div>}
           </div>

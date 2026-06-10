@@ -542,16 +542,29 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   margin-top: auto; padding-top: 6px;
 }
 .price {
-  font-size: 20px; font-weight: 700;
+  font-size: 22px; font-weight: 900;
   color: var(--ink);
-  letter-spacing: -0.02em; line-height: 1;
+  letter-spacing: -0.03em; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+/* A real strikethrough discount earns the savings color — the price is the
+   hero of the card and "this dropped" should read at a glance. */
+.card-price-row .has-discount .price { color: var(--accent); }
 .price-old {
   font-size: 12.5px; color: var(--ink-3);
   text-decoration: line-through;
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
+}
+
+/* Honest "good deal" verdict pill (cards + history panel). */
+.verdict-pill {
+  display: inline-block;
+  background: color-mix(in oklab, var(--good) 14%, #fff);
+  color: var(--good);
+  font-size: 10px; font-weight: 800;
+  padding: 2px 7px; border-radius: 6px;
+  margin-bottom: 6px;
 }
 .add-btn {
   width: 34px; height: 34px; border-radius: 50%;
@@ -868,78 +881,9 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .nowrap { white-space: nowrap; }
 
 /* =========================================================
-   Modal (product detail)
+   Offer quick-view leftovers (the old centered modal is gone —
+   ProductSheet + OfferDetails replaced it; qty-stepper + modal-link live on)
    ========================================================= */
-
-.modal-backdrop {
-  position: fixed; inset: 0; z-index: 200;
-  background: color-mix(in oklab, #000 55%, transparent);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
-  animation: fade-in .15s ease;
-}
-.modal {
-  position: relative;
-  background: var(--surface);
-  width: 100%;
-  max-width: 480px;
-  max-height: calc(100vh - 40px);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  display: flex; flex-direction: column;
-  box-shadow: 0 20px 60px color-mix(in oklab, #000 35%, transparent);
-  animation: pop-in .18s ease;
-}
-.modal-actions-top {
-  position: absolute; top: 12px; right: 12px;
-  display: flex; gap: 8px; z-index: 2;
-}
-.modal-actions-top .icon-btn {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 2px 8px color-mix(in oklab, #000 10%, transparent);
-}
-.modal-img {
-  aspect-ratio: 1.2 / 1;
-  background: var(--bg-soft);
-  border-bottom: 1px solid var(--line);
-  display: grid; place-items: center;
-  padding: 32px;
-  position: relative;
-}
-.modal-body {
-  padding: 22px 24px 24px;
-  overflow-y: auto;
-}
-.modal-meta {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 10px;
-  font-size: 12px; color: var(--ink-3);
-}
-.modal-meta .chain-pill {
-  position: static;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  padding: 3px 10px;
-  font-size: 11px;
-}
-.modal-title {
-  font-family: var(--font-serif);
-  font-size: 24px; line-height: 1.2;
-  margin: 0 0 10px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-.modal-desc {
-  font-size: 13px; color: var(--ink-3); line-height: 1.5;
-  margin: 0 0 20px;
-}
-.modal-price-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 18px;
-}
-.modal-price-row .price { font-size: 28px; }
-.modal-price-row .price-old { font-size: 14px; }
 
 .qty-stepper {
   display: inline-flex; align-items: center;
@@ -963,7 +907,6 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   font-variant-numeric: tabular-nums;
 }
 
-.modal-cta { width: 100%; }
 .modal-link {
   display: block; text-align: center;
   margin-top: 12px;
@@ -1274,6 +1217,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 .od-img .discount-badge { position: absolute; top: 12px; right: 12px; z-index: 2; }
 .od-img .chain-pill { position: absolute; top: 12px; left: 12px; z-index: 2; }
+/* In the sheet the header already names the chain — don't say it twice. */
+.compact .od-img .chain-pill { display: none; }
 
 .od-body { padding: 18px 18px 20px; }
 .compact .od-body { padding: 16px 0 4px; }

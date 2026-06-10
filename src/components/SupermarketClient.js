@@ -409,54 +409,6 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
 
       <Footer />
 
-      {cart.length > 0 && (
-        <button
-          onClick={() => setIsCartOpen(true)}
-          aria-label="Άνοιγμα λίστας"
-          style={{
-            position: "fixed",
-            bottom: 20,
-            right: 20,
-            background: "linear-gradient(135deg, #009de0, #0077b6)",
-            color: "#fff",
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            border: "none",
-            cursor: "pointer",
-            zIndex: 100,
-            boxShadow: "0 10px 24px rgba(0,157,224,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 22,
-          }}
-        >
-          🛒
-          <span
-            style={{
-              position: "absolute",
-              top: -4,
-              right: -4,
-              background: "#ff3b30",
-              color: "#fff",
-              minWidth: 22,
-              height: 22,
-              padding: "0 6px",
-              borderRadius: 11,
-              fontSize: 11,
-              fontWeight: 900,
-              border: "2px solid #fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {cart.length}
-          </span>
-        </button>
-      )}
-
       <Sheet
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
