@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getActiveDeals } from "@/actions/get-active-deals";
 import { useShoppingListStore } from "@/lib/store";
 
-import { ProductModal } from "@/components/ProductModal";
+import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { PreferredStoresSheet } from "@/components/PreferredStoresSheet";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -297,7 +297,7 @@ export default function DealsClient({ initial }) {
         </div>
       </Sheet>
 
-      <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
+      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       <PreferredStoresSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>

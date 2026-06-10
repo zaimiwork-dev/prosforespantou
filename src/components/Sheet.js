@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 // Generic bottom sheet — thumb-reachable on phones, where this app lives.
 // Controlled: render-null when closed. Used by the /deals and supermarket
 // filter sheets (and intended for any future modal-ish surface).
-export function Sheet({ isOpen, onClose, title, children, footer }) {
+export function Sheet({ isOpen, onClose, title, children, footer, actions }) {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -28,7 +28,10 @@ export function Sheet({ isOpen, onClose, title, children, footer }) {
         <div className="sheet-grip" aria-hidden="true" />
         <div className="sheet-head">
           <h2>{title}</h2>
-          <button type="button" className="sheet-close" onClick={onClose} aria-label="Κλείσιμο">×</button>
+          <div className="sheet-head-actions">
+            {actions}
+            <button type="button" className="sheet-close" onClick={onClose} aria-label="Κλείσιμο">×</button>
+          </div>
         </div>
         <div className="sheet-body">{children}</div>
         {footer && <div className="sheet-foot">{footer}</div>}

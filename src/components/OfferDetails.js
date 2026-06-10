@@ -1,0 +1,161 @@
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import { CategoryIcon } from './CategoryIcon';
+import { Icon } from './Icons';
+import { PriceHistory } from './PriceHistory';
+import { PriceComparison } from './PriceComparison';
+import { SUPERMARKETS } from '@/lib/constants';
+import { trackEvent } from '@/actions/track-event';
+import { getSessionId } from '@/lib/session-id';
+import { hiResImage } from '@/lib/images';
+
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0);
+  return Math.round((exp - today) / 86400000);
+}
+
+// The single source of truth for what an offer looks like opened up. Rendered
+// by BOTH the bottom sheet (ProductSheet) and the /offer/[id] page — the two
+// used to be parallel implementations and drifted (the sheet lost the validity
+// dates and the verdict). Keep every section here so they can't diverge again.
+export function OfferDetails({ offer, comparison = [], history = null, onAdd, compact = false }) {
+  const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
+
+  const discountedPrice = Number(offer.discountedPrice ?? offer.discounted_price);
+  const originalPrice = offer.originalPrice ?? offer.original_price
+    ? Number(offer.originalPrice ?? offer.original_price) : null;
+  const discountPercent = offer.discountPercent ?? offer.discount_percent;
+  // Raw offer name first: it matches this offer's price/pack ("9+3 Δώρο");
+  // the canonical product.name can be a single-unit variant.
+  const displayName = offer.productName || offer.product_name || offer.product?.name;
+  const description = offer.product?.description || offer.description;
+  const supermarketId = offer.supermarket || offer.supermarket_id;
+  const category = offer.category;
+
+  let displayImage = hiResImage(offer.product?.imageUrl || offer.imageUrl || offer.image_url);
+  if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
+    displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
+  }
+
+  const sm = SUPERMARKETS.find((s) => s.id === supermarketId)
+    || { name: supermarketId || '', color: 'var(--ink-2)' };
+  const pct = discountPercent || (originalPrice && discountedPrice
+    ? Math.round((1 - discountedPrice / originalPrice) * 100)
+    : null);
+
+  const dLeft = daysLeft(offer.validUntil);
+  const expiryUrgent = dLeft !== null && dLeft >= 0 && dLeft <= 2;
+  const expiryLabel = dLeft === null ? '—'
+    : dLeft < 0 ? 'Έχει λήξει'
+    : dLeft === 0 ? 'Τελειώνει σήμερα'
+    : dLeft === 1 ? 'Τελειώνει αύριο'
+    : dLeft <= 2 ? `Τελειώνει σε ${dLeft} μέρες`
+    : `Σε ${dLeft} ημέρες`;
+  const validFromFull = formatDate(offer.validFrom ?? offer.valid_from);
+  const validUntilFull = formatDate(offer.validUntil ?? offer.valid_until);
+  const notStartedYet = offer.validFrom ? new Date(offer.validFrom).getTime() > Date.now() : false;
+
+  const handleAdd = () => {
+    trackEvent({
+      eventType: 'list_add',
+      supermarket: supermarketId,
+      discountId: offer.id,
+      category,
+      sessionId: getSessionId(),
+    }).catch(() => {});
+    for (let i = 0; i < qty; i++) onAdd(offer);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1800);
+  };
+
+  return (
+    <div className={`offer-details${compact ? ' compact' : ''}`}>
+      <div className="od-img">
+        {pct > 0 && <div className="discount-badge">-{pct}%</div>}
+        <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
+        {displayImage ? (
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <Image
+              src={displayImage}
+              alt={displayName || ''}
+              fill
+              sizes={compact ? '(max-width: 640px) 100vw, 640px' : '(max-width: 820px) 100vw, 820px'}
+              style={{ objectFit: 'contain' }}
+            />
+          </div>
+        ) : (
+          <CategoryIcon id={category} size={64} />
+        )}
+      </div>
+
+      <div className="od-body">
+        {category && <div className="od-category">{category}</div>}
+        <h2 className="od-title">{displayName}</h2>
+        {description && <p className="od-desc">{description}</p>}
+
+        <div className="od-price-row">
+          <div>
+            <div className="od-price-label">Τιμή προσφοράς</div>
+            <div className="od-price">{discountedPrice.toFixed(2)}€</div>
+          </div>
+          {originalPrice && (
+            <div>
+              <div className="od-price-label">Αρχική</div>
+              <div className="od-price-old">{originalPrice.toFixed(2)}€</div>
+            </div>
+          )}
+        </div>
+
+        {notStartedYet && validFromFull && (
+          <div className="od-upcoming">Η προσφορά ξεκινά στις {validFromFull}</div>
+        )}
+
+        <div className="od-dates">
+          <div className="od-date-box">
+            <div className="od-date-label">Έναρξη</div>
+            <div className="od-date-val">{validFromFull || '—'}</div>
+          </div>
+          <div className="od-date-box">
+            <div className="od-date-label">Λήξη</div>
+            <div className={`od-date-val${expiryUrgent ? ' urgent' : ''}`}>{expiryLabel}</div>
+            {validUntilFull && <div className="od-date-sub">έως {validUntilFull}</div>}
+          </div>
+        </div>
+
+        <div className="od-cta-row">
+          <div className="qty-stepper" aria-label="Ποσότητα">
+            <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1} aria-label="Μείωση">
+              <Icon.Minus size={14} />
+            </button>
+            <span className="qty-val">{qty}</span>
+            <button type="button" onClick={() => setQty(qty + 1)} aria-label="Αύξηση">
+              <Icon.Plus size={14} />
+            </button>
+          </div>
+          <button
+            type="button"
+            className={`btn btn-lg od-add${added ? ' added' : ''}`}
+            onClick={handleAdd}
+            disabled={added}
+          >
+            {added ? '✓ Προστέθηκε' : 'Προσθήκη στη λίστα'}
+          </button>
+        </div>
+
+        <PriceComparison offer={offer} comparison={comparison} compact={compact} />
+        <PriceHistory history={history} compact={compact} />
+      </div>
+    </div>
+  );
+}

@@ -6,7 +6,7 @@ import { useShoppingListStore } from "@/lib/store";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
 import { SearchDropdown } from "@/components/SearchDropdown";
-import { ProductModal } from "@/components/ProductModal";
+import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { Footer } from "@/components/Footer";
 
@@ -123,7 +123,7 @@ export function SearchPage({ query, deals }) {
         </button>
       )}
 
-      <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
+      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </div>
   );

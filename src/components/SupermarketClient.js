@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useShoppingListStore } from "@/lib/store";
-import { ProductModal } from "@/components/ProductModal";
+import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
@@ -498,7 +498,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
         </div>
       </Sheet>
 
-      <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
+      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </div>
   );

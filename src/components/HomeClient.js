@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useShoppingListStore } from "@/lib/store";
 
-import { ProductModal } from "@/components/ProductModal";
+import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { PreferredStoresSheet } from "@/components/PreferredStoresSheet";
 
@@ -97,7 +97,7 @@ function PublicSite({ initial, onAdmin }) {
 
       <Footer />
 
-      <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
+      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       <PreferredStoresSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
