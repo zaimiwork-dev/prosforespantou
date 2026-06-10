@@ -4,9 +4,22 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-11 — observability + display-first unmatched offers SHIPPED)
+## ⚡ Pick up here (2026-06-11 — observability + display-first + category overhaul SHIPPED)
 
-**Context:** user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the two gaps were **nobody watching it** and **~4k scraped offers invisible** (no Discount written when matching fails). Both shipped, in two commits.
+**Context:** user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the two gaps were **nobody watching it** and **~4k scraped offers invisible** (no Discount written when matching fails). Both shipped. Then user reported "categories are kinda fucked up" → systematic leak hunt + engine fixes + 1,573-row backfill (slice ③).
+
+### Slice ③ — category leak overhaul (2026-06-11)
+
+User-visible problem: fabric softeners/razor refills/tissues in Προσωπική Φροντίδα, ΜΕΛΙΣΣΑ pasta in Πρωινό, juices in Φρούτα, Somersby/ρετσίνα/Μπίρα in Άλλο. Root causes found via `categorizeTrace` audit over all 9,669 active rows:
+
+- **`'λακ'` substring ate 381 rows** ("μαΛΑΚτικό", "ανταΛΑΚτικό", "σακουΛΑΚι", "φασοΛΑΚια", "διαβοΛΑΚος"). Fixed with a new **`'='` word-boundary marker** in `buildMatcher` for short Greek tokens (`'=λακ'`, `'=μελι'` honey-vs-μελιτζάνα, `'=τζιν'` gin-vs-τζίντζερ).
+- **Rule order:** new TOP-priority laundry/paper/home rule (beats 'baby'/'αρωμα'/'σαπουν'); adult-incontinence mini-rule beats Βρεφικά 'πανες' (TENA/Sani); **Προσωπική Φροντίδα moved BEFORE the food departments** (scent words — μήλο/μέλι/φράουλα/γάλα αμυγδάλου — were eating cosmetics); **Κάβα+Πρωινό before Φρούτα** (juices/ice tea land as drinks).
+- **Keywords/brands added** (each evidence-backed): κτψ (kritikos frozen abbr — 40+ rows), μπιρα spelling, ρετσινα/somersby/schweppes/xixo/powerade, haribo/cheetos/lays/tsakiris/σοκοφρετ (flavour words were dragging snacks into drinks/cheese/pantry), dirollo/babybel/milner/la vache/ηπειρος (cheese brands), lurpak, πουτιγκ/danette/στραγγιστ, le petit marseillais/papoutsanis/καραβακι/γαλακτωμα σωματος; 'καρυδ'→'καρυδι' (coconut≠walnut); bare 'milk' removed from dairy (ate Body Milk); 'adoro' deliberately NOT a cheese brand (sells butter/cream too).
+- **12 native aliases added** (all sampled first): Μπάνιου→Καθαρισμός, Υγρά Μαλακτικά→Καθαρισμός, Χαρτομάντηλα→Καθαρισμός, Παιδικά - Τρίγωνα→Τυριά, Πίτσες - Πεινιρλί→Κατεψ., Φύλλα - Βάσεις - Ζύμες→Κατεψ., Σαλάτες→Σαλάτες & Αλοιφές, Ελιές→Παντοπωλείο, Έτοιμα Μιξ→Παντοπωλείο, Μιλήτες→Κάβα (kritikos typo for Μηλίτες), Λειτουργικά + Υψηλής Παστερίωσης→Γαλακτοκομικά, **Latin-E 'Eνηλίκων'→Προσωπική** (mymarket suncare) while Greek-Ε 'Ενηλίκων' (kritikos puddings) stays keyword-resolved.
+- **Backfill policy change** in [recompute-categories.mjs](src/scripts/recompute-categories.mjs): never demote a specific category to Άλλο (the keyword engine's Άλλο = "no signal", not evidence — preserves LLM/admin knowledge).
+- **15 regression tests** in [categories.test.ts](src/lib/categories.test.ts), all real product names from the DB.
+- **Backfill applied to prod DB: 1,550 + 23 rows moved.** Distribution after: Άλλο 459→290, Καθαρισμός 1276→1607, Κάβα 369→549, Φρούτα 349→223 (now actual produce). Προσωπική stays ~3.7k — that's REAL (chains' web-offer feeds genuinely skew to personal care/cleaning promos).
+- ⚠️ **Until pushed/deployed, nightly adapter runs use the OLD engine** and will re-stale rows they update; the backfill is re-runnable to fix. Push promptly.
 
 ### Slice ② — display-first unmatched offers (2026-06-11)
 

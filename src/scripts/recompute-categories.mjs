@@ -55,7 +55,13 @@ async function run() {
       // Pass ONLY the true native hint — NOT the current category. categorize()
       // trusts a valid-department hint and returns it unchanged, so feeding back
       // d.category would freeze any wrong category and make the backfill a no-op.
-      const dept = categorize(d.productName, native);
+      let dept = categorize(d.productName, native);
+      // Never demote a specific category to Άλλο: the keyword engine's Άλλο
+      // means "no signal", not evidence — the stored label may carry knowledge
+      // the keywords don't have (LLM resolver / admin / a richer past native).
+      if (dept === 'Άλλο' && d.category && d.category !== 'Άλλο' && DEPT_SET.has(d.category)) {
+        dept = d.category;
+      }
       tally[dept] = (tally[dept] || 0) + 1;
       if (dept === d.category && native === (d.subcategory ?? null)) { unchanged++; continue; }
       if (!DRY_RUN) {
