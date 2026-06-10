@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/scrape-masoutis?source=leaflet",
       "schedule": "30 6 * * 4"
+    },
+    {
+      "path": "/api/cron/pipeline-health",
+      "schedule": "0 8 * * *"
     }
   ]
 }

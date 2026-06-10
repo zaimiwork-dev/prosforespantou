@@ -4,6 +4,26 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-10 — pipeline observability SHIPPED)
+
+**Context:** user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the #1 gap was that **nobody is watching it** (a dead adapter would go unnoticed for weeks). This sprint shipped the watching.
+
+**What shipped (one commit):**
+- **`IngestRun` flight recorder** — new table (db-pushed); [ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) records every real run (incl. zero-item aborts; dry runs skipped) with `priceChanges` = PriceSnapshots written that run (the per-chain "how much actually changed" signal for future cadence tuning).
+- **[src/lib/pipeline-health.ts](src/lib/pipeline-health.ts)** — `EXPECTED_FEEDS` registry (7 feeds: 5 daily web + 2 weekly leaflet; **keep in sync with scrape-chains.yml + vercel.json**), pure `evaluateFeed()` → `ok|warn|stale|never` (daily=36h window, weekly=8d), `fetchFeedHealth(prisma)` shared by both consumers. 9 unit tests.
+- **`/api/cron/pipeline-health`** — daily 08:00 UTC Vercel cron (after all scrape windows); raises a **Sentry error** naming each stale/never feed. `warn` (tripped safety check but fresh OK run exists) deliberately does NOT alarm — safety rails keep last-good data and it self-heals.
+- **Admin "🩺 Υγεία" tab** — per-feed status pills + last-30-runs history table ([get-ingest-health.ts](src/actions/admin/get-ingest-health.ts)).
+
+**Verified end-to-end:** zero-item abort records `healthOk:false` row (tested + cleaned up); real Masoutis web run recorded `372 scraped / 317 matched (all via mapping, 0 LLM) / 55 review / 47 priceChanges / healthOk:true`. Build green, 26 tests pass, lint unchanged (same 11 pre-existing AdminPanel items).
+
+**Expected noise:** until each feed's next scheduled run lands, the 08:00 UTC check reports `never` for feeds with no recorded run yet (Lidl genuinely never ran — first scheduled run Thu 06:00 UTC; masoutis/leaflet runs Thu 06:30). Sentry errors on day 1–2 are start-up noise, not bugs — they stop as soon as real runs land.
+
+**Decision made (user asked about scrape scheduling):** keep daily polling — adapters hit free chain JSON endpoints (no LLM in adapters; Groq only sees never-before-seen items via the resolver), so daily costs ~nothing. Aligning to assumed per-chain offer cycles would save nothing and risk missing mid-cycle changes; `priceChanges` per run now records each chain's real cadence so this can be revisited with data.
+
+**Next candidates (assessment ranked):** ② display-first unmatched offers (~4k PendingMatch rows = scraped-but-invisible offers; `Discount.productId` is already nullable — needs a stable dedup key, e.g. `chainItemcode` column on Discount); ③ verify Lidl's first run Thu + AB recon (246 active offers looks like the ΜΟΝΟ-subset problem); ④ scripts cleanup + CLAUDE.md de-drift (still documents the OLD fetcher→extractor→matcher pipeline as canonical); search relevance; `.js→.tsx` PR; Capacitor.
+
+---
+
 ## ⚡ Pick up here (2026-06-11 PM — Fable 5 mobile redesign SHIPPED, local only)
 
 **All pushed to `origin/main`** (`a4a5830`→`2bb7403`). Fable 5 executed the redesign brief with an independent re-audit first. Build green, 17 tests pass, lint 22→11 (remaining 5 errors all AdminPanel — internal tool, deliberate). Verified end-to-end at 390px with Playwright screenshots each slice.

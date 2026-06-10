@@ -16,6 +16,7 @@ import { createSkuFromPending } from "@/actions/admin/create-sku-from-pending";
 import { bulkRejectPendingMatches } from "@/actions/admin/bulk-reject-pending-matches";
 import { bulkApprovePendingMatches } from "@/actions/admin/bulk-approve-pending-matches";
 import { setFeatured } from "@/actions/admin/set-featured";
+import { getIngestHealth } from "@/actions/admin/get-ingest-health";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 
 const emptyLeafletForm = {
@@ -118,6 +119,8 @@ export function AdminPanel({ onBack }) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMinConf, setBulkMinConf] = useState(90);
   const [productDetail, setProductDetail] = useState(null);
+  const [health, setHealth] = useState({ feeds: [], recentRuns: [] });
+  const [healthLoading, setHealthLoading] = useState(false);
 
   const showMsg = (text, type = "success") => {
     setMsg({ text, type });
@@ -178,6 +181,14 @@ export function AdminPanel({ onBack }) {
     if (res.success) setSubs({ counts: res.counts, list: res.subscribers });
     else showMsg(res.error || "Failed to load subscribers", "error");
     setSubsLoading(false);
+  };
+
+  const loadHealth = async () => {
+    setHealthLoading(true);
+    const res = await getIngestHealth();
+    if (res.success) setHealth({ feeds: res.feeds, recentRuns: res.recentRuns });
+    else showMsg(res.error || "Failed to load pipeline health", "error");
+    setHealthLoading(false);
   };
 
   const loadPending = async () => {
@@ -275,6 +286,7 @@ export function AdminPanel({ onBack }) {
     if (tab === "stats") loadStats();
     if (tab === "subs") loadSubscribers();
     if (tab === "review") loadPending();
+    if (tab === "health") loadHealth();
   }, [tab]);
 
   useEffect(() => {
@@ -440,6 +452,114 @@ export function AdminPanel({ onBack }) {
     );
   };
 
+  const renderHealthTab = () => {
+    if (healthLoading) return <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση υγείας pipeline...</div>;
+
+    const STATUS = {
+      ok: { label: "OK", bg: "#e8f7ee", fg: "#1b7a43" },
+      warn: { label: "Προσοχή", bg: "#fff4e0", fg: "#8a5a00" },
+      stale: { label: "Νεκρό", bg: "#ffe9e7", fg: "#a82317" },
+      never: { label: "Δεν έτρεξε ποτέ", bg: "#f0f1f3", fg: "#707680" },
+    };
+    const timeAgo = (d) => {
+      if (!d) return "—";
+      const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000);
+      if (mins < 60) return `πριν ${mins}λ`;
+      if (mins < 48 * 60) return `πριν ${Math.round(mins / 60)}ω`;
+      return `πριν ${Math.round(mins / 1440)}μ`;
+    };
+    const pill = (status) => {
+      const s = STATUS[status] || STATUS.never;
+      return <span style={{ background: s.bg, color: s.fg, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>{s.label}</span>;
+    };
+    const th = { padding: "8px 10px", textAlign: "left", whiteSpace: "nowrap" };
+    const td = { padding: "8px 10px", whiteSpace: "nowrap" };
+
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: G.muted }}>
+            Ένα feed ανά (αλυσίδα, πηγή). «Νεκρό» = καμία υγιής εκτέλεση μέσα στο όριό του — έλεγξε τον adapter.
+          </div>
+          <button onClick={loadHealth} style={{ marginLeft: "auto", background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 RELOAD</button>
+        </div>
+
+        <div style={{ overflowX: "auto", marginBottom: 28 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead style={{ background: "#f8f9fa" }}>
+              <tr>
+                <th style={th}>Feed</th>
+                <th style={th}>Κατάσταση</th>
+                <th style={th}>Τελευταίο run</th>
+                <th style={{ ...th, textAlign: "right" }}>Items</th>
+                <th style={{ ...th, textAlign: "right" }}>Matched</th>
+                <th style={{ ...th, textAlign: "right" }}>Review</th>
+                <th style={{ ...th, textAlign: "right" }}>Αλλαγές τιμών</th>
+                <th style={th}>Πρόγραμμα</th>
+              </tr>
+            </thead>
+            <tbody>
+              {health.feeds.map((f) => (
+                <tr key={`${f.spec.chain}/${f.spec.source}`} style={{ borderTop: "1px solid #eee" }}>
+                  <td style={{ ...td, fontWeight: 700 }}>{f.spec.chain} <span style={{ color: G.muted, fontWeight: 400 }}>/ {f.spec.source}</span></td>
+                  <td style={td}>{pill(f.status)}</td>
+                  <td style={td} title={f.lastRun ? new Date(f.lastRun.finishedAt).toLocaleString("el-GR") : ""}>{timeAgo(f.lastRun?.finishedAt)}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{f.lastRun ? f.lastRun.scrapedItems : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{f.lastRun ? f.lastRun.matched : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{f.lastRun ? f.lastRun.reviewQueued : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{f.lastRun ? f.lastRun.priceChanges : "—"}</td>
+                  <td style={{ ...td, fontSize: 11, color: G.muted }}>{f.spec.schedule}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Ιστορικό εκτελέσεων</div>
+        {health.recentRuns.length === 0 ? (
+          <div style={{ color: G.muted, fontSize: 12, padding: "12px 0" }}>
+            Καμία εκτέλεση καταγεγραμμένη ακόμα — οι γραμμές εμφανίζονται μόλις τρέξει ο πρώτος adapter μετά το deploy αυτής της λειτουργίας.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead style={{ background: "#f8f9fa" }}>
+                <tr>
+                  <th style={th}>Πότε</th>
+                  <th style={th}>Feed</th>
+                  <th style={th}>Υγεία</th>
+                  <th style={{ ...th, textAlign: "right" }}>Items</th>
+                  <th style={{ ...th, textAlign: "right" }}>Matched</th>
+                  <th style={{ ...th, textAlign: "right" }}>Review</th>
+                  <th style={{ ...th, textAlign: "right" }}>Αλλαγές</th>
+                  <th style={{ ...th, textAlign: "right" }}>Απενεργ.</th>
+                  <th style={{ ...th, textAlign: "right" }}>Σφάλματα</th>
+                  <th style={th}>Σημειώσεις</th>
+                </tr>
+              </thead>
+              <tbody>
+                {health.recentRuns.map((r) => (
+                  <tr key={r.id} style={{ borderTop: "1px solid #eee", background: r.healthOk ? "transparent" : "#fff8f0" }}>
+                    <td style={td} title={new Date(r.finishedAt).toLocaleString("el-GR")}>{timeAgo(r.finishedAt)}</td>
+                    <td style={{ ...td, fontWeight: 700 }}>{r.chain} <span style={{ color: G.muted, fontWeight: 400 }}>/ {r.source}</span></td>
+                    <td style={td}>{r.healthOk ? "✅" : "⚠️"}</td>
+                    <td style={{ ...td, textAlign: "right" }}>{r.scrapedItems}</td>
+                    <td style={{ ...td, textAlign: "right" }}>{r.matched}</td>
+                    <td style={{ ...td, textAlign: "right" }}>{r.reviewQueued}</td>
+                    <td style={{ ...td, textAlign: "right" }}>{r.priceChanges}</td>
+                    <td style={{ ...td, textAlign: "right" }}>{r.deactivated}</td>
+                    <td style={{ ...td, textAlign: "right", color: r.errors > 0 ? G.red : "inherit", fontWeight: r.errors > 0 ? 700 : 400 }}>{r.errors}</td>
+                    <td style={{ ...td, whiteSpace: "normal", maxWidth: 320, fontSize: 11, color: G.muted }}>{(r.warnings || []).join(" · ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderSubsTable = () => {
     if (subsLoading) return <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση συνδρομητών...</div>;
     
@@ -525,7 +645,7 @@ export function AdminPanel({ onBack }) {
 
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: "1px solid #ddd", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#f8f9fa", borderRadius: 12, padding: 5, width: "fit-content", border: "1px solid #eee" }}>
-            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["review", "🧐 Review"], ["stats", "📊 Αναλυτικά"], ["subs", "📧 Συνδρομητές"], ["add", "➕ Νέα"]].map(([id, label]) => (
+            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["review", "🧐 Review"], ["health", "🩺 Υγεία"], ["stats", "📊 Αναλυτικά"], ["subs", "📧 Συνδρομητές"], ["add", "➕ Νέα"]].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ background: tab === id ? "#1c1e24" : "transparent", color: tab === id ? "#fff" : "#707680", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 {label}
@@ -648,6 +768,8 @@ export function AdminPanel({ onBack }) {
               )}
             </div>
           )}
+
+          {tab === "health" && renderHealthTab()}
 
           {tab === "stats" && renderStatsTable()}
 

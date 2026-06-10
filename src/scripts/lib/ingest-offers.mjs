@@ -172,7 +172,9 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     await prisma.priceSnapshot.create({
       data: { productId, supermarket: chain, price: item.price, isDiscounted: !!originalPrice },
     });
+    return { snapshotWritten: true };
   }
+  return { snapshotWritten: false };
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -184,21 +186,40 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
   const report = {
     chain, source, scrapedItems: items.length,
     matched: 0, viaMapping: 0, viaBarcode: 0, viaCache: 0,
-    reviewQueued: 0, errors: 0, deactivated: 0,
+    reviewQueued: 0, priceChanges: 0, errors: 0, deactivated: 0,
     healthOk: true, warnings: [],
   };
-
-  // SAFETY 1: an adapter returning nothing is a broken scrape, not "no offers".
-  if (items.length === 0) {
-    report.healthOk = false;
-    report.warnings.push('Adapter returned 0 items — treated as a broken scrape. Nothing written, nothing deactivated.');
-    return report;
-  }
 
   const { default: prisma } = await import('../../lib/prisma.ts');
   const runStart = new Date();
 
+  // Flight recorder — one IngestRun row per real run (dry runs skipped).
+  // Non-fatal: a recording failure must never fail the ingest itself.
+  async function recordRun() {
+    if (dryRun) return;
+    try {
+      await prisma.ingestRun.create({
+        data: {
+          chain, source, startedAt: runStart,
+          scrapedItems: report.scrapedItems, matched: report.matched,
+          reviewQueued: report.reviewQueued, priceChanges: report.priceChanges,
+          deactivated: report.deactivated, errors: report.errors,
+          healthOk: report.healthOk, warnings: report.warnings,
+        },
+      });
+    } catch (e) {
+      console.log(`   ⚠️ could not record IngestRun: ${e.message}`);
+    }
+  }
+
   try {
+    // SAFETY 1: an adapter returning nothing is a broken scrape, not "no offers".
+    if (items.length === 0) {
+      report.healthOk = false;
+      report.warnings.push('Adapter returned 0 items — treated as a broken scrape. Nothing written, nothing deactivated.');
+      await recordRun();
+      return report;
+    }
     const storeName = SM_MAPPING[chain];
     const store = await withDbRetry('ensureStore', () =>
       prisma.store.upsert({ where: { name: storeName }, create: { name: storeName }, update: {} })
@@ -253,9 +274,10 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
           });
           report.reviewQueued++;
         } else {
-          await withDbRetry(`write ${item.name}`, () =>
+          const { snapshotWritten } = await withDbRetry(`write ${item.name}`, () =>
             writeOffer(prisma, item, productId, store.id, chain, source, runStart)
           );
+          if (snapshotWritten) report.priceChanges++;
           report.matched++;
           if (via === 'mapping') report.viaMapping++;
           else if (via === 'barcode') report.viaBarcode++;
@@ -282,6 +304,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false }) {
       report.deactivated = res.count;
     }
 
+    await recordRun();
     return report;
   } finally {
     await prisma.$disconnect();
@@ -294,6 +317,7 @@ export function printReport(report) {
   console.log(`   scraped items:    ${report.scrapedItems}`);
   console.log(`   matched:          ${report.matched}  (mapping=${report.viaMapping} barcode=${report.viaBarcode} cache=${report.viaCache})`);
   console.log(`   → Review Queue:   ${report.reviewQueued}`);
+  console.log(`   price changes:    ${report.priceChanges}`);
   console.log(`   deactivated:      ${report.deactivated}`);
   console.log(`   errors:           ${report.errors}`);
   if (report.warnings.length) {

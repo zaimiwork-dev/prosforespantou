@@ -235,6 +235,30 @@ model ChainProductMapping {
   @@map("chain_product_mappings")
 }
 
+// Flight recorder: one row per ingestOffers run (including aborted zero-item
+// runs; dry runs are NOT recorded). Written by src/scripts/lib/ingest-offers.mjs,
+// read by the admin "Υγεία" tab and the /api/cron/pipeline-health staleness
+// alert. `priceChanges` = PriceSnapshots written this run — i.e. how much the
+// chain actually changed — the signal for tuning per-chain scrape cadence.
+model IngestRun {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chain        String   // chain slug — 'masoutis', 'ab', ...
+  source       String   // 'web' | 'leaflet'
+  startedAt    DateTime @map("started_at")
+  finishedAt   DateTime @default(now()) @map("finished_at")
+  scrapedItems Int      @default(0) @map("scraped_items")
+  matched      Int      @default(0)
+  reviewQueued Int      @default(0) @map("review_queued")
+  priceChanges Int      @default(0) @map("price_changes")
+  deactivated  Int      @default(0)
+  errors       Int      @default(0)
+  healthOk     Boolean  @default(true) @map("health_ok")
+  warnings     String[]
+
+  @@index([chain, source, finishedAt])
+  @@map("ingest_runs")
+}
+
 model PendingMatch {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   rawName            String   @map("raw_name")
