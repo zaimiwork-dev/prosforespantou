@@ -4,6 +4,22 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-11 — honest-pricing + category + tech-debt sprint; NEXT = Fable 5 redesign)
+
+**5 commits, LOCAL ONLY — not yet pushed to `origin/main`** (`026002e`→`6310505`). Working tree clean. This sprint came out of an honest UX teardown the user requested (screenshots at 390px) ahead of handing the **visual/UX redesign to Fable 5**. The plan: this Opus session fixes the correctness-sensitive layers (pricing/categories/tech-debt); Fable 5 owns the mobile presentation redesign on top. See **[REDESIGN_BRIEF.md](REDESIGN_BRIEF.md)** — the constraints-heavy handoff for Fable.
+
+| commit | what |
+|---|---|
+| `026002e` | Native→dept alias map (`NATIVE_ALIASES` in categories.ts) — Άλλο 12%→7% |
+| `6f8b1da` | **Honest-pricing engine** — killed the false "🔥 Χαμηλότερη τιμή" badge (it judged the last cross-chain snapshot, not the offer price). `src/lib/price-verdict.ts` (pure+tested), positive-only badges, young-data guards (≥3 pts + price spread). New **`Discount.priceVerdict`** (db-pushed) precomputed by `recompute-price-verdicts.mjs` (daily in resolvers job). ~17.6% earn a badge. |
+| `2a34e52` | Latin/English-name keyword pass — Άλλο 7%→**4.7%** (carroten/hansaplast/misko/raid/χρωμοπαγιδ + processed-tomato + hair-oil alias fix) |
+| `0081576` | Tech-debt: Outfit via `next/font` (removed 3 render-blocking `<link>`s), SearchDropdown `<img>`→`next/image`, config named exports. Lint 22→16. |
+| `6310505` | `REDESIGN_BRIEF.md` for Fable 5 + gitignore `screenshots/` |
+
+**Next:** kick off Fable 5 on REDESIGN_BRIEF.md (deals-wall homepage, modal→bottom-sheet, dead-chain filters, bottom nav, empty states). Deliberately NOT done by Opus: the 9 react-compiler setState-in-effect/purity "errors" (conventional patterns / redesign-bound — listed in the brief for Fable to avoid in the rewrites) and the `.js→.tsx` migration (separate PR, after redesign). User dropped the standalone dead-chain/sort task — it folds into Fable's redesign.
+
+---
+
 ## ⚡ Pick up here (2026-06-10 — product-feedback + bug-fix sprint done, all pushed)
 
 **Everything below is committed AND pushed to `origin/main`.** The whole 2026-06-07 product-feedback list (#1–#7) is resolved, plus a round of user-reported bugs and a deep category cleanup. Working tree clean.
