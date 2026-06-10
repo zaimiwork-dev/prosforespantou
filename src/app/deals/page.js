@@ -1,4 +1,5 @@
 import { getActiveDeals } from "@/actions/get-active-deals";
+import { getDealCounts } from "@/actions/get-deal-counts";
 import DealsClient from "@/components/DealsClient";
 import { SUPERMARKETS } from "@/lib/constants";
 
@@ -21,18 +22,21 @@ export default async function DealsPage({ searchParams }) {
   const category = typeof params?.category === "string" ? params.category : "all";
   const sort = typeof params?.sort === "string" ? params.sort : "hot";
 
-  const { deals, total } = await getActiveDeals(
-    INITIAL_LIMIT,
-    0,
-    "all",
-    category,
-    sort,
-    supermarkets.length > 0 ? supermarkets : undefined
-  );
+  const [{ deals, total }, counts] = await Promise.all([
+    getActiveDeals(
+      INITIAL_LIMIT,
+      0,
+      "all",
+      category,
+      sort,
+      supermarkets.length > 0 ? supermarkets : undefined
+    ),
+    getDealCounts(),
+  ]);
 
   return (
     <DealsClient
-      initial={{ deals, total, supermarkets, category, sort }}
+      initial={{ deals, total, supermarkets, category, sort, counts }}
     />
   );
 }

@@ -104,6 +104,15 @@ export default function DealsClient({ initial }) {
 
   const hasActiveFilters = selectedSMs.length > 0 || activeCategory !== "all";
 
+  // Only offer filters that lead somewhere: chains/categories with 0 active
+  // offers (Lidl, Bazaar, … until their adapters ship) would return an empty
+  // grid, which reads as "the app is broken".
+  const counts = initial.counts || { bySupermarket: {}, byCategory: {} };
+  const liveSMs = useMemo(
+    () => SUPERMARKETS.filter((s) => (counts.bySupermarket[s.id] || 0) > 0),
+    [counts.bySupermarket]
+  );
+
   const title = useMemo(() => {
     const c = CATEGORIES.find((x) => x.id === activeCategory);
     const smObjs = SUPERMARKETS.filter((s) => selectedSMs.includes(s.id));
@@ -118,7 +127,9 @@ export default function DealsClient({ initial }) {
     return "Όλες οι προσφορές";
   }, [activeCategory, selectedSMs]);
 
-  const categoryItems = CATEGORIES.filter((c) => c.id !== "all");
+  const categoryItems = CATEGORIES.filter(
+    (c) => c.id !== "all" && (counts.byCategory[c.id] || 0) > 0
+  );
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -156,7 +167,7 @@ export default function DealsClient({ initial }) {
               <span className="sm-chip-all-icon" aria-hidden="true">★</span>
               <span className="sm-chip-label">Όλα</span>
             </button>
-            {SUPERMARKETS.map((s) => {
+            {liveSMs.map((s) => {
               const active = selectedSMs.includes(s.id);
               return (
                 <SupermarketChip

@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useShoppingListStore } from "@/lib/store";
 
 import { ProductModal } from "@/components/ProductModal";
 import { ShoppingList } from "@/components/ShoppingList";
 import { PreferredStoresSheet } from "@/components/PreferredStoresSheet";
-import { AdminPanel, AdminAuth } from "@/components/AdminPanel";
+
+// Admin tooling is ~1k lines that 99.9% of visitors never open — load it only
+// when the (hidden) admin trigger fires, keeping it out of the public bundle.
+const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel), { ssr: false });
+const AdminAuth = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminAuth), { ssr: false });
 import { SiteHeader } from "@/components/SiteHeader";
 import { Hero } from "@/components/Hero";
 import { FeaturedCarousel } from "@/components/FeaturedCarousel";
@@ -24,6 +29,11 @@ function PublicSite({ initial, onAdmin }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { items: cart, addItem } = useShoppingListStore();
 
+  // Count only chains that actually have live offers — advertising "10
+  // αλυσίδες" while 5 are empty undermines the honest-data positioning.
+  const liveChainCount = Object.values(initial.counts?.bySupermarket || {}).filter((n) => n > 0).length
+    || SUPERMARKETS.length;
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <SiteHeader
@@ -38,7 +48,7 @@ function PublicSite({ initial, onAdmin }) {
         onSearch={setSearch}
         onCancel={() => setSearch("")}
         totalCount={initial.total}
-        supermarketCount={SUPERMARKETS.length}
+        supermarketCount={liveChainCount}
         isSearching={false}
         deals={[]}
         onSelect={setSelectedProduct}

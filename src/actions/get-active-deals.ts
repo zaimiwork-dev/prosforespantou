@@ -33,12 +33,14 @@ import * as Sentry from "@sentry/nextjs";
 /**
  * Fetches active discounts from the database with filtering and pagination.
  */
-type SortBy = 'hot' | 'expiring' | 'discount' | 'newest';
+type SortBy = 'hot' | 'expiring' | 'discount' | 'newest' | 'price_asc' | 'price_desc';
 
 const orderByFor = (sortBy: SortBy): any => {
   if (sortBy === 'discount') return [{ discountPercent: { sort: 'desc', nulls: 'last' } }, { validUntil: 'asc' }];
   if (sortBy === 'newest') return { createdAt: 'desc' };
   if (sortBy === 'expiring') return { validUntil: 'asc' };
+  if (sortBy === 'price_asc') return [{ discountedPrice: 'asc' }, { validUntil: 'asc' }];
+  if (sortBy === 'price_desc') return [{ discountedPrice: 'desc' }, { validUntil: 'asc' }];
   // 'hot' (default): merchandising rank, validUntil breaks ties.
   return [{ hotScore: 'desc' }, { validUntil: 'asc' }];
 };

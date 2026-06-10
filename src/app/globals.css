@@ -291,7 +291,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 @keyframes live-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 .hero-meta {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 6px 10px;
+  flex-wrap: wrap; /* 390px viewports: wrap instead of clipping the last stat */
   color: var(--ink-3); font-size: 13px;
 }
 .hero-meta .dot { color: var(--ink-4); }
