@@ -6,7 +6,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ## ⚡ Pick up here (2026-06-11 — observability + display-first + category overhaul SHIPPED)
 
-**Context:** user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the two gaps were **nobody watching it** and **~4k scraped offers invisible** (no Discount written when matching fails). Both shipped. Then user reported "categories are kinda fucked up" → systematic leak hunt + engine fixes + 1,573-row backfill (slice ③).
+**All pushed to `origin/main`** (`4963545`, `c124970`, `fcbadbd`). Context: user asked "is my extraction architecture healthy/sustainable?" → verdict: yes, the adapter→ingest design is right; the two gaps were **nobody watching it** and **~4k scraped offers invisible** (no Discount written when matching fails). Both shipped. Then user reported the categories looked wrong → systematic leak hunt + engine fixes + 1,573-row backfill (slice ③).
 
 ### Slice ③ — category leak overhaul (2026-06-11)
 
@@ -19,7 +19,7 @@ User-visible problem: fabric softeners/razor refills/tissues in Προσωπικ
 - **Backfill policy change** in [recompute-categories.mjs](src/scripts/recompute-categories.mjs): never demote a specific category to Άλλο (the keyword engine's Άλλο = "no signal", not evidence — preserves LLM/admin knowledge).
 - **15 regression tests** in [categories.test.ts](src/lib/categories.test.ts), all real product names from the DB.
 - **Backfill applied to prod DB: 1,550 + 23 rows moved.** Distribution after: Άλλο 459→290, Καθαρισμός 1276→1607, Κάβα 369→549, Φρούτα 349→223 (now actual produce). Προσωπική stays ~3.7k — that's REAL (chains' web-offer feeds genuinely skew to personal care/cleaning promos).
-- ⚠️ **Until pushed/deployed, nightly adapter runs use the OLD engine** and will re-stale rows they update; the backfill is re-runnable to fix. Push promptly.
+- Pushed same night, so nightly GH runs pick up the new engine. If any run fired between the backfill and the push, re-run `node src/scripts/recompute-categories.mjs` once (idempotent) to clean up.
 
 ### Slice ② — display-first unmatched offers (2026-06-11)
 
