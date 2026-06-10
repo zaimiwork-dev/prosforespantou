@@ -4,6 +4,25 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-11 PM — Fable 5 mobile redesign SHIPPED, local only)
+
+**9 commits, LOCAL ONLY — not pushed** (`a4a5830`→`bd0ef56` + docs). Fable 5 executed the redesign brief with an independent re-audit first. Build green, 17 tests pass, lint 22→11 (remaining 5 errors all AdminPanel — internal tool, deliberate). Verified end-to-end at 390px with Playwright screenshots each slice.
+
+| commit | what |
+|---|---|
+| `a4a5830` | **Bugs found in re-audit:** /deals price sort silently broken (server ignored `price_asc/desc` → fell back to hot); AdminPanel (~1k lines) statically imported into the public homepage bundle → `next/dynamic`; 0-offer chains hidden from /deals filter chips (counts wired from `getDealCounts`); hero-meta clip fixed + chain stat counts live chains only |
+| `bcb0ac8` | **Deals-first homepage:** hero+search → Κορυφαίες προσφορές → Τελειώνουν σύντομα → promo → categories → stores. UI copy genericized to "καταστήματα" (multi-store future); SEO meta keeps "σούπερ μάρκετ" deliberately |
+| `24b8d0c` | **Listings:** products above the fold on /deals + /supermarket/[id]. New reusable [Sheet.js](src/components/Sheet.js) bottom sheet; filters collapse into a Φίλτρα sheet with live count CTA; visible sort select; supermarket pages got price sorting; SortBar + StickySearch deleted |
+| `c536a0d` | **Unified offer detail:** new [OfferDetails.js](src/components/OfferDetails.js) = single source for sheet + page (image, dates grid, price, qty+CTA, [PriceComparison.js](src/components/PriceComparison.js), PriceHistory). [ProductSheet.js](src/components/ProductSheet.js) (bottom sheet) replaced ProductModal everywhere; "Δεν υπάρχει διαθέσιμη περιγραφή" gone. ("WEB ONLY" is baked into chain artwork, not our UI) |
+| `259ab25` | **Bottom nav** (Αρχική/Προσφορές/Αναζήτηση/Λίστα — Ειδοποιήσεις deliberately excluded while /alerts is token-gated) mounted in layout; list + /alerts empty states got explanations and CTAs |
+| `5915160` | **Visual hierarchy:** 900-weight price, accent color when strikethrough exists, `.verdict-pill` class, floating 🛒 removed (clashed with nav), dead modal CSS pruned |
+| `2a0f8e3` | **PWA:** manifest.webmanifest + 192/512/apple icons (rendered from the Π mark via Playwright). Installable today; Capacitor reuses assets |
+| `bd0ef56` | **react-compiler clean** in consumer components: clock snapshot per mount (no `Date.now()` in render), PreferredStoresSheet mounts fresh per open, ProductSheet split outer(URL lifecycle)/inner(keyed fetch state) — **gotcha: moving pushState/`history.back()` into a keyed child broke opening in dev (StrictMode mount→cleanup→mount ran `back()` and the async popstate closed the sheet on open). URL lifecycle must live in an always-mounted component.** |
+
+**Next candidates:** push to origin; Lidl-live + Tier-3 recon (user's chain priorities); deeper search relevance (results cluster by chain); `.js→.tsx` as its own PR; Capacitor wrap (PHASES 4.7) now has manifest/icons ready.
+
+---
+
 ## ⚡ Pick up here (2026-06-11 — honest-pricing + category + tech-debt sprint; NEXT = Fable 5 redesign)
 
 **5 commits, LOCAL ONLY — not yet pushed to `origin/main`** (`026002e`→`6310505`). Working tree clean. This sprint came out of an honest UX teardown the user requested (screenshots at 390px) ahead of handing the **visual/UX redesign to Fable 5**. The plan: this Opus session fixes the correctness-sensitive layers (pricing/categories/tech-debt); Fable 5 owns the mobile presentation redesign on top. See **[REDESIGN_BRIEF.md](REDESIGN_BRIEF.md)** — the constraints-heavy handoff for Fable.
