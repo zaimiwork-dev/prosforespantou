@@ -6,7 +6,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ## ⚡ Pick up here (2026-06-11 PM — Fable 5 mobile redesign SHIPPED, local only)
 
-**9 commits, LOCAL ONLY — not pushed** (`a4a5830`→`bd0ef56` + docs). Fable 5 executed the redesign brief with an independent re-audit first. Build green, 17 tests pass, lint 22→11 (remaining 5 errors all AdminPanel — internal tool, deliberate). Verified end-to-end at 390px with Playwright screenshots each slice.
+**All pushed to `origin/main`** (`a4a5830`→`2bb7403`). Fable 5 executed the redesign brief with an independent re-audit first. Build green, 17 tests pass, lint 22→11 (remaining 5 errors all AdminPanel — internal tool, deliberate). Verified end-to-end at 390px with Playwright screenshots each slice.
 
 | commit | what |
 |---|---|
