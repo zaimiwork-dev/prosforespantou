@@ -68,3 +68,6 @@ public/logos/*.exe
 # Local scratch from one-off scripts (resolver logs, tmp HTML/JSON probes)
 .tmp_*
 resolver-backlog.log
+
+# local UX-review screenshots (scratch)
+screenshots/
