@@ -93,7 +93,7 @@ export function PreferredStoresSheet({ isOpen, onClose }) {
         {/* Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
           <p style={{ fontSize: 14, color: "#8b929c", margin: "0 0 24px 0", lineHeight: "1.5" }}>
-            Διάλεξε τα σούπερ μάρκετ που ψωνίζεις. Θα βλέπεις προσφορές μόνο από αυτά.
+            Διάλεξε τα καταστήματα που ψωνίζεις. Θα βλέπεις προσφορές μόνο από αυτά.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

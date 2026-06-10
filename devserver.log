@@ -1,0 +1,13 @@
+
+> prosforespantou-next@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.5.0.2:3000
+- Environments: .env.local, .env
+✓ Ready in 379ms
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+ GET / 200 in 585ms (next.js: 243ms, application-code: 342ms)

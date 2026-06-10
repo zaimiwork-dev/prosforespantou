@@ -21,7 +21,7 @@ export function SupermarketTiles({ counts = {} }) {
     <section className="section">
       <div className="section-head">
         <div>
-          <h2>Περιήγηση ανά σούπερ μάρκετ</h2>
+          <h2>Περιήγηση ανά κατάστημα</h2>
         </div>
       </div>
 

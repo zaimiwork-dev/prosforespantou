@@ -272,7 +272,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   gap: 12px 24px; flex-wrap: wrap;
 }
 .hero-compact-head h1 { flex: 1 1 320px; min-width: 0; }
-.hero-compact-head .hero-meta { flex: 0 0 auto; }
+.hero-compact-head .hero-meta { flex: 0 1 auto; min-width: 0; } /* allow shrink so stats wrap, not clip */
 .hero h1 {
   font-family: var(--font-serif);
   font-weight: 400;

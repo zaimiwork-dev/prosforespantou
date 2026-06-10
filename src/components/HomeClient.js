@@ -56,30 +56,15 @@ function PublicSite({ initial, onAdmin }) {
 
       <main style={{ flex: 1 }}>
         <div className="container">
-          <SupermarketTiles counts={initial.counts?.bySupermarket || {}} />
-
-          <CategoryGrid asLinks counts={initial.counts?.byCategory || {}} />
-
-          <section className="section-tight">
-            <Link href="/deals" className="promo">
-              <div>
-                <div className="eyebrow">Όλες οι προσφορές</div>
-                <h3>Περιήγηση σε {initial.total.toLocaleString("el-GR")} προσφορές</h3>
-                <p>Φίλτραρε ανά σούπερ μάρκετ, κατηγορία ή τιμή</p>
-              </div>
-              <span className="btn btn-accent btn-lg">
-                Δες όλες <Icon.ArrowRight size={16} />
-              </span>
-            </Link>
-          </section>
-
+          {/* Deals first — a shopper opening the app daily should see savings
+              before navigation. Browsing by store/category moves below. */}
           <FeaturedCarousel
-            title="Κορυφαίες εκπτώσεις"
-            sub="Τα μεγαλύτερα ποσοστά αυτή την εβδομάδα"
+            title="Κορυφαίες προσφορές"
+            sub="Ξεχωρίζουν αυτή την εβδομάδα"
             deals={initial.topDeals}
             onAdd={addItem}
             onSelect={setSelectedProduct}
-            viewAllHref="/deals?sort=discount"
+            viewAllHref="/deals"
           />
 
           <FeaturedCarousel
@@ -90,6 +75,23 @@ function PublicSite({ initial, onAdmin }) {
             onSelect={setSelectedProduct}
             viewAllHref="/deals?sort=expiring"
           />
+
+          <section className="section-tight">
+            <Link href="/deals" className="promo">
+              <div>
+                <div className="eyebrow">Όλες οι προσφορές</div>
+                <h3>Περιήγηση σε {initial.total.toLocaleString("el-GR")} προσφορές</h3>
+                <p>Φίλτραρε ανά κατάστημα, κατηγορία ή τιμή</p>
+              </div>
+              <span className="btn btn-accent btn-lg">
+                Δες όλες <Icon.ArrowRight size={16} />
+              </span>
+            </Link>
+          </section>
+
+          <CategoryGrid asLinks counts={initial.counts?.byCategory || {}} />
+
+          <SupermarketTiles counts={initial.counts?.bySupermarket || {}} />
         </div>
       </main>
 

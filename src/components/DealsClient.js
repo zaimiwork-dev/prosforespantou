@@ -119,7 +119,7 @@ export default function DealsClient({ initial }) {
     let smLabel = "";
     if (smObjs.length === 1) smLabel = smObjs[0].name;
     else if (smObjs.length > 1 && smObjs.length <= 3) smLabel = smObjs.map((s) => s.name).join(" + ");
-    else if (smObjs.length > 3) smLabel = `${smObjs.length} σούπερ μάρκετ`;
+    else if (smObjs.length > 3) smLabel = `${smObjs.length} καταστήματα`;
 
     if (c && activeCategory !== "all" && smLabel) return `${c.label} · ${smLabel}`;
     if (c && activeCategory !== "all") return c.label;
@@ -157,7 +157,7 @@ export default function DealsClient({ initial }) {
             </div>
           </header>
 
-          <div className="sm-bar" role="group" aria-label="Σούπερ μάρκετ">
+          <div className="sm-bar" role="group" aria-label="Καταστήματα">
             <button
               type="button"
               className={`sm-chip sm-chip-all${selectedSMs.length === 0 ? " active" : ""}`}
@@ -181,7 +181,7 @@ export default function DealsClient({ initial }) {
           </div>
           {selectedSMs.length > 1 && (
             <div className="sm-multi-hint">
-              <Icon.Check size={14} /> Προβολή προσφορών από {selectedSMs.length} σούπερ μάρκετ
+              <Icon.Check size={14} /> Προβολή προσφορών από {selectedSMs.length} καταστήματα
             </div>
           )}
 

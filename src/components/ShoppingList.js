@@ -105,7 +105,7 @@ export function ShoppingList({ isOpen, onClose }) {
             <>
               {groups.length > 1 && (
                 <div className="drawer-multistore">
-                  Η λίστα σου απλώνεται σε <b>{groups.length} σούπερ μάρκετ</b>.
+                  Η λίστα σου απλώνεται σε <b>{groups.length} καταστήματα</b>.
                   Παρακάτω χωρίζεται ανά κατάστημα με επιμέρους σύνολο.
                 </div>
               )}
