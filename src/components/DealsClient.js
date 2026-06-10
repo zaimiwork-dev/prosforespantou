@@ -10,6 +10,7 @@ import { ShoppingList } from "@/components/ShoppingList";
 import { PreferredStoresSheet } from "@/components/PreferredStoresSheet";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
+import { Sheet } from "@/components/Sheet";
 import { Icon } from "@/components/Icons";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 
@@ -39,6 +40,7 @@ export default function DealsClient({ initial }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { items: cart, addItem, preferredStores, clearPreferred } = useShoppingListStore();
 
   const skipNextReloadRef = useRef(true);
@@ -103,6 +105,7 @@ export default function DealsClient({ initial }) {
   };
 
   const hasActiveFilters = selectedSMs.length > 0 || activeCategory !== "all";
+  const activeFilterCount = selectedSMs.length + (activeCategory !== "all" ? 1 : 0);
 
   // Only offer filters that lead somewhere: chains/categories with 0 active
   // offers (Lidl, Bazaar, … until their adapters ship) would return an empty
@@ -157,55 +160,19 @@ export default function DealsClient({ initial }) {
             </div>
           </header>
 
-          <div className="sm-bar" role="group" aria-label="Καταστήματα">
+          {/* One compact row instead of two walls of chips — products start
+              right below the fold instead of two screens down. */}
+          <div className="listing-toolbar">
             <button
               type="button"
-              className={`sm-chip sm-chip-all${selectedSMs.length === 0 ? " active" : ""}`}
-              onClick={() => setSelectedSMs([])}
-              aria-pressed={selectedSMs.length === 0}
+              className="btn-filters"
+              onClick={() => setIsFilterOpen(true)}
+              aria-haspopup="dialog"
             >
-              <span className="sm-chip-all-icon" aria-hidden="true">★</span>
-              <span className="sm-chip-label">Όλα</span>
+              <Icon.Sort size={14} /> Φίλτρα
+              {activeFilterCount > 0 && <span className="badge">{activeFilterCount}</span>}
             </button>
-            {liveSMs.map((s) => {
-              const active = selectedSMs.includes(s.id);
-              return (
-                <SupermarketChip
-                  key={s.id}
-                  sm={s}
-                  active={active}
-                  onClick={() => toggleSM(s.id)}
-                />
-              );
-            })}
-          </div>
-          {selectedSMs.length > 1 && (
-            <div className="sm-multi-hint">
-              <Icon.Check size={14} /> Προβολή προσφορών από {selectedSMs.length} καταστήματα
-            </div>
-          )}
-
-          <div className="filter-bar">
-            <button
-              type="button"
-              className={`chip${activeCategory === "all" ? " active" : ""}`}
-              onClick={() => setActiveCategory("all")}
-            >
-              Όλες οι κατηγορίες
-            </button>
-            {categoryItems.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`chip${activeCategory === c.id ? " active" : ""}`}
-                onClick={() => setActiveCategory(c.id)}
-              >
-                {c.label}
-              </button>
-            ))}
-
             <label className="sort-select">
-              <Icon.Sort size={14} />
               <span>Ταξινόμηση:</span>
               <select
                 value={sortBy}
@@ -218,6 +185,28 @@ export default function DealsClient({ initial }) {
               </select>
             </label>
           </div>
+
+          {hasActiveFilters && (
+            <div className="active-filters">
+              {selectedSMs.map((id) => {
+                const s = SUPERMARKETS.find((x) => x.id === id);
+                if (!s) return null;
+                return (
+                  <button key={id} type="button" className="af-chip" onClick={() => toggleSM(id)}>
+                    {s.name} <span className="x">×</span>
+                  </button>
+                );
+              })}
+              {activeCategory !== "all" && (
+                <button type="button" className="af-chip" onClick={() => setActiveCategory("all")}>
+                  {CATEGORIES.find((c) => c.id === activeCategory)?.label || activeCategory} <span className="x">×</span>
+                </button>
+              )}
+              <button type="button" className="af-clear" onClick={handleClearFilters}>
+                Καθαρισμός
+              </button>
+            </div>
+          )}
 
           {preferredStores.length > 0 && selectedSMs.length === 0 && (
             <div className="pref-banner">
@@ -243,6 +232,70 @@ export default function DealsClient({ initial }) {
           />
         </div>
       </main>
+
+      <Sheet
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        title="Φίλτρα"
+        footer={
+          <>
+            {hasActiveFilters && (
+              <button type="button" className="btn btn-outline" onClick={handleClearFilters}>
+                Καθαρισμός
+              </button>
+            )}
+            <button type="button" className="btn btn-primary" onClick={() => setIsFilterOpen(false)}>
+              {loading ? "Φόρτωση…" : `Δες ${totalCount.toLocaleString("el-GR")} προσφορές`}
+            </button>
+          </>
+        }
+      >
+        <div className="sheet-section">
+          <div className="sheet-section-title">Καταστήματα</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button
+              type="button"
+              className={`sm-chip sm-chip-all${selectedSMs.length === 0 ? " active" : ""}`}
+              onClick={() => setSelectedSMs([])}
+              aria-pressed={selectedSMs.length === 0}
+            >
+              <span className="sm-chip-all-icon" aria-hidden="true">★</span>
+              <span className="sm-chip-label">Όλα</span>
+            </button>
+            {liveSMs.map((s) => (
+              <SupermarketChip
+                key={s.id}
+                sm={s}
+                active={selectedSMs.includes(s.id)}
+                onClick={() => toggleSM(s.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="sheet-section">
+          <div className="sheet-section-title">Κατηγορίες</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button
+              type="button"
+              className={`chip${activeCategory === "all" ? " active" : ""}`}
+              onClick={() => setActiveCategory("all")}
+            >
+              Όλες
+            </button>
+            {categoryItems.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`chip${activeCategory === c.id ? " active" : ""}`}
+                onClick={() => setActiveCategory(c.id)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Sheet>
 
       <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />

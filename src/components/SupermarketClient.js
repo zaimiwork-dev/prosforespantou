@@ -7,9 +7,10 @@ import { ProductModal } from "@/components/ProductModal";
 import { ShoppingList } from "@/components/ShoppingList";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
-import { SortBar } from "@/components/SortBar";
-import { CategoryGrid } from "@/components/CategoryGrid";
+import { Sheet } from "@/components/Sheet";
+import { Icon } from "@/components/Icons";
 import { Footer } from "@/components/Footer";
+import { CATEGORIES } from "@/lib/constants";
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { searchDeals } from '@/actions/search-deals';
@@ -109,12 +110,25 @@ function expandSearch(query) {
   return Array.from(expanded);
 }
 
+const SORTS = [
+  { id: "hot",        label: "🔥 Δημοφιλή" },
+  { id: "expiring",   label: "Λήγουν σύντομα" },
+  { id: "discount",   label: "Μεγαλύτερη έκπτωση" },
+  { id: "price_asc",  label: "Τιμή: χαμηλή → υψηλή" },
+  { id: "price_desc", label: "Τιμή: υψηλή → χαμηλή" },
+  { id: "newest",     label: "Νεότερες" },
+];
+
 function sortDeals(deals, sortBy) {
   const copy = [...deals];
   if (sortBy === "hot") {
     copy.sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0));
   } else if (sortBy === "discount") {
     copy.sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0));
+  } else if (sortBy === "price_asc") {
+    copy.sort((a, b) => (a.discountedPrice ?? 0) - (b.discountedPrice ?? 0));
+  } else if (sortBy === "price_desc") {
+    copy.sort((a, b) => (b.discountedPrice ?? 0) - (a.discountedPrice ?? 0));
   } else if (sortBy === "newest") {
     copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } else {
@@ -129,6 +143,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(60);
   // Server-side results for searches: covers the full chain catalog (the
   // initialDeals prop is capped to top-500 best-discount items to keep the
@@ -173,6 +188,13 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
     for (const d of initialDeals) if (d.category) m[d.category] = (m[d.category] || 0) + 1;
     return m;
   }, [initialDeals]);
+
+  // Departments this chain actually stocks, in canonical order — drives the
+  // filter sheet (empty departments would just dead-end).
+  const chainCategories = useMemo(
+    () => CATEGORIES.filter((c) => c.id !== "all" && (categoryCounts[c.id] || 0) > 0),
+    [categoryCounts]
+  );
 
   const filtered = useMemo(() => {
     // When the user is searching, render the server results (they cover the
@@ -311,16 +333,43 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
       </section>
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px" }}>
-        <CategoryGrid activeCategory={activeCategory} onSelect={setActiveCategory} counts={categoryCounts} />
-
         <section>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 4px" }}>
             <h2 style={{ fontSize: 18, fontWeight: 900, margin: 0, letterSpacing: "-0.4px" }}>
               {activeCategory === "all" ? "Όλες οι προσφορές" : activeCategory}
             </h2>
+            <span style={{ fontSize: 13, color: "var(--ink-3)", fontWeight: 600 }}>
+              {filtered.length.toLocaleString("el-GR")} προσφορές
+            </span>
           </div>
 
-          <SortBar value={sortBy} onChange={setSortBy} totalCount={filtered.length} />
+          <div className="listing-toolbar">
+            <button
+              type="button"
+              className="btn-filters"
+              onClick={() => setIsFilterOpen(true)}
+              aria-haspopup="dialog"
+            >
+              <Icon.Sort size={14} /> Φίλτρα
+              {activeCategory !== "all" && <span className="badge">1</span>}
+            </button>
+            <label className="sort-select">
+              <span>Ταξινόμηση:</span>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Ταξινόμηση">
+                {SORTS.map((s) => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {activeCategory !== "all" && (
+            <div className="active-filters">
+              <button type="button" className="af-chip" onClick={() => setActiveCategory("all")}>
+                {activeCategory} <span className="x">×</span>
+              </button>
+            </div>
+          )}
 
           <DealGrid
             deals={visibleDeals}
@@ -407,6 +456,47 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
           </span>
         </button>
       )}
+
+      <Sheet
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        title="Φίλτρα"
+        footer={
+          <>
+            {activeCategory !== "all" && (
+              <button type="button" className="btn btn-outline" onClick={() => setActiveCategory("all")}>
+                Καθαρισμός
+              </button>
+            )}
+            <button type="button" className="btn btn-primary" onClick={() => setIsFilterOpen(false)}>
+              Δες {filtered.length.toLocaleString("el-GR")} προσφορές
+            </button>
+          </>
+        }
+      >
+        <div className="sheet-section">
+          <div className="sheet-section-title">Κατηγορίες</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button
+              type="button"
+              className={`chip${activeCategory === "all" ? " active" : ""}`}
+              onClick={() => setActiveCategory("all")}
+            >
+              Όλες
+            </button>
+            {chainCategories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`chip${activeCategory === c.id ? " active" : ""}`}
+                onClick={() => setActiveCategory(c.id)}
+              >
+                {c.label} ({categoryCounts[c.id]})
+              </button>
+            ))}
+          </div>
+        </div>
+      </Sheet>
 
       <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
