@@ -1,5 +1,72 @@
 import { describe, it, expect } from 'vitest';
-import { categorize } from './categories';
+import { categorize, categorizeForChain } from './categories';
+
+// ===== Root cause (2026-06-12): per-chain native maps beat keywords =====
+describe('categorizeForChain — native maps are the primary signal', () => {
+  it('the same label means different things at different chains', () => {
+    // 'Παιδικά': kids' suncare at mymarket, baby yogurt at kritikos
+    expect(categorizeForChain('mymarket', 'Nivea Sun Children Lotion SPF50+', 'Παιδικά').dept)
+      .toBe('Προσωπική Φροντίδα');
+    expect(categorizeForChain('kritikos', 'ΚΡΙ ΚΡΙ BABIES ΠΡΩΤΟ ΓΙΑΟΥΡΤΙ ΛΕΥΚΟ 2*140ΓΡ', 'Παιδικά').dept)
+      .toBe('Γαλακτοκομικά & Είδη Ψυγείου');
+    // 'Λευκά': white wine at mymarket, white cheese at kritikos
+    expect(categorizeForChain('mymarket', 'Λήμνος Λευκός Οίνος 750ml', 'Λευκά').dept).toBe('Κάβα');
+    expect(categorizeForChain('kritikos', 'ΔΩΔΩΝΗ ΕΛΑΦΡΥ ΣΕ ΑΛΜΗ 400ΓΡ', 'Λευκά').dept).toBe('Τυριά & Αλλαντικά');
+    // 'Συμπυκνωμένα': fabric softener at mymarket, tomato juice at kritikos
+    expect(categorizeForChain('mymarket', 'Soupline Μαλακτικό Συμπυκνωμένο', 'Συμπυκνωμένα').dept)
+      .toBe('Είδη Καθαρισμού & Σπιτιού');
+    expect(categorizeForChain('kritikos', 'ΚΥΚΝΟΣ ΧΥΜΟΣ ΤΟΜΑΤΑΣ ΕΛΑΦΡΑ ΣΥΜΠΥΚΝ. 500ΓΡ', 'Συμπυκνωμένα').dept)
+      .toBe('Κονσέρβες');
+  });
+
+  it("kritikos 'Γάλα' is infant formula, not dairy", () => {
+    expect(categorizeForChain('kritikos', 'ALMIRON GROWING UP 12-24 1L', 'Γάλα').dept).toBe('Βρεφικά Είδη');
+  });
+
+  it('map hit wins over misleading name words (the Klinex-Λεμόνι class)', () => {
+    const r = categorizeForChain('kritikos', 'KLINEX ΥΓΡ.ΠΑΝ ΠΑΤΩΜΑΤΟΣ ΛΕΜΟΝΙ XXL 15', 'Πανιά Καθαρισμού');
+    expect(r).toEqual({ dept: 'Είδη Καθαρισμού & Σπιτιού', mapped: true });
+  });
+
+  it('AB Οπωροπωλείο is real produce', () => {
+    expect(categorizeForChain('ab', 'Πιπεριές 3 Χρωμάτων Ελληνικές 450gr', 'Οπωροπωλείο').dept)
+      .toBe('Φρούτα & Λαχανικά');
+  });
+
+  it('unknown labels fall back to keywords and report mapped:false', () => {
+    const r = categorizeForChain('mymarket', 'Lavazza Καφές Espresso 250gr', 'Ολοκαίνουργιο Ράφι');
+    expect(r.mapped).toBe(false);
+    expect(r.dept).toBe('Πρωινό & Ροφήματα');
+  });
+
+  it('chains without a map (masoutis) just use keywords', () => {
+    expect(categorizeForChain('masoutis', 'Lavazza Καφές Espresso 250gr', null).dept)
+      .toBe('Πρωινό & Ροφήματα');
+  });
+});
+
+describe('keyword fallback — Φρούτα runs LAST (scent words must not win)', () => {
+  it('fruit-scented cleaning products are cleaning, not produce', () => {
+    expect(categorize('KLINEX Ultra Χλωρίνη Λεμόνι 2lt')).toBe('Είδη Καθαρισμού & Σπιτιού');
+    expect(categorize('AJAX Boost Καθαριστικό Πατώματος Ξίδι & Μήλο 1lt')).toBe('Είδη Καθαρισμού & Σπιτιού');
+    expect(categorize('FINISH Καθαριστικό Πλυντηρίου Πιάτων Υγρό Λεμόνι 250ml')).toBe('Είδη Καθαρισμού & Σπιτιού');
+  });
+
+  it('tomato sauce and potato puree are pantry, not produce', () => {
+    expect(categorize('Zanae Salsissimo Σάλτσα Ντομάτας Για Ζυμαρικά Napoletana')).toBe('Είδη Παντοπωλείου');
+    expect(categorize('ΓΙΩΤΗΣ Πουρές Πατάτας Στιγμής Vegan 2x125g')).toBe('Είδη Παντοπωλείου');
+  });
+
+  it('λεμονάδα is a soft drink, not a lemon', () => {
+    expect(categorize('ΛΟΥΞ Λεμονάδα 6x330ml')).toBe('Κάβα');
+  });
+
+  it('actual fresh produce still lands in Φρούτα & Λαχανικά', () => {
+    expect(categorize('Πατάτες Κύπρου συσκευασμένες')).toBe('Φρούτα & Λαχανικά');
+    expect(categorize('Μήλα Στάρκιν Εγχώρια συσκευασμένα')).toBe('Φρούτα & Λαχανικά');
+    expect(categorize('Κρεμμύδια Ξερά Ξανθά Εγχώρια')).toBe('Φρούτα & Λαχανικά');
+  });
+});
 
 // Every name below is a real row from the live DB that was miscategorized
 // before the 2026-06-11 leak fixes. If one of these breaks, a keyword edit

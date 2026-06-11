@@ -20,7 +20,7 @@ import 'dotenv/config';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
-import { categorize, DEPARTMENTS } from '../lib/categories.ts';
+import { categorize, categorizeForChain, DEPARTMENTS } from '../lib/categories.ts';
 
 const DEPT_SET = new Set(DEPARTMENTS);
 
@@ -33,7 +33,7 @@ async function run() {
 
   const deals = await prisma.discount.findMany({
     where: { isActive: true, validUntil: { gt: now } },
-    select: { id: true, productName: true, category: true, subcategory: true },
+    select: { id: true, productName: true, category: true, subcategory: true, supermarket: true },
   });
   console.log(`🔢 active deals to recategorize: ${deals.length}${DRY_RUN ? ' (DRY_RUN)' : ''}`);
 
@@ -52,10 +52,21 @@ async function run() {
         d.subcategory && !DEPT_SET.has(d.subcategory) ? d.subcategory
         : !DEPT_SET.has(d.category) ? d.category
         : null;
-      // Pass ONLY the true native hint — NOT the current category. categorize()
-      // trusts a valid-department hint and returns it unchanged, so feeding back
-      // d.category would freeze any wrong category and make the backfill a no-op.
-      let dept = categorize(d.productName, native);
+      let dept;
+      if (native) {
+        // Per-chain native map first (the strongest signal), then the
+        // alias/keyword chain. NOT the current category — feeding it back
+        // would freeze wrong categories and make the backfill a no-op.
+        dept = categorizeForChain(d.supermarket, d.productName, native).dept;
+      } else if (d.category && d.category !== 'Άλλο' && DEPT_SET.has(d.category)) {
+        // PROVENANCE RULE: no native label + a valid stored department means
+        // the adapter's own taxonomy set it (e.g. sklavenitis href slugs).
+        // Re-deriving from the NAME is a strictly weaker signal and is exactly
+        // how "Klinex Λεμόνι" once landed in Φρούτα & Λαχανικά. Keep it.
+        dept = d.category;
+      } else {
+        dept = categorize(d.productName, null);
+      }
       // Never demote a specific category to Άλλο: the keyword engine's Άλλο
       // means "no signal", not evidence — the stored label may carry knowledge
       // the keywords don't have (LLM resolver / admin / a richer past native).

@@ -13,6 +13,10 @@
 // one; categorize() re-runs on the next write and the backfill script
 // (recompute-categories.mjs) re-applies it to existing rows.
 
+// Explicit .ts extension: the .mjs ingestion scripts import categories.ts
+// straight into Node (strip-types), where extensionless ESM imports fail.
+import { CHAIN_NATIVE_MAPS } from './native-category-maps.ts';
+
 // Department ids — MUST match the icon keys in components/CategoryIcon.js and
 // the ids in lib/constants.js CATEGORIES.
 export const DEPARTMENTS = [
@@ -191,7 +195,7 @@ const RULES: { dept: string; terms: string[] }[] = [
     'αναψυκτικ', 'coca', 'cola', 'pepsi', 'σπριτ', 'sprite', 'fanta',
     'εμφιαλωμεν', 'σοδα', 'tonic', 'ενεργειακο ποτο', 'energy drink',
     'αναψυκτικα', 'μεταλλικο νερο', 'φυσικο νερο', 'επιτραπεζιο νερο', 'monster', 'red bull',
-    'ρετσινα', 'μηλιτης', 'somersby', 'schweppes', 'xixo', 'powerade',
+    'ρετσινα', 'μηλιτης', 'somersby', 'schweppes', 'xixo', 'powerade', 'λεμοναδα', 'πορτοκαλαδα', 'γκαζοζα',
   ] },
   { dept: 'Πρωινό & Ροφήματα', terms: [
     'καφε', 'nescafe', 'espresso', 'nespresso', 'καπουτσιν', 'φραπε', 'δημητριακα', 'cornflakes',
@@ -201,13 +205,6 @@ const RULES: { dept: string; terms: string[] }[] = [
     // catches ice tea). Tomato juice is intercepted by Κονσέρβες first.
     // '=νεκταρ' boundary-matched: the substring ate ΝΕΚΤΑΡίνια (nectarines).
     'χυμο', '=νεκταρ', 'φρουτοποτο',
-  ] },
-  { dept: 'Φρούτα & Λαχανικά', terms: [
-    'φρουτ', 'λαχανικ', 'μηλο', 'μηλα', 'μπανανα', 'πορτοκαλ', 'λεμον', 'μανταριν',
-    'ντοματ', 'πατατ', 'κρεμμυδ', 'σκορδ', 'μαρουλ', 'αγγουρ', 'καροτ', 'μπροκολ',
-    'κουνουπιδ', 'πιπερι', 'μελιτζαν', 'κολοκυθ', 'σπανακ', 'μαϊνταν', 'ανηθ', 'σελιν',
-    'φραουλ', 'σταφυλ', 'αχλαδ', 'ροδακιν', 'νεκταριν', 'βερικοκ', 'πεπον', 'καρπουζ', 'ακτινιδ',
-    'αβοκαντο', 'μανιταρ', 'ραπανακ', 'παντζαρ', 'κερασ', 'τοματιν',
   ] },
   { dept: 'Είδη Καθαρισμού & Σπιτιού', terms: [
     'απορρυπαντικ', 'πλυντηριου', 'υγρο πιατων', 'σκονη πλυσιματος', 'μαλακτικο ρουχ',
@@ -230,7 +227,19 @@ const RULES: { dept: string; terms: string[] }[] = [
     'μουσταρδα', 'μπαχαρικ', 'οσπρια', 'φακες', 'φασολια', 'ρεβυθ', 'φαβα', 'κους κους',
     'πληγουρι', 'κορν φλαουρ', 'μαγειρικ', 'ζωμος', 'κυβος', 'σος', 'μπεικιν', 'γλυκαντικ',
     // pasta + pantry brands/nouns the name-only chains expose
-    'misko', 'knorr', 'penne', 'ταλιατελ', 'φιδες', 'κριθαρακ',
+    'misko', 'knorr', 'penne', 'ταλιατελ', 'φιδες', 'κριθαρακ', 'πουρες', 'μπεσαμελ', 'ξιδι',
+  ] },
+  // Φρούτα & Λαχανικά runs LAST on purpose: fruit/vegetable words are the most
+  // common scent & flavour words in Greek product names ("Klinex Λεμόνι",
+  // "σαμπουάν Πράσινο Μήλο", "σάλτσα ντομάτας"). Only a name that matched NO
+  // other department reads as actual produce. Chains with native taxonomies
+  // never reach this rule for produce — their labels map directly.
+  { dept: 'Φρούτα & Λαχανικά', terms: [
+    'φρουτ', 'λαχανικ', 'μηλο', 'μηλα', 'μπανανα', 'πορτοκαλ', 'λεμον', 'μανταριν',
+    'ντοματ', 'πατατ', 'κρεμμυδ', 'σκορδ', 'μαρουλ', 'αγγουρ', 'καροτ', 'μπροκολ',
+    'κουνουπιδ', 'πιπερι', 'μελιτζαν', 'κολοκυθ', 'σπανακ', 'μαϊνταν', 'ανηθ', 'σελιν',
+    'φραουλ', 'σταφυλ', 'αχλαδ', 'ροδακιν', 'νεκταριν', 'βερικοκ', 'πεπον', 'καρπουζ', 'ακτινιδ',
+    'αβοκαντο', 'μανιταρ', 'ραπανακ', 'παντζαρ', 'κερασ', 'τοματιν',
   ] },
 ];
 
@@ -445,6 +454,48 @@ export function categorizeTrace(name: string | null | undefined, nativeHint?: st
   const nm = normalize(name);
   for (const r of COMPILED) { const tt = r.terms.find((x) => x.test(nm)); if (tt) return { dept: r.dept, via: 'name', term: tt.term }; }
   return { dept: 'Άλλο', via: 'none', term: null as string | null };
+}
+
+// ===== Per-chain native maps — the primary signal =====
+// Complete label→department maps for the chains that ship native categories
+// (mymarket/kritikos/ab cover ~72% of the catalog). A map hit BEATS all
+// keyword guessing; see native-category-maps.ts for the polysemy war stories
+// ('Παιδικά', 'Λευκά', 'Γάλα' mean different things per chain).
+// A null map value = "label known but too mixed for one department" — fall
+// through to keywords WITHOUT reporting the label as unmapped.
+const CHAIN_LOOKUP = new Map<string, Map<string, string | null>>();
+for (const [chain, labels] of Object.entries(CHAIN_NATIVE_MAPS)) {
+  const m = new Map<string, string | null>();
+  for (const [label, dept] of Object.entries(labels)) m.set(normalize(label), dept);
+  CHAIN_LOOKUP.set(chain, m);
+}
+
+export function hasChainMap(chain: string | null | undefined): boolean {
+  return !!chain && CHAIN_LOOKUP.has(chain);
+}
+
+/**
+ * Chain-aware categorize. Returns whether the chain map decided (`mapped`) so
+ * ingest can report unmapped labels for curation instead of silently guessing.
+ */
+export function categorizeForChain(
+  chain: string | null | undefined,
+  name: string | null | undefined,
+  nativeHint?: string | null
+): { dept: string; mapped: boolean } {
+  if (chain && nativeHint) {
+    const m = CHAIN_LOOKUP.get(chain);
+    const key = normalize(nativeHint);
+    if (m?.has(key)) {
+      const hit = m.get(key);
+      if (hit) return { dept: hit, mapped: true };
+      // Known-but-mixed label: keyword-split on the NAME ONLY — the mixed
+      // label itself must not steer the keywords (e.g. 'Μπύρες, Αναψυκτικά…'
+      // would drag every juice in the bucket to Κάβα via the native-kw step).
+      return { dept: categorize(name, null), mapped: true };
+    }
+  }
+  return { dept: categorize(name, nativeHint), mapped: false };
 }
 
 export function categorize(name: string | null | undefined, nativeHint?: string | null): string {

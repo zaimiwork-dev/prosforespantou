@@ -9,7 +9,7 @@
 
 import 'dotenv/config';
 import { computeHotScore } from '../../lib/hotness.ts';
-import { categorize } from '../../lib/categories.ts';
+import { categorizeForChain, hasChainMap } from '../../lib/categories.ts';
 
 // Chain slug → Store.name (must match what's already in the DB).
 const SM_MAPPING = {
@@ -113,7 +113,7 @@ async function matchItem(prisma, item, chain, dryRun) {
 // chain's own data, and the resolver/admin claims the row with a productId
 // later. The chain's SKU is the dedup key for these rows — without it a
 // productless offer can't be written (no stable identity across runs).
-async function writeOffer(prisma, item, productId, storeId, chain, source, runStart) {
+async function writeOffer(prisma, item, productId, storeId, chain, source, runStart, unmappedLabels) {
   const now = new Date();
   const chainItemcode = item.chainItemcode != null ? String(item.chainItemcode) : null;
   if (!productId && !chainItemcode) return { snapshotWritten: false, skipped: true };
@@ -128,11 +128,15 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     : null;
 
   // The adapter's item.category is the chain's native label → keep it as the
-  // subcategory and derive the top-level department from name + native hint.
-  const nativeCat = item.category || null;
+  // subcategory (provenance!) and derive the department through the per-chain
+  // native map first, keywords as fallback. Labels the map doesn't know are
+  // collected so the run report can surface them for curation.
+  const nativeCat = item.category && item.category !== 'Άλλο' ? item.category : null;
+  const { dept, mapped } = categorizeForChain(chain, item.name, nativeCat);
+  if (!mapped && nativeCat && hasChainMap(chain) && unmappedLabels) unmappedLabels.add(nativeCat);
   const data = {
     productName: item.name,
-    category: categorize(item.name, nativeCat),
+    category: dept,
     subcategory: nativeCat,
     discountedPrice: item.price,
     originalPrice,
@@ -292,6 +296,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
 
     let idx = 0;
     let sharedRowSkips = 0;
+    const unmappedLabels = new Set();
     for (const item of items) {
       idx++;
       try {
@@ -318,13 +323,13 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
           // claims the row (sets productId) without touching what's shown.
           if (showUnmatched) {
             const { skipped } = await withDbRetry(`write unmatched ${item.name}`, () =>
-              writeOffer(prisma, item, null, store.id, chain, source, runStart)
+              writeOffer(prisma, item, null, store.id, chain, source, runStart, unmappedLabels)
             );
             if (!skipped) report.unmatchedShown++;
           }
         } else {
           const { snapshotWritten, sharedRow } = await withDbRetry(`write ${item.name}`, () =>
-            writeOffer(prisma, item, productId, store.id, chain, source, runStart)
+            writeOffer(prisma, item, productId, store.id, chain, source, runStart, unmappedLabels)
           );
           if (snapshotWritten) report.priceChanges++;
           if (sharedRow) sharedRowSkips++;
@@ -347,6 +352,16 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
       report.warnings.push(
         `${sharedRowSkips} item(s) share a productId with another chain SKU (winner-takes-row this run). ` +
         `Likely stale mis-mappings — audit ChainProductMapping for ${chain}.`
+      );
+    }
+
+    // New chain taxonomy labels we haven't mapped yet — these rows fell back to
+    // keyword guessing. Add them to native-category-maps.ts and re-run the
+    // category backfill.
+    if (unmappedLabels.size > 0) {
+      const sample = [...unmappedLabels].slice(0, 8).map((l) => `"${l}"`).join(', ');
+      report.warnings.push(
+        `${unmappedLabels.size} native categor${unmappedLabels.size === 1 ? 'y' : 'ies'} have no map entry (keyword fallback used): ${sample}${unmappedLabels.size > 8 ? ', …' : ''}`
       );
     }
 
