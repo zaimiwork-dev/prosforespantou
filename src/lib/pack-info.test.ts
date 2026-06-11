@@ -1,5 +1,55 @@
 import { describe, it, expect } from 'vitest';
-import { parsePack, perUnitPrice } from './pack-info';
+import { parsePack, perUnitPrice, unitPrice } from './pack-info';
+
+// €/κιλό-€/λίτρο — the shelf-label number. Names are real DB rows.
+describe('unitPrice', () => {
+  it('plain weights → €/κιλό', () => {
+    expect(unitPrice('Lavazza Qualita Rossa Καφές Espresso Αλεσμένος 250γρ.', 6.05))
+      .toEqual({ per: 'κιλό', value: 24.2 });
+    expect(unitPrice('ΣΚΛΗΡΟ ΤΥΡΙ ΚΕΦΑΛΟΤΥΡΙ 400gr', 4.0)).toEqual({ per: 'κιλό', value: 10 });
+  });
+
+  it('multipack sizes multiply (6x400g = 2.4kg)', () => {
+    expect(unitPrice('ΝΟΥΝΟΥ Kid Ρόφημα Γάλακτος Συμπυκνωμένο 6x400g', 6.15))
+      .toEqual({ per: 'κιλό', value: 2.56 });
+  });
+
+  it('volumes → €/λίτρο, with decimal commas', () => {
+    expect(unitPrice('ΔΕΛΤΑ μμμMilk Γάλα Υψηλής Παστερίωσης Ελαφρύ 1,5lt', 1.61))
+      .toEqual({ per: 'λίτρο', value: 1.07 });
+    expect(unitPrice('PALMOLIVE Plus Απορρυπαντικό Πιάτων Υγρό 750ml', 1.64))
+      .toEqual({ per: 'λίτρο', value: 2.19 });
+  });
+
+  it('gift multibuys multiply a per-piece size ((9+3)×330ml = 3.96L)', () => {
+    expect(unitPrice('Βεργίνα Μπίρα Κουτί 330ml (9+3 Δώρο)', 8.42))
+      .toEqual({ per: 'λίτρο', value: 2.13 });
+  });
+
+  it('laundry doses beat volume (concentrates lie per-liter)', () => {
+    expect(unitPrice('SKIP ΥΓΡΟ ΠΛΥΝΤ. ACTIVE CLEAN 70ΜΕΖ 3,5lt', 10.89))
+      .toEqual({ per: 'μεζούρα', value: 0.16 });
+  });
+
+  it('diaper weight ranges are NOT pack sizes; falls to €/τεμ', () => {
+    expect(unitPrice('Pampers Premium Care Πάνες Νο4 (9-14kg.) Jumbo Pack 52τεμ.', 13.49))
+      .toEqual({ per: 'τεμ.', value: 0.26 });
+  });
+
+  it('sold-by-the-kilo names return the price as €/κιλό', () => {
+    expect(unitPrice('ΓΚΟΥΝΤΑ ΦΡΑΤΖΟΛΑ ΓΕΡΜΑΝΙΑΣ ΤΟ ΚΙΛΟ', 8.9)).toEqual({ per: 'κιλό', value: 8.9 });
+  });
+
+  it('no quantity in the name → null', () => {
+    expect(unitPrice('Μπύρα Fix Hellas Κουτί', 1.2)).toBeNull();
+    expect(unitPrice(null, 1.2)).toBeNull();
+  });
+
+  it('tiny quantities are not nonsense (20x2γρ tea = 40g still honest)', () => {
+    expect(unitPrice('Loyd Τσάι Αρωματικό Σε Πυραμίδες 20x2γρ.', 2.0))
+      .toEqual({ per: 'κιλό', value: 50 });
+  });
+});
 
 // Names are real rows from the live DB.
 describe('parsePack', () => {

@@ -10,7 +10,7 @@ import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { hiResImage } from '@/lib/images';
-import { parsePack, perUnitPrice } from '@/lib/pack-info';
+import { parsePack, perUnitPrice, unitPrice } from '@/lib/pack-info';
 import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
 
 function formatDate(dateStr) {
@@ -129,17 +129,20 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
           )}
         </div>
 
-        {/* Multipack honesty: the chain's photo often shows ONE piece while the
-            price buys a bundle ("9+3 Δώρο" = 12 cans). Spell it out. */}
+        {/* Honesty block: what the price actually buys. Multipack count ("9+3
+            Δώρο" = 12 cans — the photo shows one) plus the shelf-label unit
+            price (€/κιλό, €/λίτρο, €/μεζούρα) that makes pack sizes and
+            shrinkflation comparable across chains. */}
         {(() => {
           const pack = parsePack(displayName);
-          const per = pack ? perUnitPrice(discountedPrice, pack.units) : null;
-          if (!per) return null;
-          return (
-            <div className="od-pack">
-              📦 Η τιμή αφορά {pack.units} τεμάχια — περίπου {per}€/τεμ.
-            </div>
-          );
+          const perPiece = pack ? perUnitPrice(discountedPrice, pack.units) : null;
+          const unit = unitPrice(displayName, discountedPrice);
+          if (!perPiece && !unit) return null;
+          const parts = [];
+          if (perPiece) parts.push(`Η τιμή αφορά ${pack.units} τεμάχια — περίπου ${perPiece}€/τεμ.`);
+          if (unit && unit.per !== 'τεμ.') parts.push(`≈ ${unit.value.toFixed(2)}€/${unit.per}`);
+          else if (unit && !perPiece) parts.push(`≈ ${unit.value.toFixed(2)}€/τεμ.`);
+          return <div className="od-pack">📦 {parts.join(' · ')}</div>;
         })()}
 
         {notStartedYet && validFromFull && (
