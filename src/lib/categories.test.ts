@@ -54,9 +54,58 @@ describe('categorize — substring-leak regressions', () => {
   });
 });
 
+describe('categorize — beverage split (2026-06-12)', () => {
+  it('juices are breakfast/beverages, not the Κάβα shelf', () => {
+    expect(categorize('AMITA Motion Χυμός Φυσικός 4x330ml')).toBe('Πρωινό & Ροφήματα');
+    expect(categorize('ΟΛΥΜΠΟΣ Φυσικός Χυμός Πορτοκάλι 250ml')).toBe('Πρωινό & Ροφήματα');
+  });
+
+  it('ice tea follows juices to breakfast/beverages', () => {
+    expect(categorize('LIPTON Zero Ice Tea Ροδάκινο Χωρίς ζάχαρη 500ml')).toBe('Πρωινό & Ροφήματα');
+  });
+
+  it('tomato juice is a cooking ingredient (Κονσέρβες), not a drink', () => {
+    expect(categorize('KYKNOS Χυμός Ντομάτας Ελαφρά Συμπυκνωμένος 500g')).toBe('Κονσέρβες');
+    expect(categorize('ΜΙΝΕΡΒΑ Χωριό Χυμός Ντομάτας Ελαφρώς Συμπυκνωμένος 2x500g')).toBe('Κονσέρβες');
+  });
+
+  it('alcohol and soft drinks stay in Κάβα', () => {
+    expect(categorize('Βεργίνα Μπίρα Κουτί 330ml (9+3 Δώρο)')).toBe('Κάβα');
+    expect(categorize('COCA COLA ΚΟΥΤΙ 330ML(5+1)Δ')).toBe('Κάβα');
+    expect(categorize('MONSTER Juiced Ενεργειακό Ποτό Mango Loco 500ml')).toBe('Κάβα');
+  });
+
+  it('disposable cups are home goods even though they say Αναψυκτικού', () => {
+    expect(categorize('My Home Ποτήρι Νερού Αναψυκτικού Διαφανές 270ml 50 Τεμάχια'))
+      .toBe('Είδη Καθαρισμού & Σπιτιού');
+  });
+
+  it('disposable razors stay personal care (μιας χρήσης must not be a home term)', () => {
+    expect(categorize('GILLETTE Blue 3 Ξυραφάκια Μιας Χρήσης Smooth 6τεμ')).toBe('Προσωπική Φροντίδα');
+  });
+
+  it("'=νεκταρ' matches nectar drinks but not nectarines", () => {
+    expect(categorize('VIVA Νέκταρ Ανανάς 1lt')).toBe('Πρωινό & Ροφήματα');
+    expect(categorize('Νεκταρίνια Ελληνικά Χύμα 1kg')).toBe('Φρούτα & Λαχανικά');
+  });
+
+  it('φρουτοποτό is a beverage, not fruit', () => {
+    expect(categorize('Ηβη Φρουτοποτό Βύσσινο 1lt')).toBe('Πρωινό & Ροφήματα');
+  });
+
+  it("'=αρωμα' no longer eats aromatic tea", () => {
+    expect(categorize('Loyd Τσάι Αρωματικό Φρούτα Του Δάσους Σε Πυραμίδες 20x2γρ.'))
+      .toBe('Πρωινό & Ροφήματα');
+  });
+
+  it('bake rolls are snacks despite bacon/cheese flavour words', () => {
+    expect(categorize('7Days Bake Rolls Μπέικον 150γρ.')).toBe('Σνακ & Γλυκά');
+  });
+});
+
 describe('categorize — rule-order fixes', () => {
   it('fruit-flavoured drinks are drinks, not fruit', () => {
-    expect(categorize('Χυμός Πορτοκάλι Φυσικός 1L')).toBe('Κάβα');
+    expect(categorize('Χυμός Πορτοκάλι Φυσικός 1L')).toBe('Πρωινό & Ροφήματα');
   });
 
   it('honey is breakfast but eggplants are not (=μελι boundary)', () => {

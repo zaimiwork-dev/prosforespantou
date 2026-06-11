@@ -1297,6 +1297,16 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .od-price { font-size: 34px; font-weight: 900; letter-spacing: -0.03em; color: var(--price); line-height: 1; }
 .od-price-old { font-size: 17px; color: var(--price-old); text-decoration: line-through; font-weight: 600; }
 
+/* Multipack note under the price — "η τιμή αφορά 12 τεμάχια" */
+.od-pack {
+  font-size: 13px; font-weight: 600; color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin: -6px 0 16px;
+}
+
 .od-upcoming {
   background: var(--bg-soft); border: 1px solid var(--line);
   color: var(--brand); padding: 10px 14px; border-radius: var(--r-md);

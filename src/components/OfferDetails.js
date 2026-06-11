@@ -10,6 +10,7 @@ import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { hiResImage } from '@/lib/images';
+import { parsePack, perUnitPrice } from '@/lib/pack-info';
 import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
 
 function formatDate(dateStr) {
@@ -127,6 +128,19 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
             </div>
           )}
         </div>
+
+        {/* Multipack honesty: the chain's photo often shows ONE piece while the
+            price buys a bundle ("9+3 Δώρο" = 12 cans). Spell it out. */}
+        {(() => {
+          const pack = parsePack(displayName);
+          const per = pack ? perUnitPrice(discountedPrice, pack.units) : null;
+          if (!per) return null;
+          return (
+            <div className="od-pack">
+              📦 Η τιμή αφορά {pack.units} τεμάχια — περίπου {per}€/τεμ.
+            </div>
+          );
+        })()}
 
         {notStartedYet && validFromFull && (
           <div className="od-upcoming">Η προσφορά ξεκινά στις {validFromFull}</div>

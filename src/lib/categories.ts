@@ -57,6 +57,11 @@ const RULES: { dept: string; terms: string[] }[] = [
     'ενισχυτικο αρωματος', 'υφασματων', 'αρωματικο χωρου', 'αποσμητικο χωρου',
     'χαρτομαντηλ', 'χαρτ/λα', 'zewa', 'αποχνουδωτ', 'κονταρι', 'κουβας', 'στιφτη',
     'soupline', 'cajoline', 'lenor', 'silan', 'scotch-brite', 'scotch brite',
+    // disposable tableware — "Ποτήρι Νερού/Αναψυκτικού 50 Τεμάχια" was landing
+    // in Κάβα via 'αναψυκτικ'. NOT bare 'μιας χρησης' — disposable RAZORS
+    // ("Ξυραφάκια Μιας Χρήσης") are personal care.
+    'ποτηρι νερου', 'ποτηρι αναψυκτικ', 'ποτηρια μιας χρησης', 'πιατα χαρτινα',
+    'χαρτινες θηκες', 'συλλεκτης υγρασιας',
   ] },
   // Adult incontinence must beat the Βρεφικά 'πανες' keyword.
   { dept: 'Προσωπική Φροντίδα', terms: ['ακρατειας', 'tena'] },
@@ -78,6 +83,8 @@ const RULES: { dept: string; terms: string[] }[] = [
     'κατεψυγ', 'παγωτο', 'καταψυξ', 'frozen', 'κατεψ.', 'κτψ', 'φιλετο μπακαλιαρου κατεψ',
     'λαχανικα κατεψ', 'πατατες κατεψ', 'ζυμη σφολιατας', 'ζυμη κουρου',
   ] },
+  // Must outrank Τυριά/Κρέας: flavour names carry 'μπέικον'/'τυρί'/'σκόρδο'.
+  { dept: 'Σνακ & Γλυκά', terms: ['bake rolls'] },
   { dept: 'Τυριά & Αλλαντικά', terms: [
     'τυρι', 'φετα', 'γραβιερα', 'γκουντα', 'gouda', 'εμενταλ', 'emmental', 'κασερι',
     'edam', 'παρμεζαν', 'μοτσαρελ', 'ημισκληρο', 'κεφαλοτυρι', 'μυζηθρα', 'ανθοτυρο',
@@ -102,6 +109,9 @@ const RULES: { dept: string; terms: string[] }[] = [
   ] },
   { dept: 'Κονσέρβες', terms: [
     'κονσερβ', 'τονος', 'σαρδελ', 'σκουμπρι κονσ', 'πελτε', 'πασσατα', 'passata',
+    // tomato juice is a cooking ingredient, not a beverage — must beat the
+    // juice rule ('χυμο') which used to drop it in Κάβα.
+    'χυμος ντοματας', 'χυμο ντοματας', 'τοματοχυμ', 'ντοματοχυμ', 'χυμος τοματας',
     'τοματα κονσ', 'τοματακι αποφλ', 'αποφλοιωμεν', 'φασολια κονσ', 'καλαμποκι κονσ',
     'αρακας κονσ', 'φασολακια κονσ', 'ντοματα συσκευασ',
     // processed/jarred tomato (AB names them "Τομάτα Τριμμένη/Περαστή/Στον
@@ -127,10 +137,15 @@ const RULES: { dept: string; terms: string[] }[] = [
     'l\'oreal', 'loreal', 'garnier', 'nivea', 'pantene', 'syoss', 'palette',
     'schwarzkopf', 'gliss', 'elvive', 'koleston', 'excellence creme', 'diadermine',
     'bioten', 'dove', 'rexona', 'veet', 'tena', 'kotex', 'always', 'tampax',
-    'gillette', 'wilkinson', 'κολωνια', 'αρωμα', 'eau de', 'βαφη',
+    // '=αρωμα' boundary-matched: bare it ate "Τσάι ΑΡΩΜΑτικό" and every
+    // "αρωματικό" household item (real perfumes say "Άρωμα"/"Eau de").
+    'gillette', 'wilkinson', 'κολωνια', '=αρωμα', 'eau de', 'βαφη',
     // English/Latin brands + product words the Greek lists missed (null-native
     // chains: masoutis/sklavenitis/ab name-only). carroten/noxzema=suncare,
     // wellaflex=hairspray, hansaplast=plasters, septona/dermasoft=cotton+wipes.
+    // 'sanex' + 'ευαισθητη περιοχη': intimate washes say "Υγρό Καθαρισμού"
+    // and would otherwise drift to the cleaning department.
+    'sanex', 'ευαισθητη περιοχη',
     'carroten', 'noxzema', 'wellaflex', 'hansaplast', 'septona', 'dermasoft',
     'after shave', 'aftershave', 'old spice', 'wet hankies', 'hankies',
     'cotton buds', 'μπατονετ', 'εσωρουχ', 'le petit marseillais', 'papoutsanis', 'καραβακι',
@@ -143,8 +158,8 @@ const RULES: { dept: string; terms: string[] }[] = [
     'cracker', 'γλυκο κουταλιου', 'κρουασαν', 'croissant', 'κεικ', 'cake', 'ζελε',
     'λουκουμ', 'μπαρα δημητρ', 'πραλιν', 'νουγκατ', 'γκοφρ', 'kinder', 'ferrero',
     'lacta', 'oreo', 'merenda', 'σοκολατακ',
-    // snack brands whose flavour words ('cola', 'τυρι', 'αλάτι', 'φρούτα')
-    // would otherwise drag them into drinks/cheese/pantry
+    // snack brands whose flavour words ('cola', 'τυρι', 'αλάτι', 'φρούτα',
+    // 'μπέικον') would otherwise drag them into drinks/cheese/pantry/deli
     'haribo', 'cheetos', 'lays', "lay's", 'tsakiris',
   ] },
   { dept: 'Γαλακτοκομικά & Είδη Ψυγείου', terms: [
@@ -168,10 +183,13 @@ const RULES: { dept: string; terms: string[] }[] = [
     // boost/gel" cosmetics) are dropped — Greek drinks use μπύρα / explicit
     // "energy drink", so the bare words only cause cosmetic false positives.
     // '=τζιν' boundary-matched — the bare substring ate "ΤΖΙΝτζερ" (ginger).
+    // Κάβα = alcohol + soft drinks/water. Juices ('χυμο') and ice tea moved to
+    // Πρωινό & Ροφήματα — a Greek shopper reads "Κάβα" as the drinks/alcohol
+    // shelf, and finding ΑΜΙΤΑ or τοματοχυμό there reads as a bug (it was one).
     'μπυρα', 'μπιρα', 'κρασι', 'wine', 'οινος', 'ουζο', 'τσιπουρο', 'βοτκα', 'vodka',
     'ουισκι', 'whisky', 'whiskey', 'gin', '=τζιν', 'ρουμι', 'rum', 'λικερ', 'σαμπανι',
-    'αναψυκτικ', 'coca', 'cola', 'pepsi', 'σπριτ', 'sprite', 'fanta', 'χυμο', 'χυμος',
-    'εμφιαλωμεν', 'σοδα', 'tonic', 'ενεργειακο ποτο', 'energy drink', 'ice tea',
+    'αναψυκτικ', 'coca', 'cola', 'pepsi', 'σπριτ', 'sprite', 'fanta',
+    'εμφιαλωμεν', 'σοδα', 'tonic', 'ενεργειακο ποτο', 'energy drink',
     'αναψυκτικα', 'μεταλλικο νερο', 'φυσικο νερο', 'επιτραπεζιο νερο', 'monster', 'red bull',
     'ρετσινα', 'μηλιτης', 'somersby', 'schweppes', 'xixo', 'powerade',
   ] },
@@ -179,12 +197,16 @@ const RULES: { dept: string; terms: string[] }[] = [
     'καφε', 'nescafe', 'espresso', 'nespresso', 'καπουτσιν', 'φραπε', 'δημητριακα', 'cornflakes',
     'κουακερ', 'βρωμη', '=μελι', 'μαρμελαδ', 'ταχιν', 'φιστικοβουτυρ', 'τσαι', 'tea',
     'ροφημα κακαο', 'κακαο', 'nesquik', 'στιγμιαιος', 'φακελακια τσαι',
+    // juices live with breakfast, not the Κάβα shelf ('tea' above already
+    // catches ice tea). Tomato juice is intercepted by Κονσέρβες first.
+    // '=νεκταρ' boundary-matched: the substring ate ΝΕΚΤΑΡίνια (nectarines).
+    'χυμο', '=νεκταρ', 'φρουτοποτο',
   ] },
   { dept: 'Φρούτα & Λαχανικά', terms: [
     'φρουτ', 'λαχανικ', 'μηλο', 'μηλα', 'μπανανα', 'πορτοκαλ', 'λεμον', 'μανταριν',
     'ντοματ', 'πατατ', 'κρεμμυδ', 'σκορδ', 'μαρουλ', 'αγγουρ', 'καροτ', 'μπροκολ',
     'κουνουπιδ', 'πιπερι', 'μελιτζαν', 'κολοκυθ', 'σπανακ', 'μαϊνταν', 'ανηθ', 'σελιν',
-    'φραουλ', 'σταφυλ', 'αχλαδ', 'ροδακιν', 'βερικοκ', 'πεπον', 'καρπουζ', 'ακτινιδ',
+    'φραουλ', 'σταφυλ', 'αχλαδ', 'ροδακιν', 'νεκταριν', 'βερικοκ', 'πεπον', 'καρπουζ', 'ακτινιδ',
     'αβοκαντο', 'μανιταρ', 'ραπανακ', 'παντζαρ', 'κερασ', 'τοματιν',
   ] },
   { dept: 'Είδη Καθαρισμού & Σπιτιού', terms: [
