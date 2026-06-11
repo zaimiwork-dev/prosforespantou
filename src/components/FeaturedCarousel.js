@@ -38,7 +38,7 @@ export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHr
   const showArrows = !(atStart && atEnd);
 
   return (
-    <section className="section">
+    <section className={rows === 2 ? 'section section--showcase' : 'section'}>
       <div className="section-head">
         <div>
           <h2>{title}</h2>

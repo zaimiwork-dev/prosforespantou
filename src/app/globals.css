@@ -639,15 +639,28 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 @media (max-width: 560px) { .featured-scroll > .card { width: 160px; } }
 
 /* Two-row showcase variant: column-flow grid keeps horizontal swipe/snap,
-   slightly smaller cards so twice the offers fit one glance. */
+   compact cards so twice the offers fit and the next section still peeks
+   above the fold on a laptop. */
 .featured-scroll.two-row {
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(2, 1fr);
-  grid-auto-columns: 172px;
+  grid-auto-columns: 150px;
 }
 .featured-scroll.two-row > .card { width: auto; }
-@media (max-width: 560px) { .featured-scroll.two-row { grid-auto-columns: 146px; } }
+.featured-scroll.two-row .card-img { aspect-ratio: 5 / 4; }
+.featured-scroll.two-row .card-body { padding: 8px; gap: 4px; }
+.featured-scroll.two-row .card-title { font-size: 12px; }
+.featured-scroll.two-row .price { font-size: 18px; }
+.featured-scroll.two-row .price-old { font-size: 11.5px; }
+.featured-scroll.two-row .add-btn { width: 30px; height: 30px; }
+.featured-scroll.two-row .discount-badge { font-size: 11.5px; padding: 3px 6px; }
+@media (max-width: 560px) { .featured-scroll.two-row { grid-auto-columns: 132px; } }
+
+/* The double-height rail earns back vertical room from its section chrome so
+   the next section still peeks above a laptop fold. */
+.section--showcase { padding: 24px 0 16px; }
+.section--showcase .section-head { margin-bottom: 14px; }
 
 /* Header prev/next arrows for the rails */
 .car-nav { display: flex; gap: 8px; flex: none; }
