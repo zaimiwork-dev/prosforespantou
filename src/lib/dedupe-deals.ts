@@ -36,11 +36,26 @@ function collapseBy<T extends DedupableDeal>(deals: T[], keyOf: (d: T) => string
   return order.map((k) => byKey.get(k) as T);
 }
 
-export function dedupeDeals<T extends DedupableDeal>(deals: T[]): T[] {
+export function dedupeDeals<T extends DedupableDeal>(
+  deals: T[],
+  opts?: { crossChain?: boolean }
+): T[] {
   const byProduct = collapseBy(deals, (d) =>
     d.productId ? `p:${d.productId}:${d.supermarket}` : `i:${d.id}`
   );
-  return collapseBy(byProduct, (d) =>
-    `n:${(d.productName || '').toLowerCase().trim()}:${d.supermarket}`
+  const byName = collapseBy(byProduct, (d) =>
+    d.productName ? `n:${d.productName.toLowerCase().trim()}:${d.supermarket}` : `i:${d.id}`
+  );
+  if (!opts?.crossChain) return byName;
+
+  // Showcase mode (homepage rail): when the SAME canonical product is on offer
+  // at several chains, surface only the cheapest chain's row — recommending the
+  // pricier chain for an identical item breaks the "honest cheapest price"
+  // promise. Chain pages / search keep per-chain rows for comparison.
+  const byProductAnyChain = collapseBy(byName, (d) =>
+    d.productId ? `xp:${d.productId}` : `i:${d.id}`
+  );
+  return collapseBy(byProductAnyChain, (d) =>
+    d.productName ? `xn:${d.productName.toLowerCase().trim()}` : `i:${d.id}`
   );
 }

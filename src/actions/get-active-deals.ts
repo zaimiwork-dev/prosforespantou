@@ -129,12 +129,32 @@ const getTopDealsCached = unstable_cache(
       take: 80,
     });
 
+    // For every pooled product, also fetch its rows at OTHER chains — a
+    // cheaper chain's row for the identical item often ranks far below the
+    // pool's hotScore floor (no % badge → less boost), and the cross-chain
+    // collapse can only pick a cheaper sibling it can see.
+    const pids = Array.from(
+      new Set(pool.map((d) => d.productId).filter((x): x is string => !!x))
+    );
+    const siblings = pids.length
+      ? await prisma.discount.findMany({
+          where: {
+            isActive: true,
+            validUntil: { gt: now },
+            productId: { in: pids },
+            id: { notIn: [...featured.map((f) => f.id), ...pool.map((p) => p.id)] },
+          },
+          include: { store: true, leaflet: true, product: true },
+        })
+      : [];
+
     // Same product can hold one row per source (web+leaflet), and catalog
     // dupes can hold the same name under two productIds — show one card.
     // Stable partition: offers with >24h of life lead; a carousel headlining
     // "Λήγει σήμερα" sells urgency but dies on the user the same evening.
+    // Siblings append AFTER the pool so slot positions follow hotScore rank.
     const dayAway = now.getTime() + 24 * 3600_000;
-    const deduped = dedupeDeals(pool);
+    const deduped = dedupeDeals([...pool, ...siblings], { crossChain: true });
     const ordered = [
       ...deduped.filter((d) => d.validUntil.getTime() > dayAway),
       ...deduped.filter((d) => d.validUntil.getTime() <= dayAway),

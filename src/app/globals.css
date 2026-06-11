@@ -499,6 +499,18 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   z-index: 2;
 }
 
+/* Cards lay badge + chain pill in one flex strip so they can't overlap; the
+   pill gives way (ellipsis) when both compete for a narrow card. */
+.card-top-strip {
+  position: absolute; top: 8px; left: 8px; right: 8px;
+  display: flex; align-items: flex-start; gap: 6px;
+  z-index: 2;
+  pointer-events: none;
+}
+.card-top-strip .discount-badge { position: static; flex: none; }
+.card-top-right { margin-left: auto; display: flex; align-items: center; gap: 4px; min-width: 0; }
+.card-top-strip .chain-pill { position: static; max-width: 100%; }
+
 .expiry-chip {
   position: absolute; bottom: 10px; left: 10px;
   font-size: 11px; font-weight: 500;
@@ -648,7 +660,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   grid-auto-columns: 150px;
 }
 .featured-scroll.two-row > .card { width: auto; }
-.featured-scroll.two-row .card-img { aspect-ratio: 5 / 4; }
+.featured-scroll.two-row .card-img { aspect-ratio: 5 / 4; padding: 6px; }
 .featured-scroll.two-row .card-body { padding: 8px; gap: 4px; }
 .featured-scroll.two-row .card-title { font-size: 12px; }
 .featured-scroll.two-row .price { font-size: 18px; }
@@ -1253,10 +1265,15 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   padding: 20px;
   border-bottom: 1px solid var(--line);
 }
-.od-img .discount-badge { position: absolute; top: 12px; right: 12px; z-index: 2; }
+/* left:auto — the base .discount-badge pins left:10px; without clearing it the
+   badge gets BOTH edges and stretches into a full-width red bar. */
+.od-img .discount-badge { position: absolute; top: 12px; right: 12px; left: auto; z-index: 2; }
 .od-img .chain-pill { position: absolute; top: 12px; left: 12px; z-index: 2; }
 /* In the sheet the header already names the chain — don't say it twice. */
 .compact .od-img .chain-pill { display: none; }
+/* No usable photo (e.g. AB's CDN blocks hotlinking): keep a slim band instead
+   of a viewport-tall white void. */
+.od-img.no-photo { aspect-ratio: 3 / 1; color: color-mix(in oklab, var(--brand) 25%, var(--line-2)); }
 
 .od-body { padding: 18px 18px 20px; }
 .compact .od-body { padding: 16px 0 4px; }

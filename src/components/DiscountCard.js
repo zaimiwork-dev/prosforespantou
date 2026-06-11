@@ -97,42 +97,44 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
       onKeyDown={(e) => { if (e.key === 'Enter') onSelect(d); }}
     >
       <div className="card-img">
-        {isFeatured && (
-          <div style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            background: sm.color,
-            color: '#fff',
-            fontSize: 9,
-            fontWeight: 800,
-            padding: '2px 6px',
-            borderRadius: 4,
-            zIndex: 2,
-            textTransform: 'uppercase',
-            letterSpacing: '0.02em',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            {featuredLabel}
+        {/* One flex strip instead of absolute corners — long chain names
+            ("AB Vassilopoulos") used to slide over the discount badge on
+            narrow cards. The pill now shrinks/ellipsizes instead. */}
+        <div className="card-top-strip">
+          {pct > 0 ? (
+            <div className="discount-badge">-{pct}%</div>
+          ) : !originalPrice ? (
+            // Prefer the chain's printed sticker text ("-25%", "1+1", "ΧΑΜΗΛΗ
+            // ΤΙΜΗ") over a generic ΜΟΝΟ when we have it — way more honest.
+            d.description && d.description.length <= 24 ? (
+              <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>{d.description.toUpperCase()}</div>
+            ) : (
+              <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
+            )
+          ) : null}
+          <div className="card-top-right">
+            {isFeatured && (
+              <div style={{
+                background: sm.color,
+                color: '#fff',
+                fontSize: 9,
+                fontWeight: 800,
+                padding: '2px 6px',
+                borderRadius: 4,
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                whiteSpace: 'nowrap',
+              }}>
+                {featuredLabel}
+              </div>
+            )}
+            <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
           </div>
-        )}
-        
-        {pct > 0 ? (
-          <div className="discount-badge">-{pct}%</div>
-        ) : !originalPrice ? (
-          // Prefer the chain's printed sticker text ("-25%", "1+1", "ΧΑΜΗΛΗ
-          // ΤΙΜΗ") over a generic ΜΟΝΟ when we have it — way more honest.
-          d.description && d.description.length <= 24 ? (
-            <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>{d.description.toUpperCase()}</div>
-          ) : (
-            <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
-          )
-        ) : null}
-        
-        <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
+        </div>
 
         {displayImage && !imgFailed ? (
-          <div style={{ position: "relative", width: "92%", height: "92%" }}>
+          <div style={{ position: "relative", width: "100%", height: "100%" }}>
             <Image
               src={displayImage}
               alt={displayName || ""}

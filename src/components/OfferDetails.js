@@ -32,6 +32,9 @@ function daysLeft(dateStr, nowMs) {
 export function OfferDetails({ offer, comparison = [], history = null, onAdd, compact = false }) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  // Some chain CDNs (AB) 403 every off-site fetch — fall back to the category
+  // icon instead of a blank void, same as the cards do.
+  const [imgFailed, setImgFailed] = useState(false);
   // One clock snapshot per mount — date labels don't need live ticking, and an
   // impure Date.now() during render defeats memoization.
   const [nowMs] = useState(() => Date.now());
@@ -88,10 +91,10 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
 
   return (
     <div className={`offer-details${compact ? ' compact' : ''}`}>
-      <div className="od-img">
+      <div className={`od-img${displayImage && !imgFailed ? '' : ' no-photo'}`}>
         {pct > 0 && <div className="discount-badge">-{pct}%</div>}
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
-        {displayImage ? (
+        {displayImage && !imgFailed ? (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <Image
               src={displayImage}
@@ -99,6 +102,7 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
               fill
               sizes={compact ? '(max-width: 640px) 100vw, 640px' : '(max-width: 820px) 100vw, 820px'}
               style={{ objectFit: 'contain' }}
+              onError={() => setImgFailed(true)}
             />
           </div>
         ) : (
