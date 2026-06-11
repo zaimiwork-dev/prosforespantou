@@ -96,7 +96,9 @@ export async function getActiveDeals(
   });
 }
 
-const PER_CHAIN_CAP = 2;
+// Chain diversity for the homepage rail — sized for the 20-item two-row
+// carousel (cap 3 × ~7 chains ≈ 20; the fill loop covers any shortfall).
+const PER_CHAIN_CAP = 3;
 
 const getTopDealsCached = unstable_cache(
   async (limit: number) => {

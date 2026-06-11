@@ -7,7 +7,7 @@ export default async function Home() {
   const [counts, admin, topDeals, endingSoon] = await Promise.all([
     getDealCounts(),
     isAdminAuthenticated(),
-    getTopDeals(10),
+    getTopDeals(20), // two-row carousel needs the doubled pool
     getEndingSoonDeals(10),
   ]);
 

@@ -69,6 +69,7 @@ function PublicSite({ initial, onAdmin }) {
             onAdd={addItem}
             onSelect={setSelectedProduct}
             viewAllHref="/deals"
+            rows={2}
           />
 
           <FeaturedCarousel

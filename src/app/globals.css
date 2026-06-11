@@ -638,6 +638,31 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 @media (max-width: 560px) { .featured-scroll > .card { width: 160px; } }
 
+/* Two-row showcase variant: column-flow grid keeps horizontal swipe/snap,
+   slightly smaller cards so twice the offers fit one glance. */
+.featured-scroll.two-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, 1fr);
+  grid-auto-columns: 172px;
+}
+.featured-scroll.two-row > .card { width: auto; }
+@media (max-width: 560px) { .featured-scroll.two-row { grid-auto-columns: 146px; } }
+
+/* Header prev/next arrows for the rails */
+.car-nav { display: flex; gap: 8px; flex: none; }
+.car-arrow {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-sm);
+  transition: background .15s, transform .12s, opacity .15s, color .15s;
+}
+.car-arrow:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); transform: scale(1.06); }
+.car-arrow:disabled { opacity: .35; cursor: default; }
+
 /* =========================================================
    Listing page — crumbs, filter bar, chips
    ========================================================= */
