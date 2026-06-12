@@ -4,9 +4,24 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-12 PM — AB image mirroring LIVE & VERIFIED ✅)
+## ⚡ Pick up here (2026-06-12 EOD — AB image mirroring LIVE & VERIFIED ✅, all pushed @ `e8b833b`)
 
-**Activated and verified same day:** secrets set (`gh secret set`), `ab-offers` dispatched, run healthy — **348/389 active AB offers now serve from the Supabase mirror, 0 still on www.ab.gr, 0 mirror failures** (Akamai DOES serve media to GH runners; the remaining 41 rows never had an image in AB's feed). Spot-checked public URLs: 200 image/jpeg. The Akamai-403 risk flagged below is RESOLVED. Also shipped same evening: Nirvana frozen-brand rule (2 mymarket name-only rows were Άλλο; screenshot-reported), `.od-img .chain-pill right:auto` fix (pill stretched full-width over the discount badge on the offer page — same both-edges bug class as the badge fix above it). Follow-ups spotted: 5 masoutis rows store raw chain label "Παγωτά - Οικογενειακά…" as category (legacy pipeline; invisible to the Κατεψυγμένα filter chip); ab run warns 12 shared-productId SKUs (mis-mapping audit backlog); `mirror-images.mjs` fetches have no per-request timeout (fine today — add AbortSignal.timeout if a run ever hangs in the adapter step).
+**AB images: solved end-to-end in one day.** Secrets set, `ab-offers` dispatched, run healthy — **348/389 active AB offers now serve from the Supabase mirror (`chain-images` bucket), 0 still on www.ab.gr, 0 mirror failures** (Akamai DOES serve media to GH runners; the remaining 41 rows never had an image in AB's feed). Spot-checked public URLs: 200 image/jpeg. The Akamai-403 risk flagged in the section below is RESOLVED. Also shipped same evening (`e8b833b`): **'nirvana' frozen-brand rule** (2 mymarket name-only rows were Άλλο — user screenshot; backfilled) and **`.od-img .chain-pill right:auto`** (pill inherited base `right:10px`, stretched full-width and buried the −X% badge on the offer page — same both-edges bug class as the badge fix one line above it; check BOTH edges whenever overriding `.chain-pill`/`.discount-badge`).
+
+**Environment changes this session (machine capabilities!):**
+- `gh` CLI is now **authenticated** on the dev machine (account zaimiwork-dev, repo+workflow scopes) → can set secrets, dispatch workflows (`gh workflow run scrape-chains.yml -f chain=ab-offers`), and watch runs from here. The old "check Actions via DB freshness" workaround is obsolete.
+- `SUPABASE_SERVICE_ROLE_KEY` lives in `.env.local` → storage admin works locally (the line may carry an invisible leading char from the web-copy — dotenv tolerates it, PowerShell `^`-anchored regex does NOT).
+- Dev machine is Akamai-403'd from ALL of www.ab.gr (API included) → AB is **only testable via CI**.
+
+**NEXT SESSION, ranked:**
+1. **Confirm steady-state mirror behavior** (2 min): after the next scheduled ab run (03:00 UTC daily), check Υγεία — expect mostly `reused` (HEAD-skips), no mirror warnings. Then eyeball the AB section on the live site.
+2. **Bazaar Discount + Γαλαξίας recon** (user wants these chains) — new adapters plug into native-map + mirror systems from day one. Check what each site exposes first.
+3. **Lidl OCR name cleanup** — pipeline works (257 items/run) but ~25% of names garbled; cheap Groq text-fix pass, THEN flip `showUnmatched: true` for lidl.
+4. **Mirror masoutis images too** — its promo URLs rotate weekly (root cause of the 06-12 image regression); `mirrorImages` is chain-generic, AB has now proven it out.
+5. Shared-productId mis-mapping audit (ab warns 12, sklavenitis 173, masoutis 183 — samePack-based).
+6. Hygiene: `passwords.txt` + 3 scratch .txt files untracked in repo root (move out!); ~50 probe-* scripts; CLAUDE.md still documents the old fetcher→extractor→matcher pipeline as canonical.
+7. Small data nit: 5 masoutis rows store the raw chain label ("Παγωτά - Οικογενειακά…") as `category` — legacy-pipeline artifact, invisible to the Κατεψυγμένα filter chip.
+8. Hardening nit: `mirror-images.mjs` fetches have no per-request timeout — add `AbortSignal.timeout(10_000)` if an ab-offers run ever hangs in the adapter step.
 
 ---
 
