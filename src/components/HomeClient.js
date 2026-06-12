@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useShoppingListStore } from "@/lib/store";
+import { getActiveDeals } from "@/actions/get-active-deals";
+import { dedupeDeals } from "@/lib/dedupe-deals";
 
 import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
@@ -28,7 +30,33 @@ function PublicSite({ initial, onAdmin }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const { items: cart, addItem } = useShoppingListStore();
+  const { items: cart, addItem, preferredStores } = useShoppingListStore();
+
+  // "Τα καταστήματά μου" must shape the WHOLE app, not just /deals — the user
+  // sets it from this page's header, so carousels that ignore it read as
+  // broken. With a selection we refetch both rails filtered; without one the
+  // server-rendered lists stand.
+  const [filtered, setFiltered] = useState(null);
+  const prefKey = preferredStores.join(",");
+  useEffect(() => {
+    if (!prefKey) { setFiltered(null); return; }
+    let cancelled = false;
+    Promise.all([
+      getActiveDeals(16, 0, "all", "all", "hot", preferredStores),
+      getActiveDeals(12, 0, "all", "all", "expiring", preferredStores),
+    ])
+      .then(([top, ending]) => {
+        if (cancelled) return;
+        setFiltered({ topDeals: dedupeDeals(top.deals), endingSoon: dedupeDeals(ending.deals) });
+      })
+      .catch(() => { if (!cancelled) setFiltered(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefKey]);
+
+  const topDeals = filtered?.topDeals?.length ? filtered.topDeals : initial.topDeals;
+  const endingSoon = filtered?.endingSoon?.length ? filtered.endingSoon : initial.endingSoon;
+  const storesFiltered = Boolean(prefKey && filtered);
 
   // Count only chains that actually have live offers — advertising "10
   // αλυσίδες" while 5 are empty undermines the honest-data positioning.
@@ -64,8 +92,8 @@ function PublicSite({ initial, onAdmin }) {
 
           <FeaturedCarousel
             title="Κορυφαίες προσφορές"
-            sub="Ξεχωρίζουν αυτή την εβδομάδα"
-            deals={initial.topDeals}
+            sub={storesFiltered ? "Από τα καταστήματά σου" : "Ξεχωρίζουν αυτή την εβδομάδα"}
+            deals={topDeals}
             onAdd={addItem}
             onSelect={setSelectedProduct}
             viewAllHref="/deals"
@@ -74,8 +102,8 @@ function PublicSite({ initial, onAdmin }) {
 
           <FeaturedCarousel
             title="Τελειώνουν σύντομα"
-            sub="Πρόλαβε πριν λήξουν"
-            deals={initial.endingSoon}
+            sub={storesFiltered ? "Από τα καταστήματά σου" : "Πρόλαβε πριν λήξουν"}
+            deals={endingSoon}
             onAdd={addItem}
             onSelect={setSelectedProduct}
             viewAllHref="/deals?sort=expiring"

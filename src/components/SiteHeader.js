@@ -2,8 +2,12 @@
 
 import Link from 'next/link';
 import { Icon } from './Icons';
+import { useShoppingListStore } from '@/lib/store';
 
 export function SiteHeader({ onAdminTrigger = () => {}, cartCount = 0, onCartOpen = () => {}, onSettingsOpen = () => {} }) {
+  // Show how many "Τα καταστήματά μου" are active — without a visible state
+  // the filter feels like it does nothing (user feedback 2026-06-12).
+  const preferredCount = useShoppingListStore((s) => s.preferredStores.length);
   return (
     <header className="topbar">
       <div className="container topbar-inner">
@@ -20,6 +24,7 @@ export function SiteHeader({ onAdminTrigger = () => {}, cartCount = 0, onCartOpe
             className="icon-btn"
           >
             <Icon.Settings size={18} />
+            {preferredCount > 0 && <span className="badge-count">{preferredCount}</span>}
           </button>
 
           <button

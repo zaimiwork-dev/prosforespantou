@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import OfferClientContent from "./OfferClientContent";
 import { getPriceComparison } from "@/actions/get-price-comparison";
 import { getPriceHistory } from "@/actions/get-price-history";
+import { getSimilarOffers } from "@/actions/get-similar-offers";
 import { unstable_cache } from 'next/cache';
 import { SUPERMARKETS } from "@/lib/constants";
 
@@ -82,10 +83,11 @@ export default async function OfferPage({ params }) {
     updatedAt: toIso(offer.updatedAt),
   };
 
-  const [comparison, history] = await Promise.all([
+  const [comparison, history, similar] = await Promise.all([
     getPriceComparison(id),
     // Judge the verdict against THIS offer's price, not the last snapshot.
     getPriceHistory(offer.productId, { days: 90, currentPrice: Number(offer.discountedPrice) }),
+    getSimilarOffers(id),
   ]);
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://prosforespantou.gr";
@@ -118,7 +120,7 @@ export default async function OfferPage({ params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(cleanJsonLd) }}
       />
-      <OfferClientContent offer={serializedOffer} comparison={comparison} history={history} />
+      <OfferClientContent offer={serializedOffer} comparison={comparison} history={history} similar={similar} />
     </>
   );
 }

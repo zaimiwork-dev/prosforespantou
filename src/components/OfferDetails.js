@@ -26,11 +26,36 @@ function daysLeft(dateStr, nowMs) {
   return Math.round((exp - today) / 86400000);
 }
 
+// A small linked tile in the "Παρόμοιες προσφορές" strip. Plain <img> on
+// purpose: these are tiny, and skipping the optimizer avoids the
+// datacenter-blocked chain CDNs entirely.
+function SimilarCard({ d }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const sm = SUPERMARKETS.find((s) => s.id === d.supermarket);
+  return (
+    <a className="similar-card" href={`/offer/${d.id}`}>
+      <div className="similar-img">
+        {d.imageUrl && !imgFailed ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.imageUrl} alt="" loading="lazy" onError={() => setImgFailed(true)} />
+        ) : (
+          <CategoryIcon id={d.category} size={32} />
+        )}
+      </div>
+      <div className="similar-name">{d.productName}</div>
+      <div className="similar-foot">
+        <span className="similar-price">{Number(d.discountedPrice).toFixed(2)}€</span>
+        {sm && <span className="similar-chain" style={{ color: sm.color }}>{sm.short}</span>}
+      </div>
+    </a>
+  );
+}
+
 // The single source of truth for what an offer looks like opened up. Rendered
 // by BOTH the bottom sheet (ProductSheet) and the /offer/[id] page — the two
 // used to be parallel implementations and drifted (the sheet lost the validity
 // dates and the verdict). Keep every section here so they can't diverge again.
-export function OfferDetails({ offer, comparison = [], history = null, onAdd, compact = false }) {
+export function OfferDetails({ offer, comparison = [], history = null, similar = [], onAdd, compact = false }) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   // Some chain CDNs (AB) 403 every off-site fetch — fall back to the category
@@ -197,6 +222,15 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
 
         <PriceComparison offer={offer} comparison={comparison} compact={compact} />
         <PriceHistory history={history} compact={compact} />
+
+        {similar.length > 0 && (
+          <section style={{ marginTop: compact ? 14 : 18 }}>
+            <div className="similar-title">Παρόμοιες προσφορές</div>
+            <div className="similar-strip">
+              {similar.map((d) => <SimilarCard key={d.id} d={d} />)}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

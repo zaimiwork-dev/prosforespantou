@@ -125,8 +125,9 @@ export default function DealsClient({ initial }) {
     else if (smObjs.length > 1 && smObjs.length <= 3) smLabel = smObjs.map((s) => s.name).join(" + ");
     else if (smObjs.length > 3) smLabel = `${smObjs.length} καταστήματα`;
 
-    if (c && activeCategory !== "all" && smLabel) return `${c.label} · ${smLabel}`;
-    if (c && activeCategory !== "all") return c.label;
+    // Full names up here — the page title has room; `label` is the chip short form.
+    if (c && activeCategory !== "all" && smLabel) return `${c.full ?? c.id} · ${smLabel}`;
+    if (c && activeCategory !== "all") return c.full ?? c.id;
     if (smLabel) return `Προσφορές ${smLabel}`;
     return "Όλες οι προσφορές";
   }, [activeCategory, selectedSMs]);
@@ -200,7 +201,7 @@ export default function DealsClient({ initial }) {
               })}
               {activeCategory !== "all" && (
                 <button type="button" className="af-chip" onClick={() => setActiveCategory("all")}>
-                  {CATEGORIES.find((c) => c.id === activeCategory)?.label || activeCategory} <span className="x">×</span>
+                  {(() => { const c = CATEGORIES.find((x) => x.id === activeCategory); return c ? (c.full ?? c.id) : activeCategory; })()} <span className="x">×</span>
                 </button>
               )}
               <button type="button" className="af-clear" onClick={handleClearFilters}>

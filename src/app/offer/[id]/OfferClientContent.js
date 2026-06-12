@@ -10,7 +10,7 @@ import { OfferDetails } from "@/components/OfferDetails";
 // Thin shell: header + back link around the shared OfferDetails component.
 // All offer content (image, price, dates, verdict, comparison) lives there,
 // shared with the ProductSheet quick view.
-export default function OfferClientContent({ offer, comparison = [], history = null }) {
+export default function OfferClientContent({ offer, comparison = [], history = null, similar = [] }) {
   const { items, addItem } = useShoppingListStore();
   const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -26,7 +26,7 @@ export default function OfferClientContent({ offer, comparison = [], history = n
           ← Πίσω στις προσφορές
         </Link>
 
-        <OfferDetails offer={offer} comparison={comparison} history={history} onAdd={addItem} />
+        <OfferDetails offer={offer} comparison={comparison} history={history} similar={similar} onAdd={addItem} />
       </main>
 
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />

@@ -11,6 +11,9 @@ export const SUPERMARKETS = [
   { id: "galaxias", name: "Γαλαξίας", short: "ΓΑ", color: "#003f88", bg: "#eef3ff", heroLabel: "Γαλα-", heroSub: "ξίας", logo: "galaxias.jpg" },
 ];
 
+// `label` is the SHORT form for space-tight chips ("Φρούτα & Λαχ."). Anywhere
+// with room (listing page titles, active-filter chips) must show the full
+// name: use `full ?? id` — never `label` (user feedback 2026-06-12).
 export const CATEGORIES = [
   { id: "all", label: "Όλες" },
   { id: "Φρούτα & Λαχανικά", label: "Φρούτα & Λαχ." },
@@ -24,7 +27,7 @@ export const CATEGORIES = [
   { id: "Είδη Παντοπωλείου", label: "Παντοπωλείο" },
   { id: "Πρωινό & Ροφήματα", label: "Πρωινό & Καφές" },
   { id: "Σνακ & Γλυκά", label: "Σνακ & Γλυκά" },
-  { id: "Κάβα", label: "Ποτά & Κάβα" },
+  { id: "Κάβα", label: "Ποτά & Κάβα", full: "Ποτά & Κάβα" },
   { id: "Προσωπική Φροντίδα", label: "Προσωπική Φρ." },
   { id: "Βρεφικά Είδη", label: "Βρεφικά Είδη" },
   { id: "Είδη Καθαρισμού & Σπιτιού", label: "Καθαριστικά" },

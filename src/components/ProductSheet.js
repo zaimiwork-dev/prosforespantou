@@ -10,6 +10,7 @@ import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { getPriceComparison } from '@/actions/get-price-comparison';
 import { getPriceHistory } from '@/actions/get-price-history';
+import { getSimilarOffers } from '@/actions/get-similar-offers';
 
 // Bottom-sheet quick view of an offer. All content comes from OfferDetails —
 // the same component the /offer/[id] page renders — so the two surfaces can't
@@ -44,12 +45,16 @@ export function ProductSheet({ product, onClose, onAdd }) {
 function ProductSheetInner({ product, onClose, onAdd }) {
   const [comparison, setComparison] = useState([]);
   const [history, setHistory] = useState(null);
+  const [similar, setSimilar] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
     const productId = product.productId || product.product?.id;
     getPriceComparison(product.id)
       .then((rows) => { if (!cancelled) setComparison(rows || []); })
+      .catch(() => {});
+    getSimilarOffers(product.id)
+      .then((rows) => { if (!cancelled) setSimilar(rows || []); })
       .catch(() => {});
     if (productId) {
       // Judge the verdict against THIS offer's price, not the last snapshot.
@@ -89,7 +94,7 @@ function ProductSheetInner({ product, onClose, onAdd }) {
         </button>
       }
     >
-      <OfferDetails offer={product} comparison={comparison} history={history} onAdd={onAdd} compact />
+      <OfferDetails offer={product} comparison={comparison} history={history} similar={similar} onAdd={onAdd} compact />
       <Link href={`/offer/${product.id}`} className="modal-link" onClick={(e) => {
         // Full navigation, not the pushState'd URL — let Next render the page.
         e.preventDefault();
