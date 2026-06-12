@@ -134,7 +134,9 @@ export function ShoppingList({ isOpen, onClose }) {
                     <div className="list-group-body">
                       {g.items.map((item) => {
                         const name = item.product?.name || item.productName || item.product_name;
-                        let img = item.product?.imageUrl || item.imageUrl || item.image_url;
+                        // Offer-own image first (see DiscountCard) — the
+                        // catalog product's image can be a dead cross-chain URL.
+                        let img = item.imageUrl || item.image_url || item.product?.imageUrl;
                         if (img && !img.startsWith('http') && !img.startsWith('/')) {
                           img = `/wolt_images/${img.split('/').pop()}`;
                         }

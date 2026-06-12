@@ -54,7 +54,9 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
   const supermarketId = offer.supermarket || offer.supermarket_id;
   const category = offer.category;
 
-  let displayImage = hiResImage(offer.product?.imageUrl || offer.imageUrl || offer.image_url);
+  // Offer-own image first — see DiscountCard: the catalog product's image can
+  // be another chain's rotated/dead URL; the offer's own is always current.
+  let displayImage = hiResImage(offer.imageUrl || offer.image_url || offer.product?.imageUrl);
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
   }
@@ -104,6 +106,8 @@ export function OfferDetails({ offer, comparison = [], history = null, onAdd, co
               sizes={compact ? '(max-width: 640px) 100vw, 640px' : '(max-width: 820px) 100vw, 820px'}
               style={{ objectFit: 'contain' }}
               onError={() => setImgFailed(true)}
+              // See DiscountCard: AB 403s the optimizer's IPs, not browsers.
+              unoptimized={displayImage.includes('www.ab.gr')}
             />
           </div>
         ) : (

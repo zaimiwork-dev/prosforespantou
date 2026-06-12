@@ -62,7 +62,13 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   // Raw offer name first: it matches this offer's price/pack ("9+3 Δώρο");
   // the canonical product.name can be a single-unit variant.
   const displayName = d.productName || d.product_name || d.product?.name;
-  let displayImage = d.product?.imageUrl || d.imageUrl || d.image_url;
+  // Offer's OWN image first, for the same reason: it comes from the chain
+  // currently selling the deal, so it's alive and shows the right pack. The
+  // catalog product's image is whichever chain's CDN we saw FIRST — masoutis
+  // promo images rotate away and wolt-era links die, so when the 06-12 scrape
+  // matched 4k mymarket rows to products, product-first display made
+  // thousands of live images "disappear" overnight.
+  let displayImage = d.imageUrl || d.image_url || d.product?.imageUrl;
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
   }
@@ -142,6 +148,10 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
               sizes="(max-width: 768px) 180px, 220px"
               style={{ objectFit: "contain" }}
               onError={() => setImgFailed(true)}
+              // AB's host 403s datacenter IPs (the Vercel-side optimizer), but
+              // lets real browsers through — skip the optimizer for that host
+              // so the user's own browser fetches it. onError still covers a no.
+              unoptimized={displayImage.includes('www.ab.gr')}
             />
           </div>
         ) : (
