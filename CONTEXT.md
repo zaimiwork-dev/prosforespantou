@@ -14,6 +14,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 - Dev machine is Akamai-403'd from ALL of www.ab.gr (API included) → AB is **only testable via CI**.
 
 **NEXT SESSION, ranked:**
+0. **⚠️ FIRST: user has minor + major bugs to report** (he'll describe them in chat at session start — they were found after 06-12 EOD and are NOT written down anywhere). Fix those before anything below, then return to this list in order.
 1. **Confirm steady-state mirror behavior** (2 min): after the next scheduled ab run (03:00 UTC daily), check Υγεία — expect mostly `reused` (HEAD-skips), no mirror warnings. Then eyeball the AB section on the live site.
 2. **Bazaar Discount + Γαλαξίας recon** (user wants these chains) — new adapters plug into native-map + mirror systems from day one. Check what each site exposes first.
 3. **Lidl OCR name cleanup** — pipeline works (257 items/run) but ~25% of names garbled; cheap Groq text-fix pass, THEN flip `showUnmatched: true` for lidl.
