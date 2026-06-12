@@ -3,6 +3,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+    // 2026-06-12: Vercel's image-optimization quota (Hobby tier) ran out —
+    // /_next/image started returning 402 OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED
+    // for EVERY host, which blanked most product photos on prod while dev
+    // looked fine. Serve <img> directly from the source hosts instead: the
+    // Supabase mirror + chain CDNs are public and browsers reach them fine
+    // (the datacenter-IP blocks only ever affected server-side fetchers).
+    // If the site moves to a paid plan, flip this off to get resizing back.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
