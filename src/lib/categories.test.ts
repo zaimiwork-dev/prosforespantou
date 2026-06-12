@@ -61,6 +61,27 @@ describe('keyword fallback — Φρούτα runs LAST (scent words must not win)
     expect(categorize('ΛΟΥΞ Λεμονάδα 6x330ml')).toBe('Κάβα');
   });
 
+  it('frozen-only brands are frozen even without a frozen word in the name', () => {
+    expect(categorize('Μπάρμπα Στάθης Σπανάκι Σε Φύλλα 1kg.')).toBe('Κατεψυγμένα');
+    expect(categorize('Μπάρμπα Στάθης Ας Μαγειρέψουμε Ρεβίθια Με Μελιτζάνες 1kg.')).toBe('Κατεψυγμένα');
+    expect(categorize('McCain Πατάτες Chef Gourmet 500γρ.')).toBe('Κατεψυγμένα');
+    expect(categorize('Spring Rolls NIKOLOPOULOU Noon Λαχανικών 300γρ.')).toBe('Κατεψυγμένα');
+    expect(categorize('Φρούτα του Δάσους NATURAL COOL Berry Mix 300g')).toBe('Κατεψυγμένα');
+    expect(categorize('ΣΠΙΤΙΚΕΣ ΕΠΙΛΟΓΕΣ ΜΠΙΦ/ΚΙ ΜΕ ΠΑΤΑΤΕΣ 400ΓΡ')).toBe('Κατεψυγμένα');
+    expect(categorize('Λαζαρίδη Σπανάκι Σε Φύλλα 750γρ.')).toBe('Κατεψυγμένα');
+  });
+
+  it('sklavenitis raw slugs map through the chain table', () => {
+    expect(categorizeForChain('sklavenitis', 'Αρακάς Λαδερός ΜΠΑΡΜΠΑ ΣΤΑΘΗΣ Ας Μαγειρέψουμε 1kg', 'katepsygmena/katepsygmena-geymata').dept)
+      .toBe('Κατεψυγμένα');
+    expect(categorizeForChain('sklavenitis', 'Πατάτες Εγχώριες', 'freska-froyta-lachanika/lachanika').dept)
+      .toBe('Φρούτα & Λαχανικά');
+    expect(categorizeForChain('sklavenitis', 'FINISH Καθαριστικό Πλυντηρίου Πιάτων Υγρό Λεμόνι 250ml', 'aporrypantika-eidi-katharismoy/aporrypantika-piaton').dept)
+      .toBe('Είδη Καθαρισμού & Σπιτιού');
+    // a future renamed slug is NOT silently swallowed
+    expect(categorizeForChain('sklavenitis', 'Κάτι Καινούργιο 500g', 'brand-new-slug/whatever').mapped).toBe(false);
+  });
+
   it('fruit-flavoured sweets are snacks, not fruit', () => {
     expect(categorize('Orama Κουλουράκι Πλεξούδα Πορτοκαλιού Παραδοσιακό')).toBe('Σνακ & Γλυκά');
     expect(categorize('Γλειφιτζούρι Melody Pops Φράουλα 1 Τεμάχιο')).toBe('Σνακ & Γλυκά');

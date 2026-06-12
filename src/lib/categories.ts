@@ -82,10 +82,22 @@ const RULES: { dept: string; terms: string[] }[] = [
     'whiskas', 'friskies', 'pedigree', 'felix', 'sheba', 'catisfactions',
     'dreamies', 'kitekat', 'royal canin', 'perfect fit', 'purina', 'vitakraft',
   ] },
+  // Μπάρμπα Στάθης is in the frozen-brand list below, but its bagged FRESH
+  // salads (Δροσάτη/Ιταλική) must not freeze with it.
+  { dept: 'Σαλάτες & Αλοιφές', terms: ['σταθης σαλατα', 'σαλατα δροσατη'] },
   { dept: 'Κατεψυγμένα', terms: [
     // 'κτψ' = kritikos' frozen abbreviation, on ~every frozen item it sells.
     'κατεψυγ', 'παγωτο', 'καταψυξ', 'frozen', 'κατεψ.', 'κτψ', 'φιλετο μπακαλιαρου κατεψ',
     'λαχανικα κατεψ', 'πατατες κατεψ', 'ζυμη σφολιατας', 'ζυμη κουρου',
+    // frozen-only brands/lines whose names rarely say "κατεψυγμένο" — without
+    // these, masoutis' name-only rows let frozen spinach/fries read as fresh
+    // produce ('σπανακ'/'πατατ').
+    'μπαρμπα σταθης', 'μπ.σταθης', 'ας μαγειρεψουμε', 'mccain', 'natural cool',
+    'spring rolls', '=noon',
+    // Λαζαρίδη = frozen-veg brand; ΣΠΙΤΙΚΕΣ ΕΠΙΛΟΓΕΣ = kritikos ready-meal
+    // line (its 'Έτοιμα γεύματα' label is ambiguous — FRUTAPURA fruit cups
+    // share it — so the brand decides).
+    'λαζαριδη', 'σπιτικες επιλογες',
   ] },
   // Must outrank Τυριά/Κρέας: flavour names carry 'μπέικον'/'τυρί'/'σκόρδο'.
   { dept: 'Σνακ & Γλυκά', terms: ['bake rolls'] },

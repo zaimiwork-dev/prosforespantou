@@ -58,30 +58,20 @@ function parseGreekInt(s) {
 }
 
 // "/trofima-pantopoleioy/ntomatika/ntomata-passata/-8494791/" →
-// "Τρόφιμα Παντοπωλείου" (or null if no recognisable slug)
-const TOP_CATEGORIES = {
-  'trofima-pantopoleioy': 'Είδη Παντοπωλείου',
-  'turokomika-futika-anapliromata': 'Γαλακτοκομικά & Είδη Ψυγείου',
-  'galaktokomika-eidh-psugeiou': 'Γαλακτοκομικά & Είδη Ψυγείου',
-  'kreata-psaria-poulerika': 'Κρέας & Ψάρι',
-  'froyta-laxanika': 'Φρούτα & Λαχανικά',
-  'froyta-kai-laxanika': 'Φρούτα & Λαχανικά',
-  'arto-zaxaroplastikis': 'Αρτοποιία',
-  'katepsugmena': 'Κατεψυγμένα',
-  'rofimata-pota': 'Πρωινό & Ροφήματα',
-  'snak-glyka': 'Σνακ & Γλυκά',
-  'kava': 'Κάβα',
-  'prosopiki-frontida': 'Προσωπική Φροντίδα',
-  'vrefika-eidh': 'Βρεφικά Είδη',
-  'eidh-katharismou': 'Είδη Καθαρισμού & Σπιτιού',
-  'eidh-katoikidiou': 'Είδη Κατοικιδίων',
-};
-
+// "trofima-pantopoleioy/ntomatika" — the RAW slug pair, passed through as the
+// chain's native category label. The per-chain map in
+// src/lib/native-category-maps.ts translates it to a department.
+//
+// Lesson learned the hard way: a hardcoded slug→department map here went
+// STALE when sklavenitis renamed its taxonomy — unknown slugs silently fell to
+// keyword guessing and frozen Μπάρμπα Στάθης surfaced under Φρούτα. Emitting
+// the raw slug means an unmapped one now raises an ingest-report warning
+// (admin Υγεία tab) instead of rotting silently.
 function categoryFromHref(href) {
-  if (!href) return 'Άλλο';
-  const m = href.match(/^\/([a-z0-9-]+)\//i);
-  if (!m) return 'Άλλο';
-  return TOP_CATEGORIES[m[1]] || 'Άλλο';
+  if (!href) return null;
+  const parts = href.split('/').filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts[0];
 }
 
 async function fetchPage(pg) {
