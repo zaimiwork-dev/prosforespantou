@@ -220,7 +220,10 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
 // as visible productless Discounts (the chain's own name/price/image/dates),
 // alongside their PendingMatch row. Opt OUT for feeds whose item data isn't
 // trustworthy enough to publish unreviewed (e.g. Lidl's vision-OCR output).
-export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true }) {
+// extraWarnings: pre-ingest notes from the adapter (e.g. image-mirror failures)
+// that should ride along into the IngestRun record / Υγεία tab. They never
+// affect healthOk.
+export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true, extraWarnings = [] }) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (source !== 'web' && source !== 'leaflet') throw new Error(`source must be 'web' or 'leaflet', got "${source}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
@@ -229,7 +232,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     chain, source, scrapedItems: items.length,
     matched: 0, viaMapping: 0, viaBarcode: 0, viaCache: 0,
     reviewQueued: 0, unmatchedShown: 0, priceChanges: 0, errors: 0, deactivated: 0,
-    healthOk: true, warnings: [],
+    healthOk: true, warnings: [...extraWarnings],
   };
 
   const { default: prisma } = await import('../../lib/prisma.ts');

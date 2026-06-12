@@ -9,6 +9,14 @@ name: Scrape supermarket chains
 #   DIRECT_URL     — Direct Postgres URL (port 5432) for migrations
 #   GROQ_API_KEY   — Groq Cloud key for LLM resolver
 #
+# Optional repo secrets:
+#   SUPABASE_URL               — https://<ref>.supabase.co (project API URL)
+#   SUPABASE_SERVICE_ROLE_KEY  — for mirroring AB product images to Supabase
+#                                Storage (www.ab.gr 403s off-site fetches; see
+#                                src/scripts/lib/mirror-images.mjs). Without
+#                                these the AB run still works — images just
+#                                stay broken and the run report warns.
+#
 # Design (2026-06-07):
 #   Adapters run as their own short jobs (60-min timeout). They do scrape + DB
 #   ingest, never call Groq. Whatever they don't deterministically match goes to
@@ -106,6 +114,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   sklavenitis-offers:
     if: github.event.schedule == '0 1 * * *' || github.event.inputs.chain == 'sklavenitis-offers'

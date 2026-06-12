@@ -55,6 +55,14 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      // Supabase Storage mirror for chains whose own image host blocks
+      // off-site fetches (AB today — see src/scripts/lib/mirror-images.mjs).
+      {
+        protocol: 'https',
+        hostname: 'qddyyykuaiuqpzmmzqzf.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/chain-images/**',
+      },
     ],
   },
   async headers() {

@@ -21,6 +21,7 @@
 // Recovery is to re-capture via probe-ab-offers-capture.mjs and update PQ_HASH.
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { mirrorImages } from '../lib/mirror-images.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -167,7 +168,26 @@ async function run() {
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
   console.log(`   ${items.length} price-affecting offers (filtered from ${byCode.size} total promo rows)`);
 
-  const report = await ingestOffers({ chain: 'ab', source: 'web', items, dryRun: DRY_RUN });
+  // www.ab.gr 403s every off-site image fetch (Vercel optimizer included), but
+  // THIS context can reach it — mirror images to Supabase Storage and rewrite
+  // imageUrl before ingest. No-op (originals kept + warning) without creds.
+  let mirrorWarnings = [];
+  if (!DRY_RUN) {
+    const mirror = await mirrorImages({
+      chain: 'ab',
+      items,
+      match: (u) => u.includes('www.ab.gr'),
+      headers: {
+        'User-Agent': HEADERS['User-Agent'],
+        Accept: 'image/avif,image/webp,image/png,image/*,*/*;q=0.8',
+        'Accept-Language': HEADERS['Accept-Language'],
+        Referer: HEADERS.Referer,
+      },
+    });
+    mirrorWarnings = mirror.warnings;
+  }
+
+  const report = await ingestOffers({ chain: 'ab', source: 'web', items, dryRun: DRY_RUN, extraWarnings: mirrorWarnings });
   printReport(report);
   process.exit(report.healthOk ? 0 : 1);
 }

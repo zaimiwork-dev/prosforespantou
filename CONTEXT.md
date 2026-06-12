@@ -4,14 +4,25 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-12 EOD — ALL PUSHED @ `3b2930a`, 10 commits)
+## ⚡ Pick up here (2026-06-13 — AB image mirroring SHIPPED, needs 2 GH secrets to activate)
+
+**AB image mirroring at scrape time — code complete, awaiting credentials.** www.ab.gr (Akamai) 403s every off-site fetch (Vercel optimizer, node, local browsers — even this dev machine can no longer reach the AB **API**; GH Actions CAN, runs are healthy). Solution shipped:
+- **[mirror-images.mjs](src/scripts/lib/mirror-images.mjs)** — downloads images in the adapter's CI context, uploads to public Supabase Storage bucket `chain-images` (plain REST, no new dep), rewrites `item.imageUrl` pre-ingest. Deterministic path `ab/<sha1(url)>.<ext>` → re-runs HEAD the public URL and skip already-mirrored files. Per-image failures keep the original URL; Akamai HTML block pages are rejected by content-type. No creds → graceful no-op + run warning (visible in Υγεία).
+- ab.mjs calls it (skipped under DRY_RUN); `ingestOffers` gained `extraWarnings` param; next.config allows the supabase host (mirrored URLs go through the optimizer — the `unoptimized` ab.gr bypass in DiscountCard/OfferDetails stays for legacy rows); workflow passes the two new secrets to the ab-offers job. 117 tests green, build green.
+- **USER ACTION to activate:** add repo secrets `SUPABASE_URL` (https://qddyyykuaiuqpzmmzqzf.supabase.co) and `SUPABASE_SERVICE_ROLE_KEY` (Supabase dashboard → Project Settings → API keys → service_role) under GitHub → Settings → Secrets → Actions. Then either wait for the 03:00 UTC run or trigger `ab-offers` via workflow_dispatch. The bucket is auto-created on first run. All ~355 broken rows self-heal because ingest rewrites imageUrl on every update. **Verify after first run:** Υγεία tab shows no mirror warning + AB cards show photos.
+- Risk noted: untested whether Akamai serves the *media* paths to GH runner IPs (the API works from there; same host, so likely). If the first run warns `N/M image mirrors failed`, that's the signal it doesn't — fallback plan = mirror via a Greek residential proxy or at user's machine on a network that isn't blocked.
 
 **NEXT SESSION, ranked:**
-1. **AB image mirroring at scrape time** — www.ab.gr 403s EVERYONE (optimizer, node, even local browsers); ~360 AB offers show category-icon placeholders and the user is sore about it. The adapter can fetch AB's API, so try downloading images in the adapter context → store locally (public/ or blob) → rewrite imageUrl. `unoptimized` bypass for www.ab.gr is already in (may help real Greek residential IPs; unverified).
+1. Activate + verify AB image mirroring (above — 5-min user task, then check Υγεία).
 2. **Bazaar Discount + Γαλαξίας recon** (user wants these chains) — new adapters plug into the native-map system from day one. Check what each site exposes first.
 3. **Lidl OCR name cleanup** — pipeline works (257 items/run, healthy IngestRuns) but ~25% of names are garbled ("LAY'S Ταιτσ", "Tonωτικό ρόφλημα"); add a cheap Groq text-fix pass, THEN flip `showUnmatched: true` for lidl.
 4. 173 sklavenitis rows share productIds with other-chain SKUs (winner-takes-row warning every run) — audit ChainProductMapping; load-bearing since the carousel swaps in "cheaper chain" rows by productId.
 5. Hygiene: `passwords.txt` + scratch files still untracked in repo root (move out!); ~50 probe-* scripts; CLAUDE.md still documents the old fetcher→extractor→matcher pipeline as canonical.
+6. Later: masoutis promo URLs rotate weekly (the 7613174 image-regression root cause) — `mirrorImages` is chain-generic, could mirror masoutis too once AB proves it out.
+
+---
+
+## ⚡ Pick up here (2026-06-12 EOD — ALL PUSHED @ `3b2930a`, 10 commits)
 
 ### Late-day finds (after the root-cause commit) — all shipped
 - **Σκλαβενίτης adapter slug map was STALE** (`3b2930a`): the site RENAMED its URL taxonomy; unknown slugs silently fell to keyword guessing ("Ρεβίθια με λαχανικά" → 'λαχανικ' → Φρούτα) and the provenance rule then protected the wrong answers. Adapter now emits the RAW slug pair (`katepsygmena/katepsygmena-geymata`) as the native label; [native-category-maps.ts](src/lib/native-category-maps.ts) maps all 115 current pairs; a future rename raises ingest warnings (Υγεία tab). Φρούτα & Λαχανικά verified ROW-BY-ROW: 59/59 real produce.

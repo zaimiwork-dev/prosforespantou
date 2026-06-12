@@ -31,8 +31,25 @@ await ingestOffers({
                             // Review Queue, not to the public site. Turn off for
                             // feeds whose data isn't trustworthy enough to
                             // publish unreviewed (e.g. Lidl's vision-OCR output).
+  extraWarnings: [],        // optional — pre-ingest notes from the adapter
+                            // (e.g. image-mirror failures) that should appear in
+                            // the IngestRun record / Υγεία tab. Never affect
+                            // healthOk.
 });
 ```
+
+### Image mirroring (chains whose image host blocks off-site fetches)
+
+Some chains serve images from a host that 403s everything except their own
+frontend (AB/Akamai today). The adapter runs in a context that CAN reach the
+chain, so it mirrors images **at scrape time**: call
+[`mirrorImages(...)`](../lib/mirror-images.mjs) on the items array right before
+`ingestOffers` — it downloads each matching image, uploads it to the public
+`chain-images` Supabase Storage bucket and rewrites `item.imageUrl` in place.
+Without `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_URL` it is a no-op that keeps the
+original URLs and adds a warning (pass its `warnings` as `extraWarnings`).
+Because ingest refreshes `imageUrl` on every update, already-written rows heal
+on the next run — no backfill needed. See `ab.mjs` for the pattern.
 
 ## OfferItem
 
