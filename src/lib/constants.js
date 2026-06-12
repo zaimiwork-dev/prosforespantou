@@ -1,19 +1,23 @@
-// `leafletUrl` — the chain's OWN current-leaflet/offers page. Stable URLs (the
-// PDF behind them rotates on the chain's side, so the link is always fresh).
-// Each verified live 2026-06-12 except ab (Akamai blocks every non-browser
-// fetch — URL is the user's recollection; the audit-mappings workflow prints
-// its status code from CI, the one context that can reach www.ab.gr).
+// `leafletUrl` — the chain's OWN φυλλάδιο page (the actual leaflet/flipbook,
+// NOT an offers item-listing — user requirement 2026-06-12). Stable URLs; the
+// leaflet behind them rotates on the chain's side, so the link is always
+// fresh. Each verified live by page title 2026-06-12 except ab (Akamai blocks
+// every non-browser fetch — URL from the user; the audit-mappings workflow
+// prints its status from CI, the one context that reaches www.ab.gr).
+// Watch the odd spellings: kritikos "fulladia/fulladio", marketin "filadio",
+// sklavenitis "katalogoi_" (trailing underscore). No leaflet page exists on
+// galaxias.shop or discountmarkt.gr — no link rather than a wrong one.
 export const SUPERMARKETS = [
   { id: "ab", name: "AB Vassilopoulos", short: "AB", color: "#E63946", bg: "#fff0f0", heroLabel: "AB", heroSub: "Vassilopoulos", logo: "ab.png", leafletUrl: "https://www.ab.gr/promotions/leaflet" },
-  { id: "sklavenitis", name: "Σκλαβενίτης", short: "ΣΚ", color: "#1D3557", bg: "#f0f3ff", heroLabel: "Σκλαβε-", heroSub: "νίτης", logo: "sklavenitis.png", leafletUrl: "https://www.sklavenitis.gr/sylloges/prosfores/" },
+  { id: "sklavenitis", name: "Σκλαβενίτης", short: "ΣΚ", color: "#1D3557", bg: "#f0f3ff", heroLabel: "Σκλαβε-", heroSub: "νίτης", logo: "sklavenitis.png", leafletUrl: "https://www.sklavenitis.gr/katalogoi_/" },
   { id: "lidl", name: "Lidl", short: "LI", color: "#0050AA", bg: "#f0f5ff", heroLabel: "Lidl", heroSub: "", logo: "lidl.png", leafletUrl: "https://www.lidl-hellas.gr/l/el/fylladio" },
-  { id: "mymarket", name: "My Market", short: "MM", color: "#e07b00", bg: "#fff7ed", heroLabel: "My", heroSub: "Market", logo: "mymarket.jpg", leafletUrl: "https://www.mymarket.gr/offers" },
-  { id: "masoutis", name: "Μασούτης", short: "ΜΑ", color: "#2d6a4f", bg: "#f0fff4", heroLabel: "Μασού-", heroSub: "της", logo: "masoutis.png", leafletUrl: "https://www.masoutis.gr/categories/index/fylladio" },
+  { id: "mymarket", name: "My Market", short: "MM", color: "#e07b00", bg: "#fff7ed", heroLabel: "My", heroSub: "Market", logo: "mymarket.jpg", leafletUrl: "https://www.mymarket.gr/fylladio-my-market" },
+  { id: "masoutis", name: "Μασούτης", short: "ΜΑ", color: "#2d6a4f", bg: "#f0fff4", heroLabel: "Μασού-", heroSub: "της", logo: "masoutis.png", leafletUrl: "https://www.masoutis.gr/promotion" },
   { id: "bazaar", name: "Bazaar", short: "BZ", color: "#7b2d8b", bg: "#fdf0ff", heroLabel: "Bazaar", heroSub: "", logo: "bazaar.svg", leafletUrl: "https://www.bazaar-online.gr/prosfores" },
-  { id: "kritikos", name: "Κρητικός", short: "ΚΡ", color: "#e85d04", bg: "#fff4ed", heroLabel: "Κρητι-", heroSub: "κός", logo: "kritikos.avif", leafletUrl: "https://kritikos-sm.gr/fylladia/" },
-  { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/el-gr/fylladia" },
+  { id: "kritikos", name: "Κρητικός", short: "ΚΡ", color: "#e85d04", bg: "#fff4ed", heroLabel: "Κρητι-", heroSub: "κός", logo: "kritikos.avif", leafletUrl: "https://kritikos-sm.gr/fulladia/fulladio/" },
+  { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/filadio/" },
   { id: "discountmarkt", name: "Discount Markt", short: "DM", color: "#d62828", bg: "#fff0f0", heroLabel: "Discount", heroSub: "Markt", logo: "discount_markt.png" },
-  { id: "galaxias", name: "Γαλαξίας", short: "ΓΑ", color: "#003f88", bg: "#eef3ff", heroLabel: "Γαλα-", heroSub: "ξίας", logo: "galaxias.jpg", leafletUrl: "https://galaxias.shop/fylladio" },
+  { id: "galaxias", name: "Γαλαξίας", short: "ΓΑ", color: "#003f88", bg: "#eef3ff", heroLabel: "Γαλα-", heroSub: "ξίας", logo: "galaxias.jpg" },
 ];
 
 // `label` is the SHORT form for space-tight chips ("Φρούτα & Λαχ."). Anywhere
