@@ -40,6 +40,9 @@ export function favoriteKeyFor(offer: { productId?: string | null; product_id?: 
 interface ShoppingListState {
   items: ShoppingItem[];
   preferredStores: string[];
+  // Departments the user told us they usually buy (first-visit onboarding /
+  // the preferences sheet). Declared interest — ranks above learned signals.
+  preferredCategories: string[];
   favorites: FavoriteItem[];
   addItem: (product: any) => void;
   removeItem: (id: string) => void;
@@ -47,6 +50,7 @@ interface ShoppingListState {
   clearList: () => void;
   togglePreferred: (id: string) => void;
   clearPreferred: () => void;
+  togglePreferredCategory: (id: string) => void;
   toggleFavorite: (offer: any) => void;
   getShareText: () => string;
 }
@@ -56,6 +60,7 @@ export const useShoppingListStore = create<ShoppingListState>()(
     (set, get) => ({
       items: [],
       preferredStores: [],
+      preferredCategories: [],
       favorites: [],
       
       addItem: (product) => set((state) => {
@@ -89,6 +94,12 @@ export const useShoppingListStore = create<ShoppingListState>()(
       })),
 
       clearPreferred: () => set({ preferredStores: [] }),
+
+      togglePreferredCategory: (id) => set((state) => ({
+        preferredCategories: state.preferredCategories.includes(id)
+          ? state.preferredCategories.filter((c) => c !== id)
+          : [...state.preferredCategories, id],
+      })),
 
       toggleFavorite: (offer) => set((state) => {
         const key = favoriteKeyFor(offer);

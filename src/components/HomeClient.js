@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useShoppingListStore } from "@/lib/store";
 import { getActiveDeals } from "@/actions/get-active-deals";
 import { dedupeDeals } from "@/lib/dedupe-deals";
+import { loadProfile, decayProfile, topCategories, scoreOffer } from "@/lib/interest-profile";
 
 import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
@@ -30,7 +31,24 @@ function PublicSite({ initial, onAdmin }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const { items: cart, addItem, preferredStores } = useShoppingListStore();
+  const { items: cart, addItem, preferredStores, preferredCategories } = useShoppingListStore();
+
+  // First visit → open the preferences sheet as onboarding (once; the flag
+  // sets on close however it ends). 11k offers with no steer overwhelms a new
+  // user — two stores + four categories in, the page is suddenly about THEM.
+  const [introMode, setIntroMode] = useState(false);
+  useEffect(() => {
+    let opened = false;
+    try { opened = !!window.localStorage.getItem("pp-onboarded"); } catch { opened = true; }
+    if (opened) return;
+    const t = setTimeout(() => { setIntroMode(true); setIsSettingsOpen(true); }, 700);
+    return () => clearTimeout(t);
+  }, []);
+  const closeSettings = () => {
+    setIsSettingsOpen(false);
+    setIntroMode(false);
+    try { window.localStorage.setItem("pp-onboarded", "1"); } catch { /* private mode */ }
+  };
 
   // "Τα καταστήματά μου" must shape the WHOLE app, not just /deals — the user
   // sets it from this page's header, so carousels that ignore it read as
@@ -57,6 +75,33 @@ function PublicSite({ initial, onAdmin }) {
   const topDeals = filtered?.topDeals?.length ? filtered.topDeals : initial.topDeals;
   const endingSoon = filtered?.endingSoon?.length ? filtered.endingSoon : initial.endingSoon;
   const storesFiltered = Boolean(prefKey && filtered);
+
+  // "✨ Για σένα" — the v1 recommender: declared categories (onboarding) +
+  // learned ones (on-device interest profile, see lib/interest-profile) fetch
+  // one hot-ranked pool, then personal relevance re-ranks it. Stable sort
+  // keeps hotScore order inside equal-relevance groups. No prefs and no
+  // history → no rail (never fake personalization).
+  const [forYou, setForYou] = useState(null);
+  const prefCatKey = preferredCategories.join(",");
+  useEffect(() => {
+    const profile = decayProfile(loadProfile(), Date.now());
+    const cats = [...new Set([...preferredCategories, ...topCategories(profile, 3)])].slice(0, 6);
+    if (cats.length === 0) return;
+    let cancelled = false;
+    getActiveDeals(30, 0, "all", cats, "hot", preferredStores)
+      .then(({ deals }) => {
+        if (cancelled) return;
+        const ranked = dedupeDeals(deals)
+          .map((d) => ({ d, s: scoreOffer(d, profile, preferredCategories) }))
+          .sort((a, b) => b.s - a.s)
+          .map((x) => x.d)
+          .slice(0, 14);
+        setForYou(ranked);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefCatKey, prefKey, isSettingsOpen]);
 
   // Count only chains that actually have live offers — advertising "10
   // αλυσίδες" while 5 are empty undermines the honest-data positioning.
@@ -89,6 +134,17 @@ function PublicSite({ initial, onAdmin }) {
               before navigation. Browsing by store/category moves below. The
               user's own watchlist outranks everything when it has live hits. */}
           <FavoritesRow onAdd={addItem} onSelect={setSelectedProduct} />
+
+          {forYou?.length > 0 && (
+            <FeaturedCarousel
+              title="✨ Για σένα"
+              sub="Με βάση όσα σε ενδιαφέρουν"
+              deals={forYou}
+              onAdd={addItem}
+              onSelect={setSelectedProduct}
+              viewAllHref="/deals"
+            />
+          )}
 
           <FeaturedCarousel
             title="Κορυφαίες προσφορές"
@@ -132,7 +188,7 @@ function PublicSite({ initial, onAdmin }) {
 
       <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-      <PreferredStoresSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <PreferredStoresSheet isOpen={isSettingsOpen} onClose={closeSettings} intro={introMode} />
     </div>
   );
 }

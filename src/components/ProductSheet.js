@@ -11,6 +11,7 @@ import { getSessionId } from '@/lib/session-id';
 import { getPriceComparison } from '@/actions/get-price-comparison';
 import { getPriceHistory } from '@/actions/get-price-history';
 import { getSimilarOffers } from '@/actions/get-similar-offers';
+import { recordInterest, WEIGHT } from '@/lib/interest-profile';
 
 // Bottom-sheet quick view of an offer. All content comes from OfferDetails —
 // the same component the /offer/[id] page renders — so the two surfaces can't
@@ -27,6 +28,11 @@ import { getSimilarOffers } from '@/actions/get-similar-offers';
 export function ProductSheet({ product, onClose, onAdd }) {
   useEffect(() => {
     if (!product) return;
+    // Opening an offer is the lightest interest signal (lib/interest-profile).
+    recordInterest(
+      { category: product.category, productName: product.productName || product.product_name },
+      WEIGHT.view
+    );
     window.history.pushState({ offerSheet: product.id }, '', `/offer/${product.id}`);
     const onPop = () => onClose();
     window.addEventListener('popstate', onPop);

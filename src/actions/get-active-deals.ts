@@ -52,7 +52,9 @@ export async function getActiveDeals(
   limit = 20,
   offset = 0,
   supermarketId = 'all',
-  category = 'all',
+  // One department, or several (the personalized "Για σένα" rail asks for the
+  // user's declared + learned categories in a single query).
+  category: string | string[] = 'all',
   sortBy: SortBy = 'hot',
   preferredSMs?: string[]
 ) {
@@ -73,8 +75,12 @@ export async function getActiveDeals(
       } else if (preferredSMs && preferredSMs.length > 0) {
         where.supermarket = { in: preferredSMs };
       }
-      
-      if (category !== 'all') where.category = category;
+
+      if (Array.isArray(category)) {
+        if (category.length > 0) where.category = { in: category.slice(0, 8) };
+      } else if (category !== 'all') {
+        where.category = category;
+      }
 
       const [deals, total] = await Promise.all([
         prisma.discount.findMany({

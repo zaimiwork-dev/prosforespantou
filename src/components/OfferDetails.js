@@ -12,6 +12,7 @@ import { getSessionId } from '@/lib/session-id';
 import { hiResImage } from '@/lib/images';
 import { parsePack, perUnitPrice, unitPrice } from '@/lib/pack-info';
 import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
+import { recordInterest, WEIGHT } from '@/lib/interest-profile';
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -112,6 +113,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
       category,
       sessionId: getSessionId(),
     }).catch(() => {});
+    recordInterest({ category, productName: displayName }, WEIGHT.listAdd);
     for (let i = 0; i < qty; i++) onAdd(offer);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
@@ -194,7 +196,10 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
           <button
             type="button"
             className={`od-fav${isFavorite ? ' active' : ''}`}
-            onClick={() => toggleFavorite(offer)}
+            onClick={() => {
+              if (!isFavorite) recordInterest({ category, productName: displayName }, WEIGHT.favorite);
+              toggleFavorite(offer);
+            }}
             aria-pressed={isFavorite}
             aria-label={isFavorite ? 'Αφαίρεση από τα αγαπημένα' : 'Προσθήκη στα αγαπημένα'}
             title={isFavorite ? 'Στα αγαπημένα — θα το βλέπεις στην αρχική όταν είναι σε προσφορά' : 'Παρακολούθησε αυτό το προϊόν'}

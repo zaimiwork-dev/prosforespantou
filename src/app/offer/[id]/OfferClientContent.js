@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useShoppingListStore } from "@/lib/store";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ShoppingList } from "@/components/ShoppingList";
 import { OfferDetails } from "@/components/OfferDetails";
+import { recordInterest, WEIGHT } from "@/lib/interest-profile";
 
 // Thin shell: header + back link around the shared OfferDetails component.
 // All offer content (image, price, dates, verdict, comparison) lives there,
@@ -13,6 +14,12 @@ import { OfferDetails } from "@/components/OfferDetails";
 export default function OfferClientContent({ offer, comparison = [], history = null, similar = [] }) {
   const { items, addItem } = useShoppingListStore();
   const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Direct page views (shared links, SEO) count as interest too — the sheet
+  // path records its own.
+  useEffect(() => {
+    recordInterest({ category: offer.category, productName: offer.productName }, WEIGHT.view);
+  }, [offer.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ background: "var(--bg)", color: "var(--ink)", minHeight: "100vh" }}>

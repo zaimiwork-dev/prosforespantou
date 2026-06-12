@@ -2,37 +2,52 @@
 
 import { useState } from 'react';
 import { useShoppingListStore } from '@/lib/store';
-import { SUPERMARKETS } from '@/lib/constants';
+import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
+import { CategoryIcon } from './CategoryIcon';
 
-export function PreferredStoresSheet({ isOpen, onClose }) {
+// User preferences: which stores they shop at AND which departments they
+// usually buy ("Τι αγοράζεις συνήθως;"). Opened from the header gear, and —
+// with `intro` — auto-opened once on a first visit as onboarding: with 11k+
+// offers, a new user who picks 2 stores and 4 categories immediately gets a
+// feed about THEM (the Για σένα rail + filtered carousels) instead of an
+// overwhelming wall.
+export function PreferredStoresSheet({ isOpen, onClose, intro = false }) {
   // Mount the sheet fresh on every open so the draft state starts from the
   // saved selection — no setState-inside-effect syncing.
   if (!isOpen) return null;
-  return <PreferredStoresSheetInner onClose={onClose} />;
+  return <PreferredStoresSheetInner onClose={onClose} intro={intro} />;
 }
 
-function PreferredStoresSheetInner({ onClose }) {
-  const { preferredStores, togglePreferred } = useShoppingListStore();
+// Departments worth declaring — 'Άλλο' carries no signal.
+const PICKABLE = CATEGORIES.filter((c) => c.id !== 'all' && c.id !== 'Άλλο');
+
+function PreferredStoresSheetInner({ onClose, intro }) {
+  const { preferredStores, togglePreferred, preferredCategories, togglePreferredCategory } = useShoppingListStore();
   const [local, setLocal] = useState(preferredStores);
+  const [localCats, setLocalCats] = useState(preferredCategories);
 
   const toggle = (id) =>
     setLocal((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleCat = (id) =>
+    setLocalCats((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   const save = () => {
     // Sync local -> store by diffing
     for (const sm of SUPERMARKETS) {
-      const inLocal = local.includes(sm.id);
-      const inStore = preferredStores.includes(sm.id);
-      if (inLocal !== inStore) {
-        togglePreferred(sm.id);
-      }
+      if (local.includes(sm.id) !== preferredStores.includes(sm.id)) togglePreferred(sm.id);
+    }
+    for (const c of PICKABLE) {
+      if (localCats.includes(c.id) !== preferredCategories.includes(c.id)) togglePreferredCategory(c.id);
     }
     onClose();
   };
 
   const clear = () => {
     setLocal([]);
+    setLocalCats([]);
   };
+
+  const picked = local.length + localCats.length;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
@@ -65,7 +80,7 @@ function PreferredStoresSheetInner({ onClose }) {
         {/* Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #ececf0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "#1c1e24", display: "flex", alignItems: "center", gap: 8 }}>
-            ⚙️ Τα καταστήματά μου
+            {intro ? 'Καλώς ήρθες! 👋' : '⚙️ Οι προτιμήσεις μου'}
           </h2>
           <button
             onClick={onClose}
@@ -91,10 +106,15 @@ function PreferredStoresSheetInner({ onClose }) {
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-          <p style={{ fontSize: 14, color: "#8b929c", margin: "0 0 24px 0", lineHeight: "1.5" }}>
-            Διάλεξε τα καταστήματα που ψωνίζεις. Θα βλέπεις προσφορές μόνο από αυτά.
+          <p style={{ fontSize: 14, color: "#8b929c", margin: "0 0 20px 0", lineHeight: "1.5" }}>
+            {intro
+              ? 'Πάνω από 11.000 προσφορές κάθε μέρα — πες μας τι ψωνίζεις και θα σου δείχνουμε πρώτα ό,τι σε ενδιαφέρει. Τα αλλάζεις όποτε θες από το ⚙️ πάνω δεξιά.'
+              : 'Διάλεξε καταστήματα και κατηγορίες. Θα προτεραιοποιούμε προσφορές από αυτά.'}
           </p>
 
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#8b929c', marginBottom: 10 }}>
+            Τα καταστήματά μου
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {SUPERMARKETS.map((sm) => {
               const isSelected = local.includes(sm.id);
@@ -126,12 +146,45 @@ function PreferredStoresSheetInner({ onClose }) {
               );
             })}
           </div>
+
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#8b929c', margin: '26px 0 10px' }}>
+            Τι αγοράζεις συνήθως;
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {PICKABLE.map((c) => {
+              const isSelected = localCats.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => toggleCat(c.id)}
+                  aria-pressed={isSelected}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "9px 12px",
+                    borderRadius: 999,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#1c1e24",
+                    background: isSelected ? "#e7f6ee" : "#fff",
+                    border: isSelected ? "2px solid #2d6a4f" : "1px solid #ececf0",
+                  }}
+                >
+                  <CategoryIcon id={c.id} size={15} />
+                  {c.label}
+                  {isSelected && <span style={{ color: "#2d6a4f", fontWeight: 900 }}>✓</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Footer */}
         <div style={{ padding: "20px 24px", borderTop: "1px solid #ececf0", display: "flex", gap: 12, background: "#fff" }}>
           <button
-            onClick={clear}
+            onClick={intro && picked === 0 ? onClose : clear}
             style={{
               flex: 1,
               padding: "14px",
@@ -144,7 +197,7 @@ function PreferredStoresSheetInner({ onClose }) {
               cursor: "pointer"
             }}
           >
-            Καθαρισμός
+            {intro && picked === 0 ? 'Παράλειψη' : 'Καθαρισμός'}
           </button>
           <button
             onClick={save}
@@ -161,7 +214,9 @@ function PreferredStoresSheetInner({ onClose }) {
               boxShadow: "0 4px 12px rgba(0,157,224,0.2)"
             }}
           >
-            {local.length === 0 ? 'Δες όλες τις προσφορές' : `Αποθήκευση (${local.length})`}
+            {picked === 0
+              ? 'Δες όλες τις προσφορές'
+              : intro ? `Ξεκίνα (${picked})` : `Αποθήκευση (${picked})`}
           </button>
         </div>
       </div>

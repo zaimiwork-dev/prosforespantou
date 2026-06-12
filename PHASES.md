@@ -301,6 +301,25 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
+## Phase 10 — Personalization ladder (v1 SHIPPED 2026-06-13)
+
+**Why (user decision, 2026-06-12):** thousands of offers overwhelm a first-time visitor; the feed must orient around THEM, "like the big platforms". The honest engineering read: YouTube/Amazon-style collaborative filtering needs logged-in users at scale — but their *cold-start* path (declared interests + content-based ranking on your own behavior) is exactly buildable today, and it's rung 1 of the same ladder.
+
+**v1 shipped (no accounts, all on-device):**
+- **Onboarding:** first visit auto-opens the preferences sheet ([PreferredStoresSheet.js](src/components/PreferredStoresSheet.js), `intro` mode) — pick stores + "Τι αγοράζεις συνήθως;" categories. `pp-onboarded` localStorage flag; editable anytime via the header ⚙️. Declared categories live in the zustand store (`preferredCategories`).
+- **Learned profile:** [interest-profile.ts](src/lib/interest-profile.ts) — per-category and per-brand weights in localStorage; view +1 / list-add +3 / favorite +4; 14-day half-life decay; pruned + capped. Recorded at sheet-open, offer-page view, add-to-list, favorite.
+- **"✨ Για σένα" homepage rail:** declared + top-3 learned categories → one hot-ranked `getActiveDeals` fetch (category now accepts an array) → `scoreOffer` re-ranks client-side (declared +10, learned weights, brand ×1.5; stable sort keeps hotScore inside ties). Renders only when signals exist — never fake personalization.
+
+**Ladder (don't skip rungs):**
+- **Rung 2 (needs accounts):** server-side profile keyed to a user id; cross-device sync of favorites/preferences; watch-list alerts join here (Phase 9).
+- **Rung 3 (needs traffic):** collaborative filtering over ClickEvent (already logging deal_click/list_add/leaflet_click + category + sessionId since day one — the dataset accrues while we wait); "users who bought X" co-occurrence first, matrix factorization only if co-occurrence saturates.
+
+**Do NOT:**
+- Do NOT personalize "Κορυφαίες προσφορές" or the honesty verdicts — global rails and price truth stay objective; personalization is additive (its own rail), never a filter bubble over facts.
+- Do NOT ship rung 3 math on rung 1 traffic — co-occurrence on tiny data recommends noise and discredits the rail.
+
+---
+
 ## Cross-cutting: what NOT to do
 
 - Don't build admin charts before a partner asks for them. Tables sell fine.

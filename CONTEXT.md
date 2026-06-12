@@ -20,7 +20,9 @@ Living snapshot of what the project is, how data flows, and where things live. R
 4. **`d9a6255` φυλλάδιο links** — every supermarket page header links the chain's OWN current-leaflet page (`SUPERMARKETS[].leafletUrl`, each probed live except ab.gr — Akamai-blocked from here, **verify ab.gr/fylladia once in a browser**). Admin PDF (when current) still wins; stale ones no longer kill the link.
 5. **PHASES.md Phase 9** — full-catalog price baseline plan (user's strategic ask): normal/strikethrough/ΜΟΝΟ price kinds, snapshot-on-change, pilot sklavenitis+mymarket, then watch-list alerts via Phase 3 email. Read it before starting that work.
 
-**NEXT SESSION, ranked:** ① verify tonight's runs (Υγεία + live site): mymarket/sklavenitis images should flip to the mirror, masoutis mirror warnings should disappear; ② Bazaar+Γαλαξίας recon; ③ Lidl OCR cleanup; ④ Phase 9 full-catalog pilot (PHASES.md — only after mappings stay clean); ⑤ admin-panel UX rethink (deferred); ⑥ repo-root scratch txt hygiene.
+**Late addition same night — Personalization v1 (user: "onboarding picks + an algorithm like the big platforms"):** first visit auto-opens the preferences sheet (stores + "Τι αγοράζεις συνήθως;" categories, `intro` mode, `pp-onboarded` flag); [interest-profile.ts](src/lib/interest-profile.ts) keeps an on-device learned profile (view+1/add+3/fav+4, 14-day half-life); homepage gained a **"✨ Για σένα" rail** (declared + learned categories → hot pool → personal re-rank). `getActiveDeals` category param accepts arrays now. PHASES.md **Phase 10** documents the ladder (rung 2 = accounts, rung 3 = collaborative filtering over the ClickEvents we already log) + Do-NOTs (never personalize Κορυφαίες or the honesty verdicts). 143 tests.
+
+**NEXT SESSION, ranked:** ① verify tonight's runs (Υγεία + live site): mymarket/sklavenitis images should flip to the mirror, masoutis mirror warnings should disappear; ② eyeball onboarding + Για σένα on prod (fresh incognito visit); ③ Bazaar+Γαλαξίας recon; ④ Lidl OCR cleanup; ⑤ Phase 9 full-catalog pilot (PHASES.md — only after mappings stay clean); ⑥ admin-panel UX rethink (deferred); ⑦ repo-root scratch txt hygiene.
 
 ---
 
