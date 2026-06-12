@@ -4,6 +4,12 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-12 PM — AB image mirroring LIVE & VERIFIED ✅)
+
+**Activated and verified same day:** secrets set (`gh secret set`), `ab-offers` dispatched, run healthy — **348/389 active AB offers now serve from the Supabase mirror, 0 still on www.ab.gr, 0 mirror failures** (Akamai DOES serve media to GH runners; the remaining 41 rows never had an image in AB's feed). Spot-checked public URLs: 200 image/jpeg. The Akamai-403 risk flagged below is RESOLVED. Also shipped same evening: Nirvana frozen-brand rule (2 mymarket name-only rows were Άλλο; screenshot-reported), `.od-img .chain-pill right:auto` fix (pill stretched full-width over the discount badge on the offer page — same both-edges bug class as the badge fix above it). Follow-ups spotted: 5 masoutis rows store raw chain label "Παγωτά - Οικογενειακά…" as category (legacy pipeline; invisible to the Κατεψυγμένα filter chip); ab run warns 12 shared-productId SKUs (mis-mapping audit backlog); `mirror-images.mjs` fetches have no per-request timeout (fine today — add AbortSignal.timeout if a run ever hangs in the adapter step).
+
+---
+
 ## ⚡ Pick up here (2026-06-13 — AB image mirroring SHIPPED, needs 2 GH secrets to activate)
 
 **AB image mirroring at scrape time — code complete, awaiting credentials.** www.ab.gr (Akamai) 403s every off-site fetch (Vercel optimizer, node, local browsers — even this dev machine can no longer reach the AB **API**; GH Actions CAN, runs are healthy). Solution shipped:

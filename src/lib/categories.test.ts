@@ -69,6 +69,9 @@ describe('keyword fallback — Φρούτα runs LAST (scent words must not win)
     expect(categorize('Φρούτα του Δάσους NATURAL COOL Berry Mix 300g')).toBe('Κατεψυγμένα');
     expect(categorize('ΣΠΙΤΙΚΕΣ ΕΠΙΛΟΓΕΣ ΜΠΙΦ/ΚΙ ΜΕ ΠΑΤΑΤΕΣ 400ΓΡ')).toBe('Κατεψυγμένα');
     expect(categorize('Λαζαρίδη Σπανάκι Σε Φύλλα 750γρ.')).toBe('Κατεψυγμένα');
+    // mymarket name-only rows: no Greek word at all, the brand is the only signal
+    expect(categorize('Nestlé Nirvana Cookies & Cream 0.75 l')).toBe('Κατεψυγμένα');
+    expect(categorize('Nestlé Nirvana Raspberry Truffle 420 ml')).toBe('Κατεψυγμένα');
   });
 
   it('sklavenitis raw slugs map through the chain table', () => {

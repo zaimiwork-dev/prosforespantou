@@ -1268,7 +1268,9 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 /* left:auto — the base .discount-badge pins left:10px; without clearing it the
    badge gets BOTH edges and stretches into a full-width red bar. */
 .od-img .discount-badge { position: absolute; top: 12px; right: 12px; left: auto; z-index: 2; }
-.od-img .chain-pill { position: absolute; top: 12px; left: 12px; z-index: 2; }
+/* right:auto for the same reason — base .chain-pill pins right:10px; without
+   clearing it the pill stretches full-width and buries the discount badge. */
+.od-img .chain-pill { position: absolute; top: 12px; left: 12px; right: auto; z-index: 2; }
 /* In the sheet the header already names the chain — don't say it twice. */
 .compact .od-img .chain-pill { display: none; }
 /* No usable photo (e.g. AB's CDN blocks hotlinking): keep a slim band instead

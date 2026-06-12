@@ -98,6 +98,9 @@ const RULES: { dept: string; terms: string[] }[] = [
     // line (its 'Έτοιμα γεύματα' label is ambiguous — FRUTAPURA fruit cups
     // share it — so the brand decides).
     'λαζαριδη', 'σπιτικες επιλογες',
+    // Nirvana = ice-cream-only brand; mymarket name-only rows ("Nestlé
+    // Nirvana Cookies & Cream 0.75 l") carry no Greek word at all.
+    'nirvana',
   ] },
   // Must outrank Τυριά/Κρέας: flavour names carry 'μπέικον'/'τυρί'/'σκόρδο'.
   { dept: 'Σνακ & Γλυκά', terms: ['bake rolls'] },
