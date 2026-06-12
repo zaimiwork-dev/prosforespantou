@@ -284,24 +284,27 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
                 <span>έως -{biggestDiscount}%</span>
               </>
             )}
-            {leaflet && leaflet.pdfUrl && (
+            {/* Admin-uploaded PDF when one is current, else the chain's own
+                leaflet page (stable URL, always shows the running leaflet) —
+                the admin Leaflet rows went stale and the link vanished. */}
+            {(leaflet?.pdfUrl || sm.leafletUrl) && (
               <>
                 <span style={{ opacity: 0.35 }}>•</span>
                 <a
-                  href={leaflet.pdfUrl}
+                  href={leaflet?.pdfUrl || sm.leafletUrl}
                   target="_blank"
                   rel="noreferrer"
                   onClick={() => {
                     trackEvent({
                       eventType: 'leaflet_click',
                       supermarket: sm.id,
-                      leafletId: leaflet.id,
+                      leafletId: leaflet?.id,
                       sessionId: getSessionId(),
                     }).catch(() => {});
                   }}
                   style={{ color: sm.color, textDecoration: "underline", textUnderlineOffset: 3 }}
                 >
-                  Δες το φυλλάδιο
+                  📖 Δες το φυλλάδιο
                 </a>
               </>
             )}
