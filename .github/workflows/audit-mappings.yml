@@ -1,0 +1,55 @@
+name: Audit chain-product mappings
+
+# One-off / occasional data-quality job: scores every ChainProductMapping
+# against the chain's own current offer name, sends the questionable ones
+# through a Groq same/different judgement, and (with apply=1) deletes the
+# verdict=different mappings + unlinks their discounts + removes poisoned
+# PriceSnapshots. See src/scripts/audit-mappings.mjs.
+#
+# Runs in CI because the dev machine's IP is blocked by Groq (same class as
+# the www.ab.gr Akamai block). Dry-run first, download the report artifact,
+# eyeball it, then re-dispatch with apply=1.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Apply fixes (1) or dry-run report only (0)'
+        required: true
+        default: '0'
+        type: choice
+        options: ['0', '1']
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/audit-mappings.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LLM: '1'
+          APPLY: ${{ github.event.inputs.apply }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mapping-audit
+          path: |
+            mapping-audit-report.json
+            mapping-audit-verdicts.json
+          retention-days: 14

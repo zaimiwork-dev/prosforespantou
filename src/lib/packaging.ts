@@ -23,8 +23,10 @@ export function packCount(name: string | null | undefined): number {
   if (!name) return 1;
   const t = name.toLowerCase();
   let m: RegExpMatchArray | null;
-  if ((m = t.match(/(\d+)\s*\+\s*(\d+)/))) return parseInt(m[1], 10) + parseInt(m[2], 10);
-  if ((m = t.match(/(\d+)\s*[x×*]\s*\d+/))) return parseInt(m[1], 10);
+  // The first number must not be glued to a word ("SPF50+ 40ml" is a sun
+  // factor, not a 50+40 multibuy) — found auditing mappings 2026-06-12.
+  if ((m = t.match(/(?<![a-zα-ωά-ώ0-9])(\d+)\s*\+\s*(\d+)/))) return parseInt(m[1], 10) + parseInt(m[2], 10);
+  if ((m = t.match(/(?<![a-zα-ωά-ώ0-9])(\d+)\s*[x×*]\s*\d+/))) return parseInt(m[1], 10);
   return 1;
 }
 

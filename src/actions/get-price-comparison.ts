@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { samePack } from '@/lib/packaging';
+import { filterComparable } from '@/lib/offer-similarity';
 
 export async function getPriceComparison(discountId: string) {
   return await Sentry.withServerActionInstrumentation(
@@ -55,9 +56,19 @@ export async function getPriceComparison(discountId: string) {
 
         // Only compare like-for-like pack sizes. A 12-pack offer sharing a
         // canonical product with single units must not be priced against them.
-        const sameSize = others.filter((d) => samePack(source.productName, d.productName)).slice(0, 8);
+        const sameSize = others.filter((d) => samePack(source.productName, d.productName));
 
-        return sameSize.map((d) => ({
+        // Mis-mapped productIds (several chain SKUs on one canonical product)
+        // would otherwise render DIFFERENT products as "the same item elsewhere"
+        // — see lib/offer-similarity. Guard on actual name similarity.
+        const comparable = filterComparable(
+          source.productName,
+          sameSize,
+          (d) => d.productName,
+          (d) => d.supermarket
+        ).slice(0, 8);
+
+        return comparable.map((d) => ({
           ...d,
           validFrom: d.validFrom.toISOString(),
           validUntil: d.validUntil.toISOString(),
