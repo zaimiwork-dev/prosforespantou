@@ -275,6 +275,32 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
+## Phase 9 — Full-catalog price baseline → honest verdicts → watch-list alerts (PLANNED 2026-06-12)
+
+**Why (user decision, 2026-06-12):** today we only see prices when a chain *promotes* an item, so (a) the price-history "Μέση" is an average of offer prices — biased low, (b) we cannot prove a "-35%" is real (the chain may have raised the base price last week), (c) watch-list alerts can't fire for products that simply aren't on promo anywhere. Ingesting every product's shelf price gives us the baseline that makes the honesty positioning bullet-proof — it's the moat.
+
+**The three price kinds to distinguish (explicit user requirement):**
+1. **normal** — regular shelf price, no promo claimed.
+2. **strikethrough** — real price-change discount (original → offer price, both published).
+3. **mono** — "ΜΟΝΟ x€"-style promos where the chain HIDES the reference price (94% of real offers per the 2026-05-12 analysis). With a baseline we can compute the hidden delta ourselves and say honestly "κανονικά ~2.49€, τώρα 1.99€".
+
+**Design sketch (build on what exists — no new architecture):**
+- Adapters already see the full catalog (they currently FILTER to on-offer rows: mymarket keeps only `is-on-offer` cards, etc.). Step 1 is a per-chain `FULL_CATALOG=1` pass that walks all items, *not* writing Discounts for non-offer rows — only PriceSnapshots.
+- `OfferItem.offerType` (`'mono' | 'strikethrough' | null`) already flows from the adapters but ingest-offers DOESN'T persist it — persist it first (new `Discount.offerType` + `PriceSnapshot.kind = 'normal' | 'strikethrough' | 'mono'`; `isDiscounted` stays for back-compat).
+- Snapshot only on change (the ingest already does this for offers) — catalog size is ~10-30k items/chain but steady-state daily writes are the few hundred that moved.
+- Match by `chainItemcode` via ChainProductMapping — no new matching work; unmatched catalog items get NO snapshot (no productless shelf-price rows).
+- Pilot with sklavenitis + mymarket (richest catalogs, adapters already paginate the full listing), watch DB growth + IngestRun duration for two weeks, then expand.
+- Then alerts: favorites already persist client-side (`favorites` in the zustand store) + Subscriber double-opt-in email exists (Phase 3) → server-side watch list keyed by productId, daily post-ingest check "did any watched product gain an active Discount / drop below its baseline?", email via Phase 3 plumbing, push later via the Capacitor wrap (Phase 4.7).
+
+**Do NOT:**
+- Do NOT write Discount rows for non-offer catalog items — the public UI is offers-only; normal prices live in PriceSnapshot.
+- Do NOT compute verdicts mixing pack sizes or mis-mapped products — the offer-similarity guard + mapping audit (2026-06-12) must stay green first.
+- Do NOT turn on a chain's full-catalog pass before its mappings audit is clean — baselines written through wrong mappings poison the exact feature this phase exists for.
+
+**Exit:** for ≥2 chains, an offer page can show "κανονική τιμή ~X€" sourced from ≥7 days of normal-price snapshots; ≥1 real user receives a watch-list email triggered by a real price drop.
+
+---
+
 ## Cross-cutting: what NOT to do
 
 - Don't build admin charts before a partner asks for them. Tables sell fine.
