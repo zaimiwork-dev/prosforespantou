@@ -161,6 +161,7 @@ const RULES: { dept: string; terms: string[] }[] = [
     'ξηρους καρπους', 'ξηροι καρποι', 'φιστικ', 'αμυγδαλ', 'καρυδι', 'καρυδοψιχ', 'σταφιδ', 'κρακερ',
     'cracker', 'γλυκο κουταλιου', 'κρουασαν', 'croissant', 'κεικ', 'cake', 'ζελε',
     'λουκουμ', 'μπαρα δημητρ', 'πραλιν', 'νουγκατ', 'γκοφρ', 'kinder', 'ferrero',
+    'κουλουρακ', 'γλειφιτζουρ',
     'lacta', 'oreo', 'merenda', 'σοκολατακ',
     // snack brands whose flavour words ('cola', 'τυρι', 'αλάτι', 'φρούτα',
     // 'μπέικον') would otherwise drag them into drinks/cheese/pantry/deli

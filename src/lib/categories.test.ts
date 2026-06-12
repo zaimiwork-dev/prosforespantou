@@ -61,6 +61,11 @@ describe('keyword fallback — Φρούτα runs LAST (scent words must not win)
     expect(categorize('ΛΟΥΞ Λεμονάδα 6x330ml')).toBe('Κάβα');
   });
 
+  it('fruit-flavoured sweets are snacks, not fruit', () => {
+    expect(categorize('Orama Κουλουράκι Πλεξούδα Πορτοκαλιού Παραδοσιακό')).toBe('Σνακ & Γλυκά');
+    expect(categorize('Γλειφιτζούρι Melody Pops Φράουλα 1 Τεμάχιο')).toBe('Σνακ & Γλυκά');
+  });
+
   it('actual fresh produce still lands in Φρούτα & Λαχανικά', () => {
     expect(categorize('Πατάτες Κύπρου συσκευασμένες')).toBe('Φρούτα & Λαχανικά');
     expect(categorize('Μήλα Στάρκιν Εγχώρια συσκευασμένα')).toBe('Φρούτα & Λαχανικά');

@@ -24,6 +24,10 @@ import { categorize, categorizeForChain, DEPARTMENTS } from '../lib/categories.t
 
 const DEPT_SET = new Set(DEPARTMENTS);
 
+// Chains whose ADAPTER sets the department from the chain's own site taxonomy
+// (vs. ingest-time keyword guessing). Only these get provenance protection.
+const ADAPTER_TAXONOMY_CHAINS = new Set(['sklavenitis']);
+
 const DRY_RUN = process.env.DRY_RUN === '1';
 const CONCURRENCY = parseInt(process.env.CONCURRENCY || '10', 10);
 
@@ -38,7 +42,7 @@ async function run() {
   console.log(`🔢 active deals to recategorize: ${deals.length}${DRY_RUN ? ' (DRY_RUN)' : ''}`);
 
   const tally = {};
-  let updated = 0, unchanged = 0;
+  let updated = 0, unchanged = 0, failed = 0;
   const queue = [...deals];
 
   async function worker() {
@@ -58,11 +62,16 @@ async function run() {
         // alias/keyword chain. NOT the current category — feeding it back
         // would freeze wrong categories and make the backfill a no-op.
         dept = categorizeForChain(d.supermarket, d.productName, native).dept;
-      } else if (d.category && d.category !== 'Άλλο' && DEPT_SET.has(d.category)) {
-        // PROVENANCE RULE: no native label + a valid stored department means
-        // the adapter's own taxonomy set it (e.g. sklavenitis href slugs).
-        // Re-deriving from the NAME is a strictly weaker signal and is exactly
-        // how "Klinex Λεμόνι" once landed in Φρούτα & Λαχανικά. Keep it.
+      } else if (
+        ADAPTER_TAXONOMY_CHAINS.has(d.supermarket) &&
+        d.category && d.category !== 'Άλλο' && DEPT_SET.has(d.category)
+      ) {
+        // PROVENANCE RULE — but ONLY for chains whose adapter derives the
+        // department from the chain's own taxonomy (sklavenitis href slugs).
+        // Re-deriving those from the NAME is a strictly weaker signal and is
+        // exactly how "Klinex Λεμόνι" once landed in Φρούτα & Λαχανικά.
+        // Keyword-derived chains (masoutis, lidl) must stay re-derivable, or
+        // old keyword mistakes freeze forever.
         dept = d.category;
       } else {
         dept = categorize(d.productName, null);
@@ -76,7 +85,14 @@ async function run() {
       tally[dept] = (tally[dept] || 0) + 1;
       if (dept === d.category && native === (d.subcategory ?? null)) { unchanged++; continue; }
       if (!DRY_RUN) {
-        await prisma.discount.update({ where: { id: d.id }, data: { category: dept, subcategory: native } }).catch(() => {});
+        // Do NOT swallow failures silently — flaky pooled connections once ate
+        // writes here while the script still reported them as updated.
+        try {
+          await prisma.discount.update({ where: { id: d.id }, data: { category: dept, subcategory: native } });
+        } catch {
+          failed++;
+          continue;
+        }
       }
       updated++;
       if (updated % 500 === 0) process.stdout.write(`\r   updated ${updated}…   `);
@@ -85,7 +101,7 @@ async function run() {
 
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
-  console.log(`\n🏁 recategorize done — updated=${updated} unchanged=${unchanged}`);
+  console.log(`\n🏁 recategorize done — updated=${updated} unchanged=${unchanged} failed=${failed}${failed ? '  ⚠ RE-RUN (idempotent) to retry failures' : ''}`);
   const sorted = Object.entries(tally).sort((a, b) => b[1] - a[1]);
   console.log('   resulting department distribution:');
   for (const [dept, n] of sorted) console.log('   ', String(n).padStart(5), dept);
