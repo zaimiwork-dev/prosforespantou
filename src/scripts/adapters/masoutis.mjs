@@ -19,6 +19,7 @@
 //      `Itemcode` "0,1" = weekly web offers, "0,2" = leaflet offers.
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { mirrorImages } from '../lib/mirror-images.mjs';
 
 const BASE = 'https://www.masoutis.gr/api/eshop';
 const PAGE_SIZE = 50;
@@ -102,7 +103,24 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
   if (items.length > limit) items = items.slice(0, limit);
   log(`   ${items.length} offers ready to ingest`);
 
-  return await ingestOffers({ chain: 'masoutis', source, items, dryRun });
+  // Masoutis promo URLs ROTATE weekly (root cause of the 06-12 image
+  // regression) — mirror to Supabase so the copy we show never dies. This
+  // adapter runs inside the Vercel cron's 300s budget, so cap fresh downloads
+  // per run: HEAD-reuses are free, and the backlog drains across a few runs.
+  // No-op (originals kept + report warning) without SUPABASE creds in Vercel.
+  let mirrorWarnings = [];
+  if (!dryRun) {
+    const mirror = await mirrorImages({
+      chain: 'masoutis',
+      items,
+      match: (u) => u.includes('masoutisimagesneu.blob.core.windows.net'),
+      maxNew: 120,
+      paceMs: 60,
+    });
+    mirrorWarnings = mirror.warnings;
+  }
+
+  return await ingestOffers({ chain: 'masoutis', source, items, dryRun, extraWarnings: mirrorWarnings });
 }
 
 // CLI behavior — only when this file is invoked directly via `node`.

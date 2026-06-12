@@ -62,8 +62,15 @@ async function ensureBucket({ url, key }) {
 // Mirror every item whose imageUrl matches `match` and rewrite it in place.
 // Never throws for per-image failures — those keep their original URL and are
 // counted. Returns { enabled, attempted, mirrored, reused, failed, warnings }.
-export async function mirrorImages({ chain, items, match, headers = {}, paceMs = 150 }) {
-  const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, warnings: [] };
+//
+// `maxNew` caps fresh downloads per run (HEAD-reuses are free and uncapped) —
+// for callers on a serverless clock (the masoutis Vercel cron, 300s): the
+// first run mirrors a slice, every run after that picks up where it left off,
+// and within a few days the whole catalog is HEAD-reuse.
+// `rewrite` maps a source URL to the variant worth keeping forever (e.g.
+// mymarket medium → original) before download/hashing.
+export async function mirrorImages({ chain, items, match, headers = {}, paceMs = 150, maxNew = Infinity, rewrite = null }) {
+  const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, skipped: 0, warnings: [] };
 
   const config = resolveStorageConfig();
   if (!config) {
@@ -82,21 +89,25 @@ export async function mirrorImages({ chain, items, match, headers = {}, paceMs =
 
   let lastError = null;
   for (const item of items) {
-    const src = item.imageUrl;
+    let src = item.imageUrl;
     if (!src || !match(src)) continue;
+    if (rewrite) src = rewrite(src) || src;
     result.attempted++;
     const path = mirrorPathFor(chain, src);
     const publicUrl = publicUrlFor(config.url, path);
     try {
       // Already mirrored on a previous run? Public-bucket HEAD needs no auth.
-      const head = await fetch(publicUrl, { method: 'HEAD' });
+      // Per-request timeouts so one hung fetch can't stall the whole run.
+      const head = await fetch(publicUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
       if (head.ok) {
         item.imageUrl = publicUrl;
         result.reused++;
         continue;
       }
 
-      const dl = await fetch(src, { headers, redirect: 'follow' });
+      if (result.mirrored >= maxNew) { result.skipped++; continue; }
+
+      const dl = await fetch(src, { headers, redirect: 'follow', signal: AbortSignal.timeout(15000) });
       const contentType = dl.headers.get('content-type') || '';
       if (!dl.ok) throw new Error(`download HTTP ${dl.status}`);
       // Akamai block pages come back 200 text/html — never publish those.
@@ -113,6 +124,7 @@ export async function mirrorImages({ chain, items, match, headers = {}, paceMs =
           'x-upsert': 'true',
         },
         body: bytes,
+        signal: AbortSignal.timeout(20000),
       });
       if (!up.ok) throw new Error(`upload HTTP ${up.status}: ${(await up.text()).slice(0, 120)}`);
 
@@ -131,7 +143,7 @@ export async function mirrorImages({ chain, items, match, headers = {}, paceMs =
     );
   }
   console.log(
-    `   🖼️ image mirror: ${result.mirrored} uploaded, ${result.reused} already mirrored, ${result.failed} failed (of ${result.attempted})`
+    `   🖼️ image mirror: ${result.mirrored} uploaded, ${result.reused} already mirrored, ${result.failed} failed, ${result.skipped} deferred (of ${result.attempted})`
   );
   return result;
 }

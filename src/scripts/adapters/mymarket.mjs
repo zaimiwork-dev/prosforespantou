@@ -31,6 +31,7 @@
 
 import { load as loadHtml } from 'cheerio';
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { mirrorImages } from '../lib/mirror-images.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -246,7 +247,23 @@ export async function runMyMarketAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {
   let offers = [...byCode.values()].map(toOfferItem).filter((it) => it && it.name && it.price > 0);
   if (offers.length > limit) offers = offers.slice(0, limit);
 
-  const report = await ingestOffers({ chain: 'mymarket', source: 'web', items: offers, dryRun });
+  // cdn.mymarket.gr serves browsers but refuses the Vercel optimizer's
+  // datacenter IPs (verified 2026-06-12: URLs 200 from a residential
+  // connection while prod cards showed placeholders) — mirror to Supabase
+  // like AB. Mirror the `original` style so the stored copy is sharp on the
+  // offer page too; next/image downsizes it for cards.
+  let mirrorWarnings = [];
+  if (!dryRun) {
+    const mirror = await mirrorImages({
+      chain: 'mymarket',
+      items: offers,
+      match: (u) => u.includes('cdn.mymarket.gr'),
+      rewrite: (u) => u.replace(/\/images\/styles\/(?:thumbnail|alt_thumbnail|medium)\//, '/images/styles/original/'),
+    });
+    mirrorWarnings = mirror.warnings;
+  }
+
+  const report = await ingestOffers({ chain: 'mymarket', source: 'web', items: offers, dryRun, extraWarnings: mirrorWarnings });
   printReport(report);
   return report;
 }

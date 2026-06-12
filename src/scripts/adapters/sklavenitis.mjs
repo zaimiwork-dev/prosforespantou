@@ -28,6 +28,7 @@
 
 import { load as loadHtml } from 'cheerio';
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { mirrorImages } from '../lib/mirror-images.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -195,7 +196,20 @@ export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } 
   if (offers.length > limit) offers = offers.slice(0, limit);
   console.log(`   ${offers.length} offers ready for ingest`);
 
-  const report = await ingestOffers({ chain: 'sklavenitis', source: 'web', items: offers, dryRun });
+  // s1.sklavenitis.gr serves browsers but refuses the Vercel optimizer's
+  // datacenter IPs (verified 2026-06-12, same class as AB) — mirror to
+  // Supabase and rewrite imageUrl before ingest. No-op without creds.
+  let mirrorWarnings = [];
+  if (!dryRun) {
+    const mirror = await mirrorImages({
+      chain: 'sklavenitis',
+      items: offers,
+      match: (u) => u.includes('sklavenitis.gr'),
+    });
+    mirrorWarnings = mirror.warnings;
+  }
+
+  const report = await ingestOffers({ chain: 'sklavenitis', source: 'web', items: offers, dryRun, extraWarnings: mirrorWarnings });
   printReport(report);
   return report;
 }
