@@ -75,3 +75,5 @@ screenshots/
 # local scratch
 .shots.mjs
 devserver.log
+
+.vercel

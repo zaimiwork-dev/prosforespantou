@@ -4,6 +4,38 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-12 EOD — ALL PUSHED @ `3b2930a`, 10 commits)
+
+**NEXT SESSION, ranked:**
+1. **AB image mirroring at scrape time** — www.ab.gr 403s EVERYONE (optimizer, node, even local browsers); ~360 AB offers show category-icon placeholders and the user is sore about it. The adapter can fetch AB's API, so try downloading images in the adapter context → store locally (public/ or blob) → rewrite imageUrl. `unoptimized` bypass for www.ab.gr is already in (may help real Greek residential IPs; unverified).
+2. **Bazaar Discount + Γαλαξίας recon** (user wants these chains) — new adapters plug into the native-map system from day one. Check what each site exposes first.
+3. **Lidl OCR name cleanup** — pipeline works (257 items/run, healthy IngestRuns) but ~25% of names are garbled ("LAY'S Ταιτσ", "Tonωτικό ρόφλημα"); add a cheap Groq text-fix pass, THEN flip `showUnmatched: true` for lidl.
+4. 173 sklavenitis rows share productIds with other-chain SKUs (winner-takes-row warning every run) — audit ChainProductMapping; load-bearing since the carousel swaps in "cheaper chain" rows by productId.
+5. Hygiene: `passwords.txt` + scratch files still untracked in repo root (move out!); ~50 probe-* scripts; CLAUDE.md still documents the old fetcher→extractor→matcher pipeline as canonical.
+
+### Late-day finds (after the root-cause commit) — all shipped
+- **Σκλαβενίτης adapter slug map was STALE** (`3b2930a`): the site RENAMED its URL taxonomy; unknown slugs silently fell to keyword guessing ("Ρεβίθια με λαχανικά" → 'λαχανικ' → Φρούτα) and the provenance rule then protected the wrong answers. Adapter now emits the RAW slug pair (`katepsygmena/katepsygmena-geymata`) as the native label; [native-category-maps.ts](src/lib/native-category-maps.ts) maps all 115 current pairs; a future rename raises ingest warnings (Υγεία tab). Φρούτα & Λαχανικά verified ROW-BY-ROW: 59/59 real produce.
+- **Image regression** (`7613174`): display preferred `product.imageUrl` (whichever chain we catalogued FIRST — masoutis promo URLs rotate weekly, wolt-era links dead) over the offer's own image. When the 06-12 mymarket scrape matched 4,010 rows, thousands of live pics vanished overnight. Fixed offer-own-first in DiscountCard/OfferDetails/ShoppingList.
+- **Frozen-only brands** → Κατεψυγμένα for name-only chains: Μπάρμπα Στάθης (mini-rule keeps its FRESH bagged salads out), McCain, Noon, Natural Cool, Λαζαρίδη, Σπιτικές Επιλογές, spring rolls.
+- recompute-categories: provenance keep-rule restricted to ADAPTER_TAXONOMY_CHAINS={sklavenitis}; failed writes now counted (was silently swallowing pooled-connection drops — re-run if failed>0).
+
+### Same-day earlier slices
+- `da07a48`+`9f69e05` two-row compact carousel with arrows; `d406d58` cheapest-chain carousel (sibling fetch by productId), card top-strip (badge/pill can't overlap), sheet badge fix + no-photo band; `f4c5ad6` Κάβα=drinks-only beverage split + τοματοχυμός→Κονσέρβες + pack-info τεμ honesty; `327ec42` **€/κιλό–€/λίτρο–€/μεζούρα unit pricing in the sheet** (gift multibuys multiply per-piece size; doses beat volume; diaper kg-ranges guarded); `49339c6` provenance/backfill honesty.
+- Lidl verdict: don't flip showUnmatched until OCR cleanup (see #3).
+- My Market "2-3× more offers" answered: genuine — adapter filters to on-offer rows; the chain just publishes ~5k.
+
+### Category root-cause architecture (`826f414`) — how it works now
+
+1. **[native-category-maps.ts](src/lib/native-category-maps.ts)** — EVERY native label of mymarket (329) / kritikos (273) / ab (14) mapped once to a department; that's ~72% of the catalog now deterministic. Per-chain because the same label flips meaning across chains ('Παιδικά' suncare↔baby-yogurt, 'Λευκά' wine↔cheese, 'Γάλα'@kritikos = infant formula, 'Συμπυκνωμένα' softener↔tomato juice). `null` value = known-but-mixed label → keyword-split, no warning. **Unknown labels show up as ingest-run warnings** (Υγεία tab) — add them to the map, re-run backfill.
+2. **`categorizeForChain(chain, name, native)`** in [categories.ts](src/lib/categories.ts) is the entry now (map hit beats everything); ingest-offers.mjs uses it + collects `unmappedLabels`. tsconfig gained `allowImportingTsExtensions` (node strip-types needs the explicit `.ts` import).
+3. **Provenance rule** in [recompute-categories.mjs](src/scripts/recompute-categories.mjs): no native label + valid stored department = adapter taxonomy set it (sklavenitis href slugs) → KEEP; never re-derive from name keywords. (The 06-11/12 backfills had corrupted sklavenitis rows this way — repaired by re-running the sklavenitis adapter, whose update path rewrites category.)
+4. **Keyword fallback** (masoutis/lidl/unmapped only): Φρούτα rule moved LAST (fruit words are scent words: "Klinex Λεμόνι", "σαμπουάν Πράσινο Μήλο"); λεμοναδα/πορτοκαλαδα/γκαζοζα→Κάβα; πουρες/μπεσαμελ/ξιδι→Παντοπωλείο.
+5. Backfill: 955 rows moved, Άλλο 563→216, Φρούτα 214→~real-produce-only. 17 new tests (95 total).
+
+**Maintenance loop:** new chain label appears → Υγεία-tab warning → add 1 line to native-category-maps.ts → `node src/scripts/recompute-categories.mjs`.
+
+---
+
 ## ⚡ Pick up here (2026-06-11 — obs + display-first + categories + ranking + search/UX SHIPPED)
 
 ### Slices ④+⑤ — honest hotness protocol & search/UX overhaul (2026-06-11, after user feedback)
