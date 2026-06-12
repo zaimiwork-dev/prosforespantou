@@ -38,6 +38,15 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx prisma generate
+      # Piggyback check: ab.gr blocks every non-browser fetch except GH
+      # runners — confirm the leaflet URL used in lib/constants.js resolves.
+      - name: Verify ab.gr leaflet URL (info only)
+        continue-on-error: true
+        run: |
+          for u in https://www.ab.gr/promotions/leaflet https://www.ab.gr/fylladia; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 20 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" "$u")
+            echo "$code  $u"
+          done
       - run: node src/scripts/audit-mappings.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

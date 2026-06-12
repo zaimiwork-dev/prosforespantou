@@ -1,9 +1,10 @@
 // `leafletUrl` — the chain's OWN current-leaflet/offers page. Stable URLs (the
 // PDF behind them rotates on the chain's side, so the link is always fresh).
-// Each verified live 2026-06-12 except ab (this network is Akamai-blocked from
-// all of www.ab.gr — it's their standard nav path; verify once from a browser).
+// Each verified live 2026-06-12 except ab (Akamai blocks every non-browser
+// fetch — URL is the user's recollection; the audit-mappings workflow prints
+// its status code from CI, the one context that can reach www.ab.gr).
 export const SUPERMARKETS = [
-  { id: "ab", name: "AB Vassilopoulos", short: "AB", color: "#E63946", bg: "#fff0f0", heroLabel: "AB", heroSub: "Vassilopoulos", logo: "ab.png", leafletUrl: "https://www.ab.gr/fylladia" },
+  { id: "ab", name: "AB Vassilopoulos", short: "AB", color: "#E63946", bg: "#fff0f0", heroLabel: "AB", heroSub: "Vassilopoulos", logo: "ab.png", leafletUrl: "https://www.ab.gr/promotions/leaflet" },
   { id: "sklavenitis", name: "Σκλαβενίτης", short: "ΣΚ", color: "#1D3557", bg: "#f0f3ff", heroLabel: "Σκλαβε-", heroSub: "νίτης", logo: "sklavenitis.png", leafletUrl: "https://www.sklavenitis.gr/sylloges/prosfores/" },
   { id: "lidl", name: "Lidl", short: "LI", color: "#0050AA", bg: "#f0f5ff", heroLabel: "Lidl", heroSub: "", logo: "lidl.png", leafletUrl: "https://www.lidl-hellas.gr/l/el/fylladio" },
   { id: "mymarket", name: "My Market", short: "MM", color: "#e07b00", bg: "#fff7ed", heroLabel: "My", heroSub: "Market", logo: "mymarket.jpg", leafletUrl: "https://www.mymarket.gr/offers" },
