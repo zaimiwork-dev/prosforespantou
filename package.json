@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
+    "catalog:coverage": "node src/scripts/catalog-coverage.mjs",
     "cap:sync": "cap sync",
     "cap:android": "cap open android"
   },

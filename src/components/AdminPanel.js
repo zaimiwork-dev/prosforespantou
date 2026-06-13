@@ -119,7 +119,7 @@ export function AdminPanel({ onBack }) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMinConf, setBulkMinConf] = useState(90);
   const [productDetail, setProductDetail] = useState(null);
-  const [health, setHealth] = useState({ feeds: [], recentRuns: [] });
+  const [health, setHealth] = useState({ feeds: [], recentRuns: [], coverage: null });
   const [healthLoading, setHealthLoading] = useState(false);
 
   const showMsg = (text, type = "success") => {
@@ -186,7 +186,7 @@ export function AdminPanel({ onBack }) {
   const loadHealth = async () => {
     setHealthLoading(true);
     const res = await getIngestHealth();
-    if (res.success) setHealth({ feeds: res.feeds, recentRuns: res.recentRuns });
+    if (res.success) setHealth({ feeds: res.feeds, recentRuns: res.recentRuns, coverage: res.coverage });
     else showMsg(res.error || "Failed to load pipeline health", "error");
     setHealthLoading(false);
   };
@@ -472,8 +472,19 @@ export function AdminPanel({ onBack }) {
       const s = STATUS[status] || STATUS.never;
       return <span style={{ background: s.bg, color: s.fg, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>{s.label}</span>;
     };
+    const modePill = (mode) => {
+      if (mode === "full-catalog-baseline") {
+        return <span style={{ background: "#e8f7ee", color: "#1b7a43", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>FULL CATALOG</span>;
+      }
+      if (mode === "offers-only") {
+        return <span style={{ background: "#fff4e0", color: "#8a5a00", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>OFFERS ONLY</span>;
+      }
+      return <span style={{ background: "#ffe9e7", color: "#a82317", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>MISSING</span>;
+    };
+    const fmt = (n) => Number(n || 0).toLocaleString("el-GR");
     const th = { padding: "8px 10px", textAlign: "left", whiteSpace: "nowrap" };
     const td = { padding: "8px 10px", whiteSpace: "nowrap" };
+    const coverage = health.coverage;
 
     return (
       <div>
@@ -483,6 +494,64 @@ export function AdminPanel({ onBack }) {
           </div>
           <button onClick={loadHealth} style={{ marginLeft: "auto", background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 RELOAD</button>
         </div>
+
+        {coverage && (
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+              {[
+                ["Προϊόντα", fmt(coverage.totals.products)],
+                ["Με εικόνα", fmt(coverage.totals.productsWithImage)],
+                ["Με GTIN", fmt(coverage.totals.productsWithBarcode)],
+                ["Ενεργές προσφορές", fmt(coverage.totals.activeOffers)],
+                ["Linked offers", `${fmt(coverage.totals.linkedActiveOffers)} (${coverage.totals.linkedOfferRate}%)`],
+                ["Unlinked offers", fmt(coverage.totals.unlinkedActiveOffers)],
+                ["Pending review", fmt(coverage.totals.pendingMatches)],
+                ["Shelf baseline", fmt(coverage.totals.normalBaselineRows)],
+              ].map(([label, value]) => (
+                <div key={label} style={{ border: "1px solid #ececf0", borderRadius: 10, padding: 12, background: "#fff" }}>
+                  <div style={{ fontSize: 11, color: G.muted, fontWeight: 800, textTransform: "uppercase" }}>{label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Κάλυψη καταλόγου ανά supermarket</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead style={{ background: "#f8f9fa" }}>
+                  <tr>
+                    <th style={th}>Chain</th>
+                    <th style={th}>Mode</th>
+                    <th style={{ ...th, textAlign: "right" }}>Active offers</th>
+                    <th style={{ ...th, textAlign: "right" }}>Linked</th>
+                    <th style={{ ...th, textAlign: "right" }}>Unlinked</th>
+                    <th style={{ ...th, textAlign: "right" }}>Pending</th>
+                    <th style={{ ...th, textAlign: "right" }}>Mapped products</th>
+                    <th style={{ ...th, textAlign: "right" }}>Source products</th>
+                    <th style={{ ...th, textAlign: "right" }}>GTIN products</th>
+                    <th style={{ ...th, textAlign: "right" }}>Baseline products</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coverage.chains.map((c) => (
+                    <tr key={c.chain} style={{ borderTop: "1px solid #eee", background: c.unlinkedActiveOffers > 0 ? "#fffdf8" : "transparent" }}>
+                      <td style={{ ...td, fontWeight: 800 }}>{c.chain}</td>
+                      <td style={td}>{modePill(c.mode)}</td>
+                      <td style={{ ...td, textAlign: "right" }}>{fmt(c.activeOffers)}</td>
+                      <td style={{ ...td, textAlign: "right" }}>{fmt(c.linkedActiveOffers)} <span style={{ color: G.muted }}>({c.linkedOfferRate}%)</span></td>
+                      <td style={{ ...td, textAlign: "right", color: c.unlinkedActiveOffers > 0 ? "#8a5a00" : "inherit", fontWeight: c.unlinkedActiveOffers > 0 ? 800 : 400 }}>{fmt(c.unlinkedActiveOffers)}</td>
+                      <td style={{ ...td, textAlign: "right", color: c.pendingMatches > 0 ? "#8a5a00" : "inherit", fontWeight: c.pendingMatches > 0 ? 800 : 400 }}>{fmt(c.pendingMatches)}</td>
+                      <td style={{ ...td, textAlign: "right" }}>{fmt(c.mappedProducts)}</td>
+                      <td style={{ ...td, textAlign: "right" }}>{fmt(c.sourceProducts)}</td>
+                      <td style={{ ...td, textAlign: "right" }}>{fmt(c.sourceProductsWithBarcode)}</td>
+                      <td style={{ ...td, textAlign: "right" }}>{fmt(c.normalBaselineProducts)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div style={{ overflowX: "auto", marginBottom: 28 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>

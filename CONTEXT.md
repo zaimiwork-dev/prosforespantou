@@ -114,6 +114,30 @@ dirty; review + push when ready.** Build green, 152 tests, lint at the pre-exist
   matching, while still keeping current offers first. Offer detail images render inside a centered
   frame.
 
+**Track 3d — catalog coverage visibility (Codex handoff slice, local commit):**
+- Owner correctly flagged data coverage as the biggest risk: we do **not** have every shelf product
+  from every supermarket. Current facts from local DB on 2026-06-13: ~19.7k Products, ~19.65k with
+  images, ~15.6k with GTIN/barcode, ~11.5k active offer rows, ~8.1k linked to canonical Products,
+  ~3.36k active offers still unlinked. Full normal shelf-price baseline currently exists only for
+  Κρητικός.
+- Added [catalog-coverage.ts](src/lib/catalog-coverage.ts): shared read-only coverage calculator
+  for totals + per-chain mode (`full-catalog-baseline` vs `offers-only`), active offers, linked /
+  unlinked offers, pending matches, mapped products, source products, GTIN products, and normal
+  baseline products.
+- Extended [get-ingest-health.ts](src/actions/admin/get-ingest-health.ts) so the admin Υγεία tab
+  returns `coverage` alongside feed health and recent runs.
+- Extended [AdminPanel.js](src/components/AdminPanel.js) Υγεία tab with coverage KPI cards +
+  per-chain table, so the owner can see the exact gap instead of guessing from the public catalog.
+- Added [catalog-coverage.mjs](src/scripts/catalog-coverage.mjs) and `npm run catalog:coverage`
+  for a read-only CLI report.
+- Verification status: code was saved, but `npm run catalog:coverage` was interrupted by the user
+  to preserve usage. Claude/Codex should run `npm run catalog:coverage`, then `npm run test:run`,
+  `npm run build`, and `npm run lint` next. Expect lint to keep the pre-existing AdminPanel debt.
+- Next data work after verification: (1) run/repair `resolve-pending-matches.mjs` where Groq works
+  to reduce the ~3.36k unlinked active offers; (2) design full-catalog ingestion per chain, starting
+  with the chains that expose catalog pages/feeds most cleanly; (3) keep Κρητικός as the proven
+  baseline pattern.
+
 **Track 4 — native app (Capacitor 8 scaffold):**
 - [capacitor.config.ts](capacitor.config.ts) → `server.url` = `CAP_SERVER_URL` || prod
   (`https://prosforespantou.gr`); loads the live site so SSR + Server Actions keep working.
