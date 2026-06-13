@@ -8,6 +8,7 @@ import { discountInputSchema } from '@/lib/validations/discount-input';
 import * as Sentry from "@sentry/nextjs";
 import { sendAlertEmail } from '@/lib/email';
 import { computeHotScore } from '@/lib/hotness';
+import { alertMatchesDiscount } from '@/lib/alert-match';
 
 const SM_MAPPING: Record<string, string> = {
   ab: 'AB Vassilopoulos',
@@ -22,35 +23,24 @@ const SM_MAPPING: Record<string, string> = {
   galaxias: 'Γαλαξίας',
 };
 
-const normalizeString = (s: string) => 
-  s.toLowerCase()
-   .normalize('NFD')
-   .replace(/\p{Diacritic}/gu, '')
-   .trim();
-
 async function fireAlertsFor(discount: any) {
-  const name = normalizeString(discount.productName);
   const alerts = await prisma.alert.findMany({
-    where: { 
-      isActive: true, 
-      subscriber: { 
-        confirmedAt: { not: null }, 
-        unsubscribedAt: null 
-      } 
+    where: {
+      isActive: true,
+      subscriber: {
+        confirmedAt: { not: null },
+        unsubscribedAt: null
+      }
     },
     include: { subscriber: true },
   });
 
+  // Shared predicate (lib/alert-match) so this admin path and the scraped
+  // ingest pipeline match identically; the 6h cooldown is stateful, kept here.
+  const now = Date.now();
   const matched = alerts.filter((a) => {
-    if (!name.includes(normalizeString(a.keyword))) return false;
-    if (a.supermarkets.length && !a.supermarkets.includes(discount.supermarket)) return false;
-    if (a.category && a.category !== discount.category) return false;
-    if (a.maxPrice && Number(discount.discountedPrice) > Number(a.maxPrice)) return false;
-    
-    const now = Date.now();
-    const recently = a.lastTriggeredAt && (now - a.lastTriggeredAt.getTime()) < 6 * 3600000;
-    if (recently) return false;
-    
+    if (!alertMatchesDiscount(a, discount)) return false;
+    if (a.lastTriggeredAt && now - a.lastTriggeredAt.getTime() < 6 * 3600000) return false;
     return true;
   });
 

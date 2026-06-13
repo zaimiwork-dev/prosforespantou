@@ -9,6 +9,7 @@
 
 import 'dotenv/config';
 import { computeHotScore } from '../../lib/hotness.ts';
+import { alertMatchesDiscount } from '../../lib/alert-match.ts';
 import { categorizeForChain, hasChainMap } from '../../lib/categories.ts';
 
 // Chain slug → Store.name (must match what's already in the DB).
@@ -193,16 +194,29 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     createdAt: existing ? existing.createdAt : now,
     clicks: existing ? existing.clickCount : 0,
   });
+  let discountId;
   if (existing) {
     await prisma.discount.update({ where: { id: existing.id }, data: { ...data, hotScore } });
+    discountId = existing.id;
   } else {
-    await prisma.discount.create({ data: { ...data, hotScore } });
+    const created = await prisma.discount.create({ data: { ...data, hotScore } });
+    discountId = created.id;
   }
+
+  // Alertable = the offer just became visible to a watcher: a brand-new row,
+  // or a price DROP vs what we last showed. A standing offer (already active,
+  // same/higher price) is NOT alertable, so a week-long offer can't re-email
+  // nightly. The caller collects these and fires the keyword-alert engine once.
+  const alert = (!existing || item.price < existing.discountedPrice)
+    ? { discountId, productName: item.name, supermarket: chain, category: dept,
+        discountedPrice: item.price, originalPrice, discountPercent }
+    : null;
 
   // PriceSnapshot — only when THIS offer's stored price actually moved
   // (guards against shared-productId rows re-recording each other's price).
   // Snapshots hang off the Product, so productless offers get history only
   // once they're claimed.
+  let snapshotWritten = false;
   const priceMoved = !existing || existing.discountedPrice !== item.price;
   if (productId && priceMoved) {
     const last = await prisma.priceSnapshot.findFirst({
@@ -222,10 +236,10 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
           kind: data.offerType,
         },
       });
-      return { snapshotWritten: true };
+      snapshotWritten = true;
     }
   }
-  return { snapshotWritten: false };
+  return { snapshotWritten, alert };
 }
 
 // ── Full-catalog price baseline (Phase 9) ────────────────────────────────────
@@ -317,6 +331,49 @@ export async function ingestBaseline({ chain, items, dryRun = false }) {
   return out;
 }
 
+// ── Watch-list alerts (Phase 9 §4) ───────────────────────────────────────────
+// Fire the keyword-alert engine for offers that JUST appeared or dropped this
+// run — the SAME engine the admin create-discount path uses, now triggered by
+// the scraped pipeline too (it was dormant for scraped offers before). One
+// email per alert per run with a 6h cooldown. Best-effort: a no-op without
+// confirmed subscribers, and a silent console log without RESEND_API_KEY (see
+// lib/email.ts). Caller wraps it so it can never fail the ingest.
+async function fireWatchAlerts(prisma, alertable) {
+  const alerts = await prisma.alert.findMany({
+    where: { isActive: true, subscriber: { confirmedAt: { not: null }, unsubscribedAt: null } },
+    include: { subscriber: true },
+  });
+  if (alerts.length === 0) return { matchedAlerts: 0, sent: 0 };
+
+  const { sendAlertEmail } = await import('../../lib/email.ts');
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://prosforespantou.gr';
+  const COOLDOWN_MS = 6 * 3600000;
+  const now = Date.now();
+  let matchedAlerts = 0, sent = 0;
+
+  for (const a of alerts) {
+    if (a.lastTriggeredAt && now - a.lastTriggeredAt.getTime() < COOLDOWN_MS) continue;
+    const hit = alertable.find((d) => alertMatchesDiscount(a, d));
+    if (!hit) continue;
+    matchedAlerts++;
+    // Mark triggered FIRST so the cooldown holds even if the email send fails.
+    await prisma.alert.update({ where: { id: a.id }, data: { lastTriggeredAt: new Date() } });
+    const r = await sendAlertEmail({
+      email: a.subscriber.email,
+      unsubToken: a.subscriber.unsubToken,
+      keyword: a.keyword,
+      productName: hit.productName,
+      supermarketName: SM_MAPPING[hit.supermarket] || hit.supermarket,
+      discountedPrice: Number(hit.discountedPrice),
+      originalPrice: hit.originalPrice != null ? Number(hit.originalPrice) : null,
+      discountPercent: hit.discountPercent ?? null,
+      offerUrl: hit.discountId ? `${baseUrl}/offer/${hit.discountId}` : baseUrl,
+    });
+    if (r?.ok) sent++;
+  }
+  return { matchedAlerts, sent };
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 // showUnmatched: display-first — items with no Product match are still written
 // as visible productless Discounts (the chain's own name/price/image/dates),
@@ -402,6 +459,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     let idx = 0;
     let sharedRowSkips = 0;
     const unmappedLabels = new Set();
+    const alertable = []; // offers that newly appeared / dropped this run
     for (const item of items) {
       idx++;
       try {
@@ -433,11 +491,12 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
             if (!skipped) report.unmatchedShown++;
           }
         } else {
-          const { snapshotWritten, sharedRow } = await withDbRetry(`write ${item.name}`, () =>
+          const { snapshotWritten, sharedRow, alert } = await withDbRetry(`write ${item.name}`, () =>
             writeOffer(prisma, item, productId, store.id, chain, source, runStart, unmappedLabels)
           );
           if (snapshotWritten) report.priceChanges++;
           if (sharedRow) sharedRowSkips++;
+          if (alert) alertable.push(alert);
           report.matched++;
           if (via === 'mapping') report.viaMapping++;
           else if (via === 'barcode') report.viaBarcode++;
@@ -479,6 +538,18 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
         })
       );
       report.deactivated = res.count;
+    }
+
+    // Fire watch-list alerts for the offers that newly appeared / dropped this
+    // run. Best-effort — wrapped so a flaky email provider never fails ingest.
+    if (alertable.length > 0) {
+      try {
+        const { matchedAlerts, sent } = await fireWatchAlerts(prisma, alertable);
+        if (matchedAlerts > 0) console.log(`   🔔 alerts: ${sent}/${matchedAlerts} email(s) sent (${alertable.length} new/dropped offers)`);
+        report.alertsSent = sent;
+      } catch (e) {
+        console.log(`   ⚠️ alert pass failed (non-fatal): ${e.message}`);
+      }
     }
 
     await recordRun();
