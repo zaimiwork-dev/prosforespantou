@@ -4,6 +4,57 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ START HERE — full checkpoint for a fresh chat (2026-06-13)
+
+**Project:** Prosfores Pantou — cross-chain Greek supermarket offers (6 chains, ~11k offers). **End goal:** native iOS/Android app; **login OPTIONAL** (email/Google/Apple) → cross-device sync + **push/email watch-list alerts**. Anonymous browsing/list/favorites always work. See [[project_vision]].
+
+**Everything below is committed + pushed to `origin/main` (working tree clean apart from 4 untracked scratch `.txt` files in root — incl. a `passwords.txt` security smell; move out).**
+
+### ✅ Shipped this session (all LIVE on prod unless noted)
+
+**Accuracy / data quality:**
+- Comparison no longer shows different products as "same item elsewhere" — new [offer-similarity.ts](src/lib/offer-similarity.ts) guards getPriceComparison + getCheaperAlternatives. Mapping audit **applied in CI**: 577 wrong ChainProductMappings deleted, 402 poisoned PriceSnapshots removed. Re-run anytime: `gh workflow run audit-mappings.yml`.
+- **Prod photos fixed** — root cause was the **Vercel image-optimizer quota (402 on `/_next/image`)**, not (only) CDN blocking. `images.unoptimized:true` → browsers load straight from source hosts. Image mirroring (AB done 359/359; sklavenitis/mymarket/masoutis draining) is the server-side resilience layer.
+
+**UX / product:**
+- Infinite scroll; full category names on titles; homepage honors "Τα καταστήματά μου"; "Παρόμοιες προσφορές" strip; capped (de-blurred) offer image.
+- φυλλάδιο links: every supermarket page links the chain's **real leaflet page** (slugs in [constants.js](src/lib/constants.js)).
+- **Personalization v1**: first-visit onboarding sheet (stores + "Τι αγοράζεις συνήθως;"), on-device [interest-profile.ts](src/lib/interest-profile.ts), "✨ Για σένα" homepage rail. (PHASES Phase 10.)
+
+**Phase 9 — full-catalog baseline + offer-type distinction + alerts (slices 1–4a):**
+- `Discount.offerType` + `PriceSnapshot.kind`: every offer tagged `strikethrough` (published reference %) vs `mono` (hidden reference).
+- **Κρητικός full-catalog `normal`-price baseline**, live behind `BASELINE=1` on the nightly job — [ingestBaseline()](src/scripts/lib/ingest-offers.mjs), batched + barcode-matched (verified: 8,669 products → 6,038 snapshots, 99.8% match, 9m55s). NO Discount rows for non-offers.
+- Clear **−X% / ΜΟΝΟ** badge on the offer detail view (mirrors the card). **User decision: NO "κανονική τιμή" text** — baseline quietly powers the verdict + alerts.
+- **Alert engine now fires from the scraped pipeline** (was admin-only/dormant) for newly-appeared/price-dropped offers; shared [alert-match.ts](src/lib/alert-match.ts); 6h cooldown; **no-op until `RESEND_API_KEY` exists**.
+
+**Auth accounts FOUNDATION (login not active yet):**
+- next-auth@5 (supports Next 16/React 19) + @auth/prisma-adapter; `User`/`Account`/`Session`/`VerificationToken` + `PushToken` models (db-pushed); [src/auth.ts](src/auth.ts) DB sessions, Google/Apple/Resend providers **gated on env**; route `/api/auth/[...nextauth]`.
+
+### ⛔ BLOCKED ON USER — credential shopping list (unblocks the next build)
+1. **`RESEND_API_KEY`** → Vercel + `.env.local` (resend.com). Unblocks **alert emails AND email magic-link login**. To email real users (not just your own address), verify domain `prosforespantou.gr` in Resend (DNS).
+2. **`AUTH_SECRET`** → Vercel (`openssl rand -base64 32`; a local one is in `.env.local`).
+3. *(optional, social login)* **Google OAuth** → `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, redirect `https://prosforespantou.gr/api/auth/callback/google` (+ localhost for dev).
+4. *(iOS-app stage)* **Apple Sign-In** — paid Apple Developer Program ($99/yr) + JWT key.
+
+### ▶ NEXT BUILD (once #1 + #2 land — fully testable then)
+Login UI + session-aware header → move favorites / preferred-stores / preferred-categories **server-side keyed by `userId` with merge-on-login** from localStorage → favorites→alerts as a logged-in toggle on the live engine. Then **Capacitor wrap (Phase 4.7)** adds native push (PushToken table ready; PWA assets exist).
+
+### ❓ OPEN DECISIONS (owner)
+- **Σκλαβενίτης scrape is CI-IP-blocked** (Akamai blocks GH + Vercel datacenter IPs; serves residential). Data was **refreshed manually 06-13**. Durable fix: residential proxy (~$/mo, hands-off) vs scheduled task on the dev PC (free, PC-must-be-on). Not urgent (weekly offers).
+- **Android vs iOS first:** recommend **Android public-first** (Greek market ~75–80% Android; cheaper/faster review; defers Apple Sign-In). iOS TestFlight early **if owner is on iPhone**. Awaiting owner's phone choice.
+
+### 🧰 Machine / infra gotchas
+- This dev machine: **Groq + ab.gr + Anthropic WebFetch→ab are IP-blocked** (CI only). **sklavenitis.gr blocks CI but serves this machine** (residential). `gh` + `vercel` CLIs are authenticated and work.
+- PowerShell here-strings mangle `git commit -m` with Greek/quotes → use `git commit -F <file>` or a bash heredoc.
+- After `prisma db push` → `rm -rf .next` (stale generated client).
+
+### 🔍 Verify-on-prod next session
+Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ badge on a mono offer's detail page; Κρητικός baseline growing (`PriceSnapshot` where `kind='normal'`); tonight's runs healthy in the Υγεία tab.
+
+*(Detailed per-area blocks below, newest first.)*
+
+---
+
 ## ⚡ Pick up here (2026-06-13 — Auth.js accounts FOUNDATION shipped; awaiting creds)
 
 **End-goal context (owner):** this becomes a native iOS/Android app; users **log in (email/Google/Apple)** → get **push + email** alerts on watched items. Login STAYS OPTIONAL (anonymous UX unaffected); accounts add sync + notifications. See [[project_vision]].
