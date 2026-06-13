@@ -122,7 +122,17 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
   return (
     <div className={`offer-details${compact ? ' compact' : ''}`}>
       <div className={`od-img${displayImage && !imgFailed ? '' : ' no-photo'}`}>
-        {pct > 0 && <div className="discount-badge">-{pct}%</div>}
+        {/* Same offer-type clarity as the card: a real −X% when the chain
+            published a reference price, else the chain's own sticker text
+            ("ΧΑΜΗΛΗ ΤΙΜΗ", "1+1") or a generic ΜΟΝΟ for hidden-reference promos.
+            We deliberately do NOT show a computed "κανονική τιμή". */}
+        {pct > 0 ? (
+          <div className="discount-badge">-{pct}%</div>
+        ) : !originalPrice ? (
+          <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.7rem', padding: '4px 8px', letterSpacing: '0.5px' }}>
+            {offer.description && offer.description.length <= 24 ? offer.description.toUpperCase() : 'ΜΟΝΟ'}
+          </div>
+        ) : null}
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
         {displayImage && !imgFailed ? (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
