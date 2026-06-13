@@ -13,7 +13,7 @@ import { alertMatchesDiscount } from '../../lib/alert-match.ts';
 import { categorizeForChain, hasChainMap } from '../../lib/categories.ts';
 
 // Chain slug → Store.name (must match what's already in the DB).
-const SM_MAPPING = {
+export const SM_MAPPING = {
   ab: 'AB Vassilopoulos',
   lidl: 'Lidl',
   sklavenitis: 'Σκλαβενίτης',
@@ -34,7 +34,7 @@ function gtin13CheckDigit(twelve) {
   for (let i = 0; i < 12; i++) sum += parseInt(twelve[i], 10) * (i % 2 === 0 ? 1 : 3);
   return (10 - (sum % 10)) % 10;
 }
-function normalizeBarcode(raw) {
+export function normalizeBarcode(raw) {
   if (!raw) return null;
   const s = String(raw).trim();
   if (!/^\d+$/.test(s)) return null;
@@ -47,7 +47,7 @@ function normalizeBarcode(raw) {
 
 // ── Small DB retry — survives Neon/Supabase pooler cold-start ────────────────
 const RETRY_DELAYS = [5000, 10000, 20000, 30000];
-async function withDbRetry(label, fn) {
+export async function withDbRetry(label, fn) {
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
