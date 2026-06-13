@@ -1,5 +1,10 @@
 const CHAINS = ['ab', 'kritikos', 'lidl', 'masoutis', 'mymarket', 'sklavenitis'];
 
+// Images self-hosted on the Supabase mirror look like publicUrlFor() in
+// src/scripts/lib/mirror-images.mjs — i.e. they contain this path. Everything
+// else still points at a chain CDN and breaks if that host blocks us.
+const MIRROR_MARKER = '/storage/v1/object/public/chain-images/';
+
 type CountRow = { supermarket: string | null; _count: { _all: number } };
 type PairRow = { supermarket: string | null; productId: string | null };
 
@@ -46,6 +51,8 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
     activeLinkedProductRows,
     normalBaselineRows,
     normalBaselineProducts,
+    totalProductsMirrored,
+    sourceProductsMirrored,
   ] = await Promise.all([
     prisma.product.count(),
     prisma.product.count({ where: { imageUrl: { not: null } } }),
@@ -83,6 +90,10 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
       select: { supermarket: true, productId: true },
       distinct: ['supermarket', 'productId'],
     }),
+
+    // Catalog images self-hosted on the Supabase mirror (resilience metric).
+    prisma.product.count({ where: { imageUrl: { contains: MIRROR_MARKER } } }),
+    prisma.product.groupBy({ by: ['supermarket'], where: { imageUrl: { contains: MIRROR_MARKER } }, _count: { _all: true } }),
   ]);
 
   const sourceProductMap = countMap(sourceProducts);
@@ -93,6 +104,7 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
   const unlinkedOfferMap = countMap(unlinkedActiveOffers);
   const pendingMap = countMap(pendingMatches);
   const normalRowsMap = countMap(normalBaselineRows);
+  const mirroredImageMap = countMap(sourceProductsMirrored);
   const mappingProductMap = pairMap(mappingRows);
   const activeLinkedProductMap = pairMap(activeLinkedProductRows);
   const normalProductMap = pairMap(normalBaselineProducts);
@@ -113,6 +125,8 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
       sourceProducts: sourceProductMap.get(chain) || 0,
       sourceProductsWithImage: sourceImageMap.get(chain) || 0,
       sourceProductsWithBarcode: sourceBarcodeMap.get(chain) || 0,
+      sourceProductsMirrored: mirroredImageMap.get(chain) || 0,
+      mirroredImageRate: pct(mirroredImageMap.get(chain) || 0, sourceImageMap.get(chain) || 0),
       activeOffers: offerRows,
       linkedActiveOffers: linkedRows,
       unlinkedActiveOffers: unlinkedOfferMap.get(chain) || 0,
@@ -131,6 +145,8 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
       products: totalProducts,
       productsWithImage: totalProductsWithImage,
       productsWithBarcode: totalProductsWithBarcode,
+      productsMirrored: totalProductsMirrored,
+      mirroredImageRate: pct(totalProductsMirrored, totalProductsWithImage),
       activeOffers: totalActiveOffers,
       linkedActiveOffers: totalLinkedActiveOffers,
       unlinkedActiveOffers: totalActiveOffers - totalLinkedActiveOffers,

@@ -61,9 +61,14 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 breaks when a chain blocks us, keep it auto-renewing even when blocked, make the **full catalog
 browsable**, and **wrap it as a native app**. Decisions locked: residential proxy from CI;
 full catalog browsable; Android dogfood APK first (iOS later via cloud-Mac CI). Plan file:
-`~/.claude/plans/hi-so-read-whatver-noble-zephyr.md`. **All LOCAL (not committed) — working tree
-dirty; review + push when ready.** Build green, 152 tests, lint at the pre-existing baseline
-(5 errors/6 warnings, all AdminPanel/DealsClient — my new files are clean).
+`~/.claude/plans/hi-so-read-whatver-noble-zephyr.md`. **SHIPPED + LIVE:** committed + pushed
+(`39fadf2`) and deployed to prod — `/catalog` verified live (24 cards SSR, offer deep-links 200).
+A follow-up Codex session extended this slice: catalog is now **offers-first with real search
+ranking** (reuses [search-rank.ts](src/lib/search-rank.ts) via `unaccent` SQL), wrapped in the app
+shell (header/cart/preferred-stores), non-offer items stay **price-silent** (honest), plus a new
+**coverage diagnostic** ([catalog-coverage.ts](src/lib/catalog-coverage.ts) + `catalog:coverage`
+script + admin panel). Build green, 153 tests, lint at the pre-existing baseline (5 errors/6 warnings,
+all AdminPanel/DealsClient).
 
 **Track 1 — autonomous refresh that survives IP blocks (Σκλαβενίτης):**
 - New [proxy-fetch.mjs](src/scripts/lib/proxy-fetch.mjs): `installProxyFromEnv()` installs an

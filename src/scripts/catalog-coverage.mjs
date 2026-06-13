@@ -30,6 +30,7 @@ if (process.env.JSON === '1') {
     mappedProducts: c.mappedProducts,
     sourceProducts: c.sourceProducts,
     gtinProducts: c.sourceProductsWithBarcode,
+    mirrored: `${c.sourceProductsMirrored} (${c.mirroredImageRate}%)`,
     baselineProducts: c.normalBaselineProducts,
   })));
 }
