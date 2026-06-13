@@ -141,6 +141,10 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     discountedPrice: item.price,
     originalPrice,
     discountPercent,
+    // Phase 9: persist WHY this is an offer. Trust the adapter's classification;
+    // fall back to the price shape (a published original ⇒ strikethrough, else
+    // mono — the chain hid the reference price).
+    offerType: item.offerType || (originalPrice ? 'strikethrough' : 'mono'),
     validFrom,
     validUntil,
     imageUrl: item.imageUrl || null,
@@ -206,8 +210,17 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
       orderBy: { recordedAt: 'desc' },
     });
     if (!last || last.price !== item.price) {
+      // This path only runs for OFFER rows, so the snapshot is a promo price:
+      // strikethrough when a reference price was published, else mono. The
+      // 'normal' kind comes from the separate full-catalog pass (Phase 9 §2).
       await prisma.priceSnapshot.create({
-        data: { productId, supermarket: chain, price: item.price, isDiscounted: !!originalPrice },
+        data: {
+          productId,
+          supermarket: chain,
+          price: item.price,
+          isDiscounted: !!originalPrice,
+          kind: data.offerType,
+        },
       });
       return { snapshotWritten: true };
     }

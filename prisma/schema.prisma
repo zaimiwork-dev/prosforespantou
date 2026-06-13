@@ -56,10 +56,17 @@ model PriceSnapshot {
   supermarket     String
   price           Float
   isDiscounted    Boolean  @default(false) @map("is_discounted")
+  // Phase 9: what this price point IS — 'normal' (full-catalog shelf price,
+  // no promo), 'strikethrough' (published original→offer), or 'mono'
+  // (reference price hidden). null = legacy snapshot (all offer-derived,
+  // recorded before the full-catalog baseline existed). `isDiscounted` is the
+  // back-compat boolean; `kind` is the richer signal the baseline/verdict use.
+  kind            String?
   recordedAt      DateTime @default(now()) @map("recorded_at")
   product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, recordedAt])
+  @@index([productId, kind, recordedAt])
   @@map("price_snapshots")
 }
 
@@ -95,6 +102,11 @@ model Discount {
   originalPrice   Float?   @map("original_price")
   discountedPrice Float    @map("discounted_price")
   discountPercent Float?   @map("discount_percent")
+  // Why this is an offer (Phase 9): 'strikethrough' = chain published an
+  // original→offer price (real % is provable); 'mono' = "ΜΟΝΟ x€"-style promo
+  // where the chain HIDES the reference price (delta inferred from the
+  // full-catalog baseline). null = adapter didn't classify / legacy row.
+  offerType       String?  @map("offer_type")
   validFrom       DateTime @map("valid_from")
   validUntil      DateTime @map("valid_until")
   imageUrl        String?  @map("image_url")
