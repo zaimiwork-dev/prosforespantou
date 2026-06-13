@@ -166,6 +166,31 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## 🚀 LAUNCH PLAN (new north star, set 2026-06-12) — ship in days, beat the copycat
+
+**Context shift:** a competitor has shipped something similar → goal is now **public launch in the next few days, made BETTER than baseline**, then pivot to marketing. User has a ChatGPT Pro plan for cheaper/boilerplate work (drafts, copy, legal text); use THIS session for architecture + data + anything load-bearing. User budget = €0 (no paid Claude tier), so be token-efficient: background long jobs, don't stream logs, compact between sessions.
+
+**Our edge vs the copycat (lead with these in product + marketing):**
+1. **Honest €/κιλό–€/λίτρο–€/μεζούρα unit pricing** (shipped) — almost no GR offers site does this; it's the anti-shrinkflation hook.
+2. **Cross-chain cheapest price** per product (carousel swaps in the cheaper chain).
+3. **Watch-list ⭐ + price-drop alerts** (favorites shipped; email alerts need RESEND key).
+4. **Honest price verdicts + history** (not fake "-50%" theater).
+5. **Accurate categories** via per-chain native taxonomy (just hardened).
+
+**LAUNCH BLOCKERS (must clear before public launch):**
+- [ ] **Legal/GDPR** — NO privacy policy / terms / cookie-consent pages exist. Mandatory for an EU consumer site. (Good ChatGPT task: draft Greek Πολιτική Απορρήτου + Όροι Χρήσης; we wire the pages + a cookie banner.)
+- [ ] **AB images** (~360 placeholder; host 403s everyone) — mirror at scrape time. #1 visible-polish item.
+- [ ] **Email alerts live** — needs `RESEND_API_KEY` (user-provided). Then watch-list → "το Χ έπεσε στα Υ€". This is the retention hook; high marketing value.
+- [ ] **Login decision** — accounts foundation shipped but login NOT active (needs `AUTH_SECRET` + optional Google OAuth). Per vision login is OPTIONAL → can launch WITHOUT it (favorites already work device-local); decide explicitly, don't let it block.
+- [ ] **Production smoke** — confirm prod deploy (Vercel), custom domain, all 6 chains' crons green in Υγεία tab, Sentry receiving.
+- [ ] **Basic analytics** for the marketing phase (Vercel Analytics or Plausible — privacy-friendly fits the brand).
+
+**NICE-TO-HAVE (post-launch / marketing phase):** Capacitor wrap for app stores (vision = native mobile app); Bazaar Discount + Γαλαξίας chains (more coverage = better than competitor); Lidl OCR cleanup; the 173 sklavenitis mis-mappings audit.
+
+**Suggested launch order:** legal pages + cookie banner → AB images → prod/cron/domain smoke → (RESEND key) email alerts → soft launch → marketing. Login can come after.
+
+---
+
 ## ⚡ Pick up here (2026-06-12 EOD — ALL PUSHED @ `3b2930a`, 10 commits)
 
 ### Late-day finds (after the root-cause commit) — all shipped
