@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useShoppingListStore } from "@/lib/store";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
-import { SearchDropdown } from "@/components/SearchDropdown";
 import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { Footer } from "@/components/Footer";
@@ -17,8 +16,9 @@ export function SearchPage({ query, deals }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { items: cart, addItem } = useShoppingListStore();
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && inputValue.trim().length >= 2) {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (inputValue.trim().length >= 2) {
       router.push("/search?q=" + encodeURIComponent(inputValue.trim()));
     }
   };
@@ -39,13 +39,13 @@ export function SearchPage({ query, deals }) {
           zIndex: 100,
         }}
       >
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", gap: 10, alignItems: "center" }}>
+        <form onSubmit={handleSubmit} style={{ maxWidth: 1200, margin: "0 auto", display: "flex", gap: 10, alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1 }}>
             <input
               autoFocus
+              type="search"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder="Αναζήτηση προϊόντος..."
               style={{
                 width: "100%",
@@ -61,15 +61,15 @@ export function SearchPage({ query, deals }) {
             <svg style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, color: "#8b929c" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <SearchDropdown query={inputValue} deals={deals} onSelect={(d) => { if (d) setSelectedProduct(d); }} />
           </div>
           <button
+            type="button"
             onClick={() => router.push("/")}
             style={{ background: "none", border: "none", color: "#009de0", fontWeight: 800, fontSize: 13, cursor: "pointer", padding: "0 4px", whiteSpace: "nowrap" }}
           >
             ΑΚΥΡΟ
           </button>
-        </div>
+        </form>
       </div>
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px" }}>

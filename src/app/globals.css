@@ -240,6 +240,27 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   transform: translateY(-50%); color: var(--ink-3);
   pointer-events: none;
 }
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-link {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 800;
+}
+.topbar-link:hover,
+.topbar-link.active {
+  background: var(--bg-soft);
+  color: var(--brand);
+}
+@media (max-width: 768px) { .topbar-nav { display: none; } }
 .topbar-right { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .icon-btn {
   width: 40px; height: 40px;
@@ -1269,7 +1290,14 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   padding: 20px;
   border-bottom: 1px solid var(--line);
 }
+.od-photo-frame {
+  position: relative;
+  width: min(100%, 460px);
+  height: 100%;
+  margin-inline: auto;
+}
 .compact .od-img { max-height: 200px; }
+.compact .od-photo-frame { width: min(100%, 360px); }
 /* left:auto — the base .discount-badge pins left:10px; without clearing it the
    badge gets BOTH edges and stretches into a full-width red bar. */
 .od-img .discount-badge { position: absolute; top: 12px; right: 12px; left: auto; z-index: 2; }

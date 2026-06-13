@@ -104,6 +104,16 @@ dirty; review + push when ready.** Build green, 152 tests, lint at the pre-exist
 - Non-offer products stay **price-silent** — no "Τιμή ραφιού" card treatment. We only promote
   active offers with the real `-X%` badge or supermarket-style `ΜΟΝΟ`.
 
+**Track 3c — catalog/search UX fix (Codex continuation):**
+- Added a visible desktop/tablet `Κατάλογος` header link and the normal app header on `/catalog`
+  (mobile still uses the bottom tab).
+- Search suggestions no longer open empty / sticky panels; `/search` shows only the submitted
+  results after Enter. `gala`/`γάλα` now ranks actual dairy before soap/body-care scent matches,
+  and short hidden substrings like `μεγάλα` are not treated as hits.
+- `/catalog` search now uses the shared greeklish + relevance scorer instead of raw substring
+  matching, while still keeping current offers first. Offer detail images render inside a centered
+  frame.
+
 **Track 4 — native app (Capacitor 8 scaffold):**
 - [capacitor.config.ts](capacitor.config.ts) → `server.url` = `CAP_SERVER_URL` || prod
   (`https://prosforespantou.gr`); loads the live site so SSR + Server Actions keep working.

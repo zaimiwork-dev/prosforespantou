@@ -135,7 +135,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
         ) : null}
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
         {displayImage && !imgFailed ? (
-          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <div className="od-photo-frame">
             <Image
               src={displayImage}
               alt={displayName || ''}

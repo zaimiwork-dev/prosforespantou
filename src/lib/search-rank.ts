@@ -122,6 +122,7 @@ export type SearchableDeal = {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const B = '[^a-z0-9α-ωϊϋΐΰς]'; // not-a-word-char (normalized text)
+const SHORT_SUBSTRING_MIN = 5;
 
 // How strongly one term matches one deal. 0 = no match.
 function termScore(term: string, name: string, rest: string): number {
@@ -129,12 +130,49 @@ function termScore(term: string, name: string, rest: string): number {
   const t = escapeRe(term);
   if (new RegExp(`(^|${B})${t}(${B}|$)`).test(name)) return 100; // whole word in name
   if (new RegExp(`(^|${B})${t}`).test(name)) return 70;          // word-prefix in name
-  if (name.includes(term)) return 35;                            // anywhere in name
+  // Very short bare substrings are usually false positives in Greek search:
+  // "gala" should not match "μεγάλα". Prefixes still match ("γάλακτος").
+  if (name.includes(term)) return term.length >= SHORT_SUBSTRING_MIN ? 35 : 0;
   if (rest.includes(term)) return 10;                            // description/category only
   return 0;
 }
 
 export const CATEGORY_INTENT_BOOST = 50;
+
+export function searchIntentDepartment(query: string, terms = expandSearch(query)): string {
+  const direct = categorize(query);
+  if (direct !== 'Άλλο') return direct;
+
+  // Greeklish queries ("gala") need the expanded Greek spelling ("γαλα") for
+  // intent. Without this, exact scent words in soap/body-care tied real dairy.
+  for (const term of terms) {
+    const dept = categorize(term);
+    if (dept !== 'Άλλο') return dept;
+  }
+  return 'Άλλο';
+}
+
+export function scoreSearchResult<T extends SearchableDeal>(
+  query: string,
+  deal: T,
+  terms = expandSearch(query),
+  intentDept = searchIntentDepartment(query, terms)
+): number {
+  if (terms.length === 0) return 0;
+
+  const name = normalizeSearchText(deal.productName);
+  const rest = `${normalizeSearchText(deal.description)} ${normalizeSearchText(deal.category)}`;
+  let best = 0;
+  for (const term of terms) {
+    const s = termScore(term, name, rest);
+    if (s > best) best = s;
+  }
+  if (best === 0) return 0;
+  const candidateDept = deal.category || categorize(deal.productName);
+  if (intentDept !== 'Άλλο' && candidateDept === intentDept) best += CATEGORY_INTENT_BOOST;
+  best += Math.min(Math.max(deal.hotScore ?? 0, 0), 60) * 0.1; // popularity = tiebreak only
+  return best;
+}
 
 // Rank a candidate list for a query. Returns matches only, best first.
 export function rankSearchResults<T extends SearchableDeal>(query: string, deals: T[]): T[] {
@@ -143,21 +181,13 @@ export function rankSearchResults<T extends SearchableDeal>(query: string, deals
 
   // What department does this query "mean"? Reuses the catalog categorizer, so
   // searching a staple boosts the rows that live where the staple lives.
-  const intentDept = categorize(query);
+  const intentDept = searchIntentDepartment(query, terms);
 
   const scored: { deal: T; score: number }[] = [];
   for (const deal of deals) {
-    const name = normalizeSearchText(deal.productName);
-    const rest = `${normalizeSearchText(deal.description)} ${normalizeSearchText(deal.category)}`;
-    let best = 0;
-    for (const term of terms) {
-      const s = termScore(term, name, rest);
-      if (s > best) best = s;
-    }
-    if (best === 0) continue;
-    if (intentDept !== 'Άλλο' && deal.category === intentDept) best += CATEGORY_INTENT_BOOST;
-    best += Math.min(Math.max(deal.hotScore ?? 0, 0), 60) * 0.1; // popularity = tiebreak only
-    scored.push({ deal, score: best });
+    const score = scoreSearchResult(query, deal, terms, intentDept);
+    if (score === 0) continue;
+    scored.push({ deal, score });
   }
 
   return scored.sort((a, b) => b.score - a.score).map((x) => x.deal);

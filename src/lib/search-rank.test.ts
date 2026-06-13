@@ -7,6 +7,7 @@ const milk = { productName: 'ΝΟΥΝΟΥ Γάλα Συμπυκνωμένο Ελ
 const lotion = { productName: 'Agnotis Βρεφικό Γαλάκτωμα Σώματος 200ml.', category: 'Βρεφικά Είδη', hotScore: 10 };
 const soap = { productName: 'Palmolive Naturals Κρεμοσάπουνο Μέλι & Γάλα 750ml', category: 'Προσωπική Φροντίδα', hotScore: 12 };
 const chocolate = { productName: 'ΙΟΝ ΣΟΚΟΛΑΤΑ ΓΑΛΑΚΤΟΣ 70ΓΡ', category: 'Σνακ & Γλυκά', hotScore: 27 };
+const large = { productName: 'Μεγάλα πιάτα χάρτινα 50 τεμ.', category: 'Είδη Καθαρισμού & Σπιτιού', hotScore: 40 };
 
 describe('rankSearchResults — the γάλα test', () => {
   it('actual milk outranks lotions, soaps and chocolate', () => {
@@ -25,9 +26,13 @@ describe('rankSearchResults — the γάλα test', () => {
   });
 
   it('greeklish "gala" finds the Greek rows', () => {
-    const ranked = rankSearchResults('gala', [lotion, milk]);
+    const ranked = rankSearchResults('gala', [lotion, soap, milk]);
     expect(ranked.length).toBeGreaterThan(0);
     expect(ranked[0]).toBe(milk);
+  });
+
+  it('does not treat short hidden substrings as matches', () => {
+    expect(rankSearchResults('gala', [large])).toHaveLength(0);
   });
 });
 

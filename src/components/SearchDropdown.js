@@ -33,7 +33,7 @@ function SearchThumb({ src, alt }) {
 // search action uses, so suggestions and the results page agree on what
 // "relevant" means (they previously had divergent inline copies that matched
 // bare substrings: typing "γάλα" suggested body lotions before milk).
-export function SearchDropdown({ query, deals, onSelect }) {
+export function SearchDropdown({ query, deals, onSelect, open = true, showEmpty = false }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -49,9 +49,10 @@ export function SearchDropdown({ query, deals, onSelect }) {
     };
   }, [onSelect]);
 
-  if (!query || query.trim().length < 2) return null;
+  if (!open || !query || query.trim().length < 2) return null;
 
-  const results = rankSearchResults(query, deals).slice(0, 10);
+  const results = rankSearchResults(query, deals || []).slice(0, 6);
+  if (results.length === 0 && !showEmpty) return null;
 
   const sm = (id) => SUPERMARKETS.find((s) => s.id === id);
 
@@ -68,7 +69,7 @@ export function SearchDropdown({ query, deals, onSelect }) {
         boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
         zIndex: 200,
         overflowY: "auto",
-        maxHeight: "210px",
+        maxHeight: "260px",
         border: "1px solid #ececf0",
       }}
     >
