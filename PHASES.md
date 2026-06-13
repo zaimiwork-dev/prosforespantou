@@ -275,7 +275,10 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ---
 
-## Phase 9 — Full-catalog price baseline → honest verdicts → watch-list alerts (PLANNED 2026-06-12)
+## Phase 9 — Full-catalog price baseline → honest verdicts → watch-list alerts (SLICES 1–4a SHIPPED 2026-06-13)
+
+**Shipped 2026-06-13:** slice 1 = `Discount.offerType`/`PriceSnapshot.kind` (strikethrough vs mono); slice 2 = Κρητικός full-catalog `normal`-price baseline, batched + barcode-matched, live behind `BASELINE=1` (verified 6,038 snapshots / 99.8% match / 9m55s on the full catalog); slice 3 = clear −X%/ΜΟΝΟ badge on the detail view (NO "κανονική τιμή" text — user call); slice 4a = the keyword-alert engine now fires from the scraped pipeline (was admin-only), shared `lib/alert-match.ts`, anti-spam (new/dropped offers only + 6h cooldown), no-op until a Resend key exists. **Left (4b):** add `RESEND_API_KEY` (user) → emails send; then the favorites→email opt-in UI (the product vision) on the now-live engine. Extending the baseline to another chain needs that chain's full catalog + barcode matching.
+
 
 **Why (user decision, 2026-06-12):** today we only see prices when a chain *promotes* an item, so (a) the price-history "Μέση" is an average of offer prices — biased low, (b) we cannot prove a "-35%" is real (the chain may have raised the base price last week), (c) watch-list alerts can't fire for products that simply aren't on promo anywhere. Ingesting every product's shelf price gives us the baseline that makes the honesty positioning bullet-proof — it's the moat.
 

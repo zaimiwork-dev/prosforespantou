@@ -4,6 +4,34 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-13 — Phase 9 (full-catalog baseline + alerts) slices 1–4a SHIPPED)
+
+**The "store every item + clear offer distinction + alerts" track. All pushed.**
+
+- **Slice 1 (`d4c5335`)** — `Discount.offerType` + `PriceSnapshot.kind` (additive, db-pushed). Every offer records WHY: `strikethrough` (published reference price) vs `mono` (hidden reference). Ingest writes both.
+- **Slice 2 (`dbaad56`)** — **full-catalog price baseline, Κρητικός pilot, live behind `BASELINE=1`** on the nightly job. `ingestBaseline()` in [ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) writes `kind:'normal'` snapshots for NON-offer items, **batched** (preload mappings/barcodes/cache/last-price → bulk createMany; scales to full catalog in seconds), barcode-matched, matched-only, NO Discount rows. **Full CI run verified: 8,669 products → 6,421/6,436 non-offers matched (99.8%), 6,038 normal snapshots, 9m55s.** Κρητικός is the pilot because its adapter already fetches the whole catalog + matches by GTIN (sidesteps the mapping-cleanliness risk). To extend to another chain: that chain's adapter must expose its full catalog AND have clean (barcode-based) matching.
+- **Slice 3 (`03d8be6`)** — offer-type clarity on the detail view: −X% (strikethrough) vs a **ΜΟΝΟ** badge (or chain sticker text), mirroring the card. **Per user: NO "κανονική τιμή" text** — non-discounted items aren't shown, and we don't surface a computed reference. The baseline data quietly powers the price-history verdict + alerts instead.
+- **Slice 4a (`465eff0`)** — the keyword-alert engine (Alert model + `/alerts` page + `sendAlertEmail`) was **dormant for scraped offers** (only admin-created discounts fired it). Now the nightly scrape fires it too, for offers that **newly appeared / dropped** that run (standing offers don't re-spam; 6h cooldown). New shared [alert-match.ts](src/lib/alert-match.ts) predicate (admin path refactored onto it). **Safe no-op today** — no confirmed subscribers + no `RESEND_API_KEY` ⇒ nothing sends.
+
+**Phase 9 — what's left (slice 4b, needs user):**
+1. **USER: add `RESEND_API_KEY`** (free at resend.com) to Vercel env → alert emails actually send. Until then everything's a logged no-op.
+2. **Favorites→email opt-in UI** (the user's stated vision): attach an email to the ⭐ favorites (via the existing double-opt-in Subscriber) so a saved PRODUCT alerts when it drops — built on the now-live engine. This is the next build once a Resend key exists (so it's end-to-end verifiable).
+
+**Still parked (non-blocking):** Σκλαβενίτης durable scrape fix (residential-only — proxy vs PC task; data was refreshed manually, see below).
+
+---
+
+## ⚡ Pick up here (2026-06-13 cont. — Σκλαβενίτης is now CI-IP-blocked; data refreshed manually; FIX DECISION PENDING)
+
+**New finding (Opus continuation):** the scheduled Σκλαβενίτης scrape **fails in CI with `page 1 HTTP 403`** — confirmed PERSISTENT across two GH dispatches AND a freshly-built Vercel cron route (`75b3b56`, [scrape-sklavenitis/route.ts](src/app/api/cron/scrape-sklavenitis/route.ts)). sklavenitis.gr's Akamai **IP-blocks datacenter ranges (GitHub Actions + Vercel both)** while serving residential IPs fine (this dev machine + the user's browser get 200, same headers). It's per-chain and not uniform: **AB is the opposite** (works from GH runners, blocks this dev machine). So "blocked" is chain×IP-range specific, not global.
+
+- **Immediate staleness handled:** ran the adapter from this machine (residential) → **2983 scraped / 1850 matched / 44 deactivated / health OK** (image-mirroring deliberately skipped for speed — live photos already load direct via `unoptimized`). Data is fresh as of now.
+- **The Vercel route (`75b3b56`) is confirmed NON-functional** (Vercel egress is also blocked) — it's NOT in vercel.json, never called. Remove it OR repurpose it only if we add a proxy. Decide with the chosen fix.
+- **DECISION PENDING (user):** durable fix for residential-only chains = **(a) residential proxy** routed from CI (set-and-forget, scales to future blocked chains, ~$5–15/mo) vs **(b) Windows scheduled task on this PC** (free, proven, but pipeline depends on the machine being on). User is cost-conscious (chose "test Vercel free" first). No urgency now that data is fresh + sklavenitis offers rotate weekly.
+- Tiny follow-up from the refresh: 1 unmapped native category `fresko-kreas/freska-arnia-katsikia` (fresh lamb/goat) → add to [native-category-maps.ts](src/lib/native-category-maps.ts); 169 sklavenitis shared-productId mis-mappings remain (post-audit residue, "winner-takes-row" warning).
+
+---
+
 ## ⚡ Pick up here (2026-06-13 — bug-report session COMPLETE: all pushed, audit APPLIED, prod photos FIXED)
 
 **Everything below is LIVE on prod (user authorized push mid-session). Final state:**
