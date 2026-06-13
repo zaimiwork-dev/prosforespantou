@@ -4,6 +4,27 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-13 — Auth.js accounts FOUNDATION shipped; awaiting creds)
+
+**End-goal context (owner):** this becomes a native iOS/Android app; users **log in (email/Google/Apple)** → get **push + email** alerts on watched items. Login STAYS OPTIONAL (anonymous UX unaffected); accounts add sync + notifications. See [[project_vision]].
+
+**Shipped (`4391df3`)** — the auth foundation (NO login active yet, all gated on env):
+- next-auth@5 beta.31 (confirmed: supports Next 16 + React 19) + @auth/prisma-adapter.
+- Prisma: `User`/`Account`/`Session`/`VerificationToken` (Auth.js standard, UUID-aligned) + `PushToken` (future Capacitor FCM/APNs). db-pushed.
+- [src/auth.ts](src/auth.ts): database sessions via the Prisma driver-adapter singleton; **Google / Apple / Resend-magic-link providers gated on their env vars** (none set → app builds + runs, login just isn't offered). Route at `/api/auth/[...nextauth]`.
+
+**USER CREDENTIAL SHOPPING LIST (to activate login):**
+1. **`AUTH_SECRET`** → Vercel env (generate: `openssl rand -base64 32`). A local one is already in `.env.local`.
+2. **Google OAuth** (Google Cloud Console → OAuth client, Web): redirect `https://prosforespantou.gr/api/auth/callback/google` (+ `http://localhost:3000/...` for dev) → `AUTH_GOOGLE_ID` + `AUTH_GOOGLE_SECRET` to Vercel + `.env.local`.
+3. **`RESEND_API_KEY`** (resend.com) → Vercel + `.env.local`. Dual-purpose: enables alert emails AND the email magic-link login.
+4. **Apple Sign-In** — needs the paid Apple Developer Program; defer to the iOS-app stage (required for App Store if Google login is offered, not for web).
+
+**NEXT (once Google + AUTH_SECRET + Resend land):** login UI + session-aware header (login/account button), then move favorites/preferred-stores/categories server-side keyed by userId with **merge-on-login** from localStorage. Then favorites→alerts become a logged-in toggle on the (already-live) alert engine.
+
+**App-store timing (owner asked):** two moments — (1) Capacitor wrap + push → TestFlight/Play-internal (dogfood on your phone) soon after accounts+push; (2) public launch later, gated on native value (push+login = Apple's justification), "Sign in with Apple", polish, stable data, privacy/terms, dev accounts ($99/yr Apple, $25 Google). Recommend Android public first, then iOS.
+
+---
+
 ## ⚡ Pick up here (2026-06-13 — Phase 9 (full-catalog baseline + alerts) slices 1–4a SHIPPED)
 
 **The "store every item + clear offer distinction + alerts" track. All pushed.**
