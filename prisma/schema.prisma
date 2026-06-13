@@ -207,6 +207,80 @@ model Alert {
   @@map("alerts")
 }
 
+// ── Accounts (Phase: auth foundation, 2026-06-13) ────────────────────────────
+// Standard Auth.js (NextAuth v5) Prisma-adapter models, UUID-aligned to this
+// schema's convention. Login is OPTIONAL (anonymous browsing/list/favorites
+// keep working); accounts add cross-device sync + watch-list push/email.
+// Providers: email magic-link (Resend), Google, Apple — added as creds land.
+model User {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?   @map("email_verified")
+  image         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  accounts      Account[]
+  sessions      Session[]
+  pushTokens    PushToken[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Device push tokens for native (Capacitor FCM/APNs) + web push. Keyed to the
+// user; the alert engine gains push as a second delivery channel alongside email.
+model PushToken {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  token      String   @unique
+  platform   String   // 'ios' | 'android' | 'web'
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
 // Persistent (rawName, supermarket) → productId mapping. Populated by matcher
 // on every successful LLM match (or auto-accept). Subsequent cycles look up
 // here BEFORE pre-filter / LLM, skipping the expensive call entirely. This is
