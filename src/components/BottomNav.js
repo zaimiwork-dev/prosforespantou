@@ -16,6 +16,7 @@ import { useShoppingListStore } from '@/lib/store';
 const TABS = [
   { href: '/', label: 'Αρχική', icon: 'Home', match: (p) => p === '/' },
   { href: '/deals', label: 'Προσφορές', icon: 'Tag', match: (p) => p.startsWith('/deals') || p.startsWith('/offer') || p.startsWith('/supermarket') },
+  { href: '/catalog', label: 'Κατάλογος', icon: 'Grid', match: (p) => p.startsWith('/catalog') },
   { href: '/search', label: 'Αναζήτηση', icon: 'Search', match: (p) => p.startsWith('/search') },
 ];
 

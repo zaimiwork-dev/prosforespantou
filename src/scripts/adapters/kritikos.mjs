@@ -18,6 +18,7 @@
 //     data stays live (rather than wiping everything).
 
 import { ingestOffers, printReport, ingestBaseline } from '../lib/ingest-offers.mjs';
+import { mirrorImages } from '../lib/mirror-images.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -183,7 +184,24 @@ async function run() {
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
   console.log(`   ${items.length} real offers ready to ingest`);
 
-  const report = await ingestOffers({ chain: 'kritikos', source: 'web', items, dryRun: DRY_RUN });
+  // Self-host every offer image on the Supabase mirror (resilience: own the
+  // picture so it survives the chain ever blocking us / rotating S3 keys). The
+  // Kritikos S3 host isn't datacenter-blocked, so this works from CI without a
+  // proxy; deterministic paths + HEAD-skip mean only genuinely-new artwork is
+  // downloaded after the first drain. maxNew caps fresh downloads per run so the
+  // ~8.7k-product first pass drains over a few daily runs inside the job budget.
+  let mirrorWarnings = [];
+  if (!DRY_RUN) {
+    const mirror = await mirrorImages({
+      chain: 'kritikos',
+      items,
+      match: (u) => u.includes('/w4ve/kritikos/'),
+      maxNew: parseInt(process.env.MIRROR_MAX_NEW || '2500', 10),
+    });
+    mirrorWarnings = mirror.warnings;
+  }
+
+  const report = await ingestOffers({ chain: 'kritikos', source: 'web', items, dryRun: DRY_RUN, extraWarnings: mirrorWarnings });
 
   // Phase 9 baseline (opt-in BASELINE=1): snapshot the NON-offer products we
   // already have in hand at their shelf price. Excludes anything that ingested

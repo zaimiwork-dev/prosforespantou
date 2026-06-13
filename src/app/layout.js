@@ -46,6 +46,7 @@ export const viewport = {
 };
 
 import { BottomNav } from "@/components/BottomNav";
+import { PushRegistrar } from "@/components/PushRegistrar";
 
 export default function RootLayout({ children }) {
   return (
@@ -58,6 +59,8 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <BottomNav />
+        {/* Native-only push registration (no-op on web). */}
+        <PushRegistrar />
       </body>
     </html>
   );

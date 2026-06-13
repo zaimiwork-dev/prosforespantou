@@ -16,6 +16,11 @@ name: Scrape supermarket chains
 #                                src/scripts/lib/mirror-images.mjs). Without
 #                                these the AB run still works — images just
 #                                stay broken and the run report warns.
+#   PROXY_URL                  — residential proxy (http://user:pass@host:port)
+#                                for chains whose host IP-blocks GitHub's
+#                                datacenter ranges. Σκλαβενίτης (Akamai) needs
+#                                it; without it the daily sklavenitis-offers job
+#                                403s. See src/scripts/lib/proxy-fetch.mjs.
 #
 # Design (2026-06-07):
 #   Adapters run as their own short jobs (60-min timeout). They do scrape + DB
@@ -100,6 +105,11 @@ jobs:
           # (kind='normal') for the price baseline. Kritikos already fetches
           # every product to find offers, so this is free + barcode-matched.
           BASELINE: '1'
+          # Self-host offer images on the Supabase mirror (resilience). Kritikos
+          # S3 isn't IP-blocked, so no proxy needed. Without these the run still
+          # works — images just stay on S3 and the report warns.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   ab-offers:
     if: github.event.schedule == '0 3 * * *' || github.event.inputs.chain == 'ab-offers'
@@ -140,6 +150,11 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # sklavenitis.gr (Akamai) 403s GitHub's datacenter IPs — route the
+          # scrape + image downloads through a residential proxy. Without the
+          # secret the adapter no-ops the proxy and 403s as before (set it to
+          # make the daily run autonomous). See src/scripts/lib/proxy-fetch.mjs.
+          PROXY_URL: ${{ secrets.PROXY_URL }}
 
   mymarket-offers:
     if: github.event.schedule == '0 0 * * *' || github.event.inputs.chain == 'mymarket-offers'
@@ -428,3 +443,19 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           PACE_MS: '150'
+      - name: Self-host Kritikos catalog images (non-offer Product pics)
+        # Mirrors Product.imageUrl (the full browsable catalog) to Supabase so
+        # pictures survive a CDN block / S3 key rotation. Incremental: caps fresh
+        # downloads per run, HEAD-skips already-mirrored files. Seed the initial
+        # ~8.7k locally for speed; this keeps it topped up weekly. No-op without
+        # the Supabase creds. See src/scripts/mirror-catalog.mjs.
+        continue-on-error: true
+        run: node src/scripts/mirror-catalog.mjs
+        env:
+          CHAIN: kritikos
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MIRROR_MAX_NEW: '2500'
+          QUERY_LIMIT: '4000'

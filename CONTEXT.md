@@ -55,6 +55,69 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-13 — AUTONOMY + APP slice: proxy, full-image self-hosting, browse catalog, Capacitor scaffold)
+
+**Owner ask:** make the product self-sufficient — own every product/price/picture so nothing
+breaks when a chain blocks us, keep it auto-renewing even when blocked, make the **full catalog
+browsable**, and **wrap it as a native app**. Decisions locked: residential proxy from CI;
+full catalog browsable; Android dogfood APK first (iOS later via cloud-Mac CI). Plan file:
+`~/.claude/plans/hi-so-read-whatver-noble-zephyr.md`. **All LOCAL (not committed) — working tree
+dirty; review + push when ready.** Build green, 152 tests, lint at the pre-existing baseline
+(5 errors/6 warnings, all AdminPanel/DealsClient — my new files are clean).
+
+**Track 1 — autonomous refresh that survives IP blocks (Σκλαβενίτης):**
+- New [proxy-fetch.mjs](src/scripts/lib/proxy-fetch.mjs): `installProxyFromEnv()` installs an
+  `undici` global `ProxyAgent` when `PROXY_URL` is set (no-op otherwise → other chains
+  untouched). Added `undici` dep + 4 unit tests.
+- [sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) calls it at startup → in CI the page
+  scrape **and** the s1.sklavenitis.gr image downloads route through a residential IP. 403 still
+  throws before ingest, so a blocked run deactivates nothing (safety intact).
+- `scrape-chains.yml`: `PROXY_URL` secret passed to the `sklavenitis-offers` job (+ documented).
+  The dead Vercel sklavenitis route was already gone.
+- **⛔ USER ACTION:** sign up for a residential proxy (Greek/EU residential), add repo secret
+  `PROXY_URL=http://user:pass@host:port`. Then the daily 01:00 UTC run self-heals. Verify:
+  `gh workflow run scrape-chains.yml -f chain=sklavenitis-offers` → 200 + healthy IngestRun.
+
+**Track 2 — every image self-hosted (resilience):**
+- [kritikos.mjs](src/scripts/adapters/kritikos.mjs) now mirrors its OFFER images (S3 host,
+  reachable from CI; `maxNew` capped). Added SUPABASE creds to the `kritikos-offers` job.
+- New [mirror-catalog.mjs](src/scripts/mirror-catalog.mjs): self-hosts `Product.imageUrl` (the
+  non-offer catalog that the browse view renders), chain-parameterized + incremental + proxy-aware,
+  writes the rewritten URL back. Wired into the `kritikos-canonical` weekly job. Smoke-tested
+  (DRY_RUN) against the live DB. **Seed the initial ~8.7k Κρητικός locally to drain fast:**
+  `CHAIN=kritikos node src/scripts/mirror-catalog.mjs` (re-run until uploaded=0). Other chains:
+  `CHAIN=ab` (CI), `CHAIN=sklavenitis PROXY_URL=…`, etc.
+- **Deferred (noted):** Lidl leaflet-page mirroring (Lidl items are OCR'd, no per-product images).
+
+**Track 3a — full catalog, browsable (NEW public surface):**
+- [get-catalog-products.ts](src/actions/get-catalog-products.ts): searches every `Product`,
+  attaches its cheapest CURRENT offer when one exists (honest — silent price otherwise).
+- [ProductCard.js](src/components/ProductCard.js) + [CatalogClient.js](src/components/CatalogClient.js)
+  (debounced search + infinite scroll, DealsClient's setState-in-callback pattern) +
+  [/catalog](src/app/catalog/page.tsx) (force-dynamic). New **"Κατάλογος" bottom-nav tab**
+  (+ `Icon.Grid`). v1 = search + paginate (no category/chain facet yet — `Product` has no category;
+  that's the Track 3b follow-up).
+
+**Track 4 — native app (Capacitor 8 scaffold):**
+- [capacitor.config.ts](capacitor.config.ts) → `server.url` = `CAP_SERVER_URL` || prod
+  (`https://prosforespantou.gr`); loads the live site so SSR + Server Actions keep working.
+  Minimal offline `capacitor-www/index.html`. `cap:sync`/`cap:android` npm scripts. `android/`,
+  `ios/` gitignored. Deps installed (`@capacitor/core|cli|android|push-notifications`).
+- Push foundation: [register-push-token.ts](src/actions/register-push-token.ts) (session-gated —
+  `PushToken.userId` is required) + [PushRegistrar.js](src/components/PushRegistrar.js)
+  (native-only via `window.Capacitor`, zero web overhead), mounted in layout. Inert until login is
+  active + FCM/APNs configured.
+- **⛔ USER ACTIONS (runbook):** `npx cap add android` → open in Android Studio (`npm run cap:android`)
+  → build/sign APK → sideload to dogfood. Push needs a Firebase project (FCM `google-services.json`).
+  iOS: same project built on Codemagic/GitHub-macOS + Apple Developer Program ($99/yr) — no Mac needed.
+
+**Still open / honest caveats:** full-catalog PRICES for all chains = Track 3b (extend the
+Κρητικός `normal`-price baseline chain-by-chain, gated on clean mappings — don't show untrusted
+prices); public store launch (review + legal pages + dev accounts) is beyond the couple-days window;
+alerts/login still need `RESEND_API_KEY` + `AUTH_SECRET`.
+
+---
+
 ## ⚡ Pick up here (2026-06-13 — Auth.js accounts FOUNDATION shipped; awaiting creds)
 
 **End-goal context (owner):** this becomes a native iOS/Android app; users **log in (email/Google/Apple)** → get **push + email** alerts on watched items. Login STAYS OPTIONAL (anonymous UX unaffected); accounts add sync + notifications. See [[project_vision]].

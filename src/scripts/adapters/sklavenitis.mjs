@@ -29,6 +29,7 @@
 import { load as loadHtml } from 'cheerio';
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
+import { installProxyFromEnv } from '../lib/proxy-fetch.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -167,6 +168,12 @@ function toOfferItem(raw) {
 
 export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
   console.log(`🛒 Sklavenitis adapter${dryRun ? ' (DRY_RUN)' : ''}`);
+
+  // sklavenitis.gr (Akamai) 403s datacenter IPs (GitHub Actions, Vercel) but
+  // serves residential ones. In CI, PROXY_URL routes the global fetch — page
+  // scrapes AND the s1.sklavenitis.gr image-mirror downloads — through a
+  // residential proxy. No-op locally / without the secret. See lib/proxy-fetch.mjs.
+  installProxyFromEnv();
 
   const byCode = new Map();
   let totalCount = null;
