@@ -6,12 +6,9 @@ import { ProductCard } from './ProductCard';
 
 const PAGE = 24;
 
-// Full-catalog browse: search every Product we hold (offer or not), infinite
-// scroll. On-offer products show an honest price + deep-link to the offer; the
-// rest are silent info tiles. Follows DealsClient's fetch pattern — setState
-// lives in the `load` useCallback, the effect only calls it (skip-ref guards the
-// SSR-provided first render) — so it stays clear of the react-compiler
-// set-state-in-effect rule.
+// Full-catalog browse: offers first, then the wider Product catalog for search /
+// deeper browsing. On-offer products show an honest price + deep-link to the
+// offer; the rest are silent info tiles.
 export default function CatalogClient({ initial }) {
   const [products, setProducts] = useState(initial.products);
   const [total, setTotal] = useState(initial.total);
@@ -75,7 +72,7 @@ export default function CatalogClient({ initial }) {
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '16px 12px 80px' }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: '8px 0 4px' }}>Όλα τα προϊόντα</h1>
       <p style={{ color: 'var(--ink-3, #888)', fontSize: 13, margin: '0 0 14px' }}>
-        Όλος ο κατάλογος — με τιμή όταν κάτι είναι σε προσφορά τώρα.
+        Πρώτα όσα είναι σε προσφορά τώρα — και μετά όλος ο κατάλογος για αναζήτηση.
       </p>
 
       <input

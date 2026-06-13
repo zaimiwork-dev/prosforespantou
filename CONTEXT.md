@@ -98,6 +98,12 @@ dirty; review + push when ready.** Build green, 152 tests, lint at the pre-exist
   (+ `Icon.Grid`). v1 = search + paginate (no category/chain facet yet — `Product` has no category;
   that's the Track 3b follow-up).
 
+**Track 3b — catalog ranking / honesty tweak (Codex continuation):**
+- `/catalog` now ranks products with a CURRENT active offer first, then quiet catalog-only products
+  underneath. Search still spans the full catalog, but offers lead the results.
+- Non-offer products stay **price-silent** — no "Τιμή ραφιού" card treatment. We only promote
+  active offers with the real `-X%` badge or supermarket-style `ΜΟΝΟ`.
+
 **Track 4 — native app (Capacitor 8 scaffold):**
 - [capacitor.config.ts](capacitor.config.ts) → `server.url` = `CAP_SERVER_URL` || prod
   (`https://prosforespantou.gr`); loads the live site so SSR + Server Actions keep working.
@@ -111,10 +117,9 @@ dirty; review + push when ready.** Build green, 152 tests, lint at the pre-exist
   → build/sign APK → sideload to dogfood. Push needs a Firebase project (FCM `google-services.json`).
   iOS: same project built on Codemagic/GitHub-macOS + Apple Developer Program ($99/yr) — no Mac needed.
 
-**Still open / honest caveats:** full-catalog PRICES for all chains = Track 3b (extend the
-Κρητικός `normal`-price baseline chain-by-chain, gated on clean mappings — don't show untrusted
-prices); public store launch (review + legal pages + dev accounts) is beyond the couple-days window;
-alerts/login still need `RESEND_API_KEY` + `AUTH_SECRET`.
+**Still open / honest caveats:** full-catalog shelf-price baselines should stay behind the scenes
+until a chain's mappings are clean; public store launch (review + legal pages + dev accounts) is
+beyond the couple-days window; alerts/login still need `RESEND_API_KEY` + `AUTH_SECRET`.
 
 ---
 

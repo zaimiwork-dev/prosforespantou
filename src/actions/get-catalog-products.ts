@@ -4,12 +4,10 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 
-// Browse the FULL catalog (every Product we hold), not just offers. Each product
-// carries its cheapest CURRENT offer when one exists, so the UI can show an
-// honest "σε προσφορά X€" badge — and stays silent (no invented price) when the
-// product isn't on offer anywhere right now. This is the resilience payoff: the
-// catalog + its self-hosted images live in our DB, so it browses even when a
-// chain blocks our scrapers.
+// Browse the FULL catalog (every Product we hold), not just offers. Current
+// offers rank first; non-offer products remain available for deeper browsing /
+// search but stay price-silent. This is the resilience payoff: the catalog + its
+// self-hosted images live in our DB, so it browses even when a chain blocks us.
 
 const InputSchema = z.object({
   search: z.string().max(120).optional().default(''),
@@ -34,8 +32,13 @@ export type CatalogProduct = {
     category: string;
     description: string | null;
     priceVerdict: string | null;
+    offerType: string | null;
   };
 };
+
+function compactWhere(parts: any[]) {
+  return parts.length ? { AND: parts } : {};
+}
 
 export async function getCatalogProducts(rawInput: unknown): Promise<{ products: CatalogProduct[]; total: number }> {
   return await Sentry.withServerActionInstrumentation('getCatalogProducts', { recordResponse: true }, async () => {
@@ -44,49 +47,76 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
     const { search, limit, offset, scope } = parsed.data;
     const now = new Date();
 
-    const where: any = {};
-    if (scope === 'withImage') where.imageUrl = { not: null };
+    const baseParts: any[] = [];
+    if (scope === 'withImage') baseParts.push({ imageUrl: { not: null } });
     const q = search.trim();
     if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { brand: { contains: q, mode: 'insensitive' } },
-        { barcode: { contains: q } },
-      ];
+      baseParts.push({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { brand: { contains: q, mode: 'insensitive' } },
+          { barcode: { contains: q } },
+        ],
+      });
     }
 
     try {
-      const [rows, total] = await Promise.all([
-        prisma.product.findMany({
-          where,
+      const currentOfferWhere = { isActive: true, validUntil: { gt: now } };
+      const baseWhere = compactWhere(baseParts);
+      const withOfferWhere = compactWhere([...baseParts, { discounts: { some: currentOfferWhere } }]);
+      const withoutOfferWhere = compactWhere([...baseParts, { NOT: { discounts: { some: currentOfferWhere } } }]);
+      const select = {
+        id: true,
+        name: true,
+        brand: true,
+        unitInfo: true,
+        imageUrl: true,
+        // Cheapest CURRENT offer for this product, if any — the only price we
+        // promote in the catalog.
+        discounts: {
+          where: currentOfferWhere,
+          orderBy: { discountedPrice: 'asc' as const },
+          take: 1,
           select: {
             id: true,
-            name: true,
-            brand: true,
-            unitInfo: true,
-            imageUrl: true,
-            // Cheapest CURRENT offer for this product, if any — the honest price.
-            discounts: {
-              where: { isActive: true, validUntil: { gt: now } },
-              orderBy: { discountedPrice: 'asc' },
-              take: 1,
-              select: {
-                id: true,
-                supermarket: true,
-                discountedPrice: true,
-                originalPrice: true,
-                category: true,
-                description: true,
-                priceVerdict: true,
-              },
-            },
+            supermarket: true,
+            discountedPrice: true,
+            originalPrice: true,
+            category: true,
+            description: true,
+            priceVerdict: true,
+            offerType: true,
           },
-          orderBy: { updatedAt: 'desc' },
-          take: limit,
-          skip: offset,
-        }),
-        prisma.product.count({ where }),
+        },
+      };
+
+      const [offerTotal, total] = await Promise.all([
+        prisma.product.count({ where: withOfferWhere }),
+        prisma.product.count({ where: baseWhere }),
       ]);
+
+      const rows: any[] = [];
+      if (offset < offerTotal) {
+        const take = Math.min(limit, offerTotal - offset);
+        rows.push(...await prisma.product.findMany({
+          where: withOfferWhere,
+          select,
+          orderBy: { updatedAt: 'desc' },
+          skip: offset,
+          take,
+        }));
+      }
+
+      if (rows.length < limit) {
+        const nonOfferOffset = Math.max(0, offset - offerTotal);
+        rows.push(...await prisma.product.findMany({
+          where: withoutOfferWhere,
+          select,
+          orderBy: { updatedAt: 'desc' },
+          skip: nonOfferOffset,
+          take: limit - rows.length,
+        }));
+      }
 
       const products: CatalogProduct[] = rows.map((p) => ({
         id: p.id,

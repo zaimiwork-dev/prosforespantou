@@ -7,10 +7,8 @@ import { CategoryIcon } from './CategoryIcon';
 import { SUPERMARKETS } from '@/lib/constants';
 
 // Catalog card: a Product from the full catalog, with its cheapest CURRENT offer
-// when one exists. Deliberately price-silent for non-offer items (honesty: we
-// don't invent a shelf price). On-offer cards link to the offer detail page;
-// off-offer cards are non-interactive info tiles. Shares the .card styling with
-// DiscountCard for visual consistency.
+// when one exists. Deliberately price-silent for non-offer items: the catalog is
+// browsable, but only true active offers get price treatment.
 export function ProductCard({ p }) {
   const [imgFailed, setImgFailed] = useState(false);
   const offer = p.offer;
@@ -19,6 +17,7 @@ export function ProductCard({ p }) {
   const pct = offer && offer.originalPrice && offer.discountedPrice
     ? Math.round((1 - offer.discountedPrice / offer.originalPrice) * 100)
     : null;
+  const showMono = offer && !pct && (offer.offerType === 'mono' || !offer.originalPrice);
 
   const img = p.imageUrl && !imgFailed ? (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -44,7 +43,7 @@ export function ProductCard({ p }) {
         <div className="card-top-strip">
           {pct > 0 ? (
             <div className="discount-badge">-{pct}%</div>
-          ) : offer && !offer.originalPrice ? (
+          ) : showMono ? (
             <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>
               {offer.description && offer.description.length <= 24 ? offer.description.toUpperCase() : 'ΜΟΝΟ'}
             </div>
