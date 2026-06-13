@@ -407,6 +407,17 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           PACE_MS: '200'
+      - name: My Market full catalog (site listing → Product + shelf-price baseline)
+        # mymarket.gr/offers paginates the WHOLE catalogue (~5.5k) offers-first;
+        # this captures every product (SKU-keyed) so the catalog is complete and
+        # future offers link instantly. Wolt step above still adds GTINs for the
+        # subset it covers. See src/scripts/mymarket-catalog.mjs.
+        continue-on-error: true
+        run: node src/scripts/mymarket-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '600'
 
   sklavenitis-canonical:
     if: github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'sklavenitis-canonical'
