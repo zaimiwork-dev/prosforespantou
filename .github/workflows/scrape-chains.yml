@@ -96,6 +96,10 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           PACE_MS: '150'
+          # Phase 9 pilot: also snapshot the full catalog's shelf prices
+          # (kind='normal') for the price baseline. Kritikos already fetches
+          # every product to find offers, so this is free + barcode-matched.
+          BASELINE: '1'
 
   ab-offers:
     if: github.event.schedule == '0 3 * * *' || github.event.inputs.chain == 'ab-offers'

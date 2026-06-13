@@ -228,6 +228,95 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
   return { snapshotWritten: false };
 }
 
+// ── Full-catalog price baseline (Phase 9) ────────────────────────────────────
+// Records a 'normal' PriceSnapshot for catalog items that are NOT on offer, so
+// price history has a true shelf-price baseline (prove a "-X%"/ΜΟΝΟ is real;
+// fire watch-list alerts when a tracked item actually drops). Same
+// deterministic waterfall as offers (chain SKU → barcode → cache); UNMATCHED
+// items are skipped — we never write productless baseline rows. NO Discount
+// rows: the public UI stays offers-only. On-change only. The caller MUST pass
+// only NON-offer items at their shelf price — an on-offer item's price is
+// already captured by ingestOffers as mono/strikethrough, and labelling it
+// 'normal' would poison the very baseline this exists to build.
+export async function ingestBaseline({ chain, items, dryRun = false }) {
+  if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
+  if (!Array.isArray(items)) throw new Error('items must be an array');
+  const { default: prisma } = await import('../../lib/prisma.ts');
+  const out = { total: items.length, matched: 0, written: 0, unchanged: 0, unmatched: 0, errors: 0 };
+  const valid = items.filter((it) => it && it.price > 0);
+  if (valid.length === 0) { console.log('   📒 baseline: no valid items'); return out; }
+
+  // Batched, not per-item: a full catalog is 10k–20k rows and per-item queries
+  // would blow the CI timeout. Preload the three lookups in a handful of
+  // queries, resolve in memory, bulk-insert. Same deterministic waterfall as
+  // offers — chain SKU mapping → barcode → name cache — and UNMATCHED items
+  // are skipped (never a productless baseline row).
+  const [mappings, cache] = await Promise.all([
+    withDbRetry('baseline mappings', () =>
+      prisma.chainProductMapping.findMany({ where: { supermarket: chain }, select: { chainItemcode: true, productId: true } })),
+    withDbRetry('baseline cache', () =>
+      prisma.matchCache.findMany({ where: { supermarket: chain }, select: { rawName: true, productId: true } })),
+  ]);
+  const skuToPid = new Map(mappings.map((m) => [m.chainItemcode, m.productId]));
+  const nameToPid = new Map(cache.map((c) => [c.rawName, c.productId]));
+
+  // Barcode lookup only for items the SKU map didn't already resolve.
+  const needBarcode = [...new Set(
+    valid.filter((it) => !(it.chainItemcode && skuToPid.has(String(it.chainItemcode))))
+      .map((it) => normalizeBarcode(it.barcode)).filter(Boolean)
+  )];
+  const barcodeToPid = new Map();
+  for (let i = 0; i < needBarcode.length; i += 500) {
+    const chunk = needBarcode.slice(i, i + 500);
+    const prods = await withDbRetry('baseline barcodes', () =>
+      prisma.product.findMany({ where: { barcode: { in: chunk } }, select: { id: true, barcode: true } }));
+    for (const p of prods) if (p.barcode) barcodeToPid.set(p.barcode, p.id);
+  }
+
+  // Resolve each item → productId (one row per product per run).
+  const wantPrice = new Map(); // productId → shelf price
+  for (const it of valid) {
+    const pid = (it.chainItemcode && skuToPid.get(String(it.chainItemcode)))
+      || barcodeToPid.get(normalizeBarcode(it.barcode))
+      || nameToPid.get(it.name);
+    if (!pid) { out.unmatched++; continue; }
+    out.matched++;
+    if (!wantPrice.has(pid)) wantPrice.set(pid, it.price);
+  }
+  if (dryRun || wantPrice.size === 0) {
+    console.log(`   📒 baseline (dry=${dryRun}): ${out.matched} matched / ${out.unmatched} unmatched (of ${out.total})`);
+    return out;
+  }
+
+  // On-change dedup: latest 'normal' snapshot price per product (DISTINCT ON).
+  const pids = [...wantPrice.keys()];
+  const lastNormal = new Map();
+  for (let i = 0; i < pids.length; i += 1000) {
+    const chunk = pids.slice(i, i + 1000);
+    const snaps = await withDbRetry('baseline last-normal', () =>
+      prisma.priceSnapshot.findMany({
+        where: { supermarket: chain, kind: 'normal', productId: { in: chunk } },
+        orderBy: [{ productId: 'asc' }, { recordedAt: 'desc' }],
+        distinct: ['productId'],
+        select: { productId: true, price: true },
+      }));
+    for (const s of snaps) lastNormal.set(s.productId, s.price);
+  }
+
+  const toWrite = [];
+  for (const [pid, price] of wantPrice) {
+    if (lastNormal.get(pid) === price) { out.unchanged++; continue; }
+    toWrite.push({ productId: pid, supermarket: chain, price, isDiscounted: false, kind: 'normal' });
+  }
+  for (let i = 0; i < toWrite.length; i += 1000) {
+    const chunk = toWrite.slice(i, i + 1000);
+    await withDbRetry('baseline insert', () => prisma.priceSnapshot.createMany({ data: chunk }));
+    out.written += chunk.length;
+  }
+  console.log(`   📒 baseline: ${out.written} written, ${out.unchanged} unchanged, ${out.matched} matched / ${out.unmatched} unmatched (of ${out.total})`);
+  return out;
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 // showUnmatched: display-first — items with no Product match are still written
 // as visible productless Discounts (the chain's own name/price/image/dates),

@@ -17,7 +17,7 @@
 //     returns nothing, we abort early so the health check trips and stale
 //     data stays live (rather than wiping everything).
 
-import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { ingestOffers, printReport, ingestBaseline } from '../lib/ingest-offers.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -138,6 +138,16 @@ function toOfferItem(p) {
   };
 }
 
+// Phase 9: a NON-offer catalog product at its shelf price → 'normal' baseline.
+// We already fetched every product to find the offers, so this is free data.
+function toBaselineItem(p) {
+  if (!p.available || !p.enabled) return null;
+  const price = p.finalPrice ? p.finalPrice / 100 : null;
+  if (!price || price <= 0) return null;
+  const barcode = Array.isArray(p.barcodes) && p.barcodes.length ? String(p.barcodes[0]) : null;
+  return { name: (p.name || '').trim(), price, chainItemcode: String(p.sku), barcode };
+}
+
 async function run() {
   console.log(`🛒 Kritikos adapter${DRY_RUN ? ' (DRY_RUN)' : ''}`);
   const buildId = await getBuildId();
@@ -174,6 +184,26 @@ async function run() {
   console.log(`   ${items.length} real offers ready to ingest`);
 
   const report = await ingestOffers({ chain: 'kritikos', source: 'web', items, dryRun: DRY_RUN });
+
+  // Phase 9 baseline (opt-in BASELINE=1): snapshot the NON-offer products we
+  // already have in hand at their shelf price. Excludes anything that ingested
+  // as an offer (its price is the promo price, captured there). Secondary +
+  // best-effort — a failure here never fails the offer run.
+  if (process.env.BASELINE === '1') {
+    try {
+      const offerSkus = new Set(items.map((it) => String(it.chainItemcode)));
+      let baseline = [...bySku.values()]
+        .filter((p) => p.sku && !offerSkus.has(String(p.sku)))
+        .map(toBaselineItem)
+        .filter(Boolean);
+      if (baseline.length > LIMIT) baseline = baseline.slice(0, LIMIT);
+      console.log(`   ${baseline.length} non-offer catalog items for baseline`);
+      await ingestBaseline({ chain: 'kritikos', items: baseline, dryRun: DRY_RUN });
+    } catch (e) {
+      console.log(`   ⚠️ baseline pass failed (non-fatal): ${e.message}`);
+    }
+  }
+
   printReport(report);
   process.exit(report.healthOk ? 0 : 1);
 }
