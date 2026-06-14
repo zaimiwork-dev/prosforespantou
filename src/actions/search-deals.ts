@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import * as Sentry from "@sentry/nextjs";
 import { expandSearch, rankSearchResults } from '@/lib/search-rank';
+import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export async function searchDeals(query: string, supermarket?: string) {
   return await Sentry.withServerActionInstrumentation('searchDeals', { recordResponse: true }, async () => {
@@ -35,6 +36,7 @@ export async function searchDeals(query: string, supermarket?: string) {
         SELECT id FROM discounts
         WHERE is_active = true
           AND valid_until > NOW()
+          AND (supermarket IS DISTINCT FROM 'mymarket' OR original_price IS NOT NULL OR description IS NOT NULL)
           ${supermarketClause}
           AND (${joinedConditions})
         ORDER BY hot_score DESC
@@ -44,7 +46,7 @@ export async function searchDeals(query: string, supermarket?: string) {
       if (rows.length === 0) return [];
 
       const candidates = await prisma.discount.findMany({
-        where: { id: { in: rows.map((r) => r.id) } },
+        where: withPublicDealVisibility({ id: { in: rows.map((r) => r.id) } }),
         include: { store: true, leaflet: true, product: true },
       });
 

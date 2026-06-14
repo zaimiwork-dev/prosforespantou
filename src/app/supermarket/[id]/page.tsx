@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { SUPERMARKETS } from "@/lib/constants";
 import SupermarketClient from "@/components/SupermarketClient";
 import { pruneExpiredDatelessLeaflets } from "@/actions/admin/leaflet-actions";
+import { activePublicDealWhere } from "@/lib/public-deal-filters";
 
 export const dynamic = 'force-dynamic';
 
@@ -36,17 +37,13 @@ export default async function SupermarketPage({ params }) {
   // server action (`searchDeals(query, supermarket)`) for queries ≥ 2 chars.
   const [deals, totalCount, leaflet] = await Promise.all([
     prisma.discount.findMany({
-      where: {
-        supermarket: id,
-        isActive: true,
-        validUntil: { gt: now },
-      },
+      where: activePublicDealWhere(now, { supermarket: id }),
       include: { store: true, leaflet: true, product: true },
       orderBy: [{ hotScore: "desc" }, { validUntil: "asc" }],
       take: 500,
     }),
     prisma.discount.count({
-      where: { supermarket: id, isActive: true, validUntil: { gt: now } },
+      where: activePublicDealWhere(now, { supermarket: id }),
     }),
     prisma.leaflet.findFirst({
       where: {

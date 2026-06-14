@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { samePack } from '@/lib/packaging';
 import { nameSimilarity, COMPARISON_SIMILARITY_FLOOR } from '@/lib/offer-similarity';
+import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export interface CheaperAlternative {
   discountId: string;
@@ -74,12 +75,12 @@ export async function getCheaperAlternatives(
 
         const now = new Date();
         const candidates = await prisma.discount.findMany({
-          where: {
+          where: withPublicDealVisibility({
             productId: { in: [...allProductIds] },
             isActive: true,
             validUntil: { gt: now },
             id: { notIn: parsed.data },
-          },
+          }),
           select: {
             id: true,
             productId: true,

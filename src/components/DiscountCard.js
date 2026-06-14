@@ -8,6 +8,7 @@ import { SUPERMARKETS } from '@/lib/constants';
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
 import { isPositiveVerdict } from '@/lib/price-verdict';
+import { displayCategoryForProduct } from '@/lib/display-category';
 
 // Honest "good deal" labels — only positive verdicts ever reach the card
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
@@ -37,7 +38,6 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const validUntil      = d.validUntil      ?? d.valid_until;
   const validFrom       = d.validFrom       ?? d.valid_from;
   const discountPercent = d.discountPercent ?? d.discount_percent;
-  const category        = d.category;
   const supermarketId   = d.supermarket || d.supermarket_id;
 
   const sm = SUPERMARKETS.find((s) => s.id === supermarketId) || { name: supermarketId, color: "var(--ink-2)", short: "??" };
@@ -62,6 +62,7 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   // Raw offer name first: it matches this offer's price/pack ("9+3 Δώρο");
   // the canonical product.name can be a single-unit variant.
   const displayName = d.productName || d.product_name || d.product?.name;
+  const category = displayCategoryForProduct(displayName, d.category);
   // Offer's OWN image first, for the same reason: it comes from the chain
   // currently selling the deal, so it's alive and shows the right pack. The
   // catalog product's image is whichever chain's CDN we saw FIRST — masoutis

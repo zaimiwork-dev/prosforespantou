@@ -120,6 +120,12 @@ function extractItemsFromHtml(html) {
     });
     const hasArchTeli = Number.isFinite(archi) && Number.isFinite(teli) && archi > teli && teli > 0;
     const isWeightedOffer = !$row.length && hasArchTeli;
+    const offerNote = $art.find('.offer-note').first().text().trim() || null;
+    const printedOfferText = [
+      offerNote,
+      $art.find('[class*="badge"], [class*="label"], [class*="sticker"]').text(),
+    ].filter(Boolean).join(' ');
+    const hasPrintedOfferSignal = /super|mono|μόνο|δωρ|δώρ|προσφ|χαμηλ/i.test(printedOfferText);
 
     // Keep only real offers; a plain regular-price row (no is-on-offer, no
     // struck original) is skipped.
@@ -149,6 +155,7 @@ function extractItemsFromHtml(html) {
       if (pct != null && pct > 0.01 && pct < 0.95) {
         originalPrice = Math.round((price / (1 - pct)) * 100) / 100;
       }
+      if (!originalPrice && !hasPrintedOfferSignal) return;
     } else {
       // WEIGHTED: per-kilo final + original come straight from the label pair.
       price = teli;
@@ -167,9 +174,6 @@ function extractItemsFromHtml(html) {
     // Image
     let imageUrl = $art.find('picture img').first().attr('src') || $art.find('img').first().attr('src') || null;
     if (imageUrl && imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
-
-    // Offer note: "SUPER ΤΙΜΗ", "ΜΟΝΟ", etc.
-    const offerNote = $art.find('.offer-note').first().text().trim() || null;
 
     items.push({
       variantSku: String(variantSku),
@@ -201,7 +205,8 @@ function toOfferItem(raw) {
     unit: null,
     category: raw.category,
     imageUrl: raw.imageUrl,
-    offerType: 'mono',
+    description: raw.offerNote,
+    offerType: raw.originalPrice ? 'strikethrough' : 'mono',
   };
 }
 

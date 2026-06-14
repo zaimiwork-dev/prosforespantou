@@ -181,6 +181,19 @@ function PublicSite({ initial, onAdmin }) {
           <CategoryGrid asLinks counts={initial.counts?.byCategory || {}} />
 
           <SupermarketTiles counts={initial.counts?.bySupermarket || {}} />
+
+          <section className="section-tight">
+            <Link href="/catalog" className="catalog-cta">
+              <div>
+                <div className="eyebrow">Πλήρεις κατάλογοι</div>
+                <h3>Βρες προϊόντα πέρα από τις σημερινές προσφορές</h3>
+                <p>Αναζήτηση σε προϊόντα, μάρκες, κατηγορίες και καταστήματα.</p>
+              </div>
+              <span className="btn btn-outline btn-lg">
+                Άνοιγμα καταλόγου <Icon.ArrowRight size={16} />
+              </span>
+            </Link>
+          </section>
         </div>
       </main>
 

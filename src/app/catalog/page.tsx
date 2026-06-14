@@ -1,5 +1,5 @@
 import CatalogClient from '@/components/CatalogClient';
-import { getCatalogProducts } from '@/actions/get-catalog-products';
+import { getCatalogFacets, getCatalogProducts } from '@/actions/get-catalog-products';
 
 export const metadata = {
   title: 'Όλα τα προϊόντα',
@@ -12,6 +12,9 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function CatalogPage() {
-  const initial = await getCatalogProducts({ limit: 24, offset: 0 });
-  return <CatalogClient initial={initial} />;
+  const [catalog, facets] = await Promise.all([
+    getCatalogProducts({ limit: 24, offset: 0 }),
+    getCatalogFacets(),
+  ]);
+  return <CatalogClient initial={{ ...catalog, facets }} />;
 }

@@ -40,9 +40,30 @@ export const DEPARTMENTS = [
 ] as const;
 
 const DEPT_SET = new Set<string>(DEPARTMENTS);
+const PERSONAL_CARE_DEPT = DEPARTMENTS[12];
+const PERSONAL_CARE_NAME_MARKERS = [
+  'spf',
+  'nivea sun',
+  'carroten',
+  'noxzema',
+  'ambre solaire',
+  'sunscreen',
+  'sun block',
+  'sun lotion',
+  'after sun',
+  '\u03b1\u03bd\u03c4\u03b7\u03bb\u03b9\u03b1\u03ba',
+];
 
 function normalize(s: string | null | undefined): string {
   return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function nameFirstOverride(name: string | null | undefined): string | null {
+  const n = normalize(name);
+  if (PERSONAL_CARE_NAME_MARKERS.some((marker) => n.includes(marker))) {
+    return PERSONAL_CARE_DEPT;
+  }
+  return null;
 }
 
 // Ordered keyword rules — FIRST match wins, so list specific departments before
@@ -499,6 +520,9 @@ export function categorizeForChain(
   name: string | null | undefined,
   nativeHint?: string | null
 ): { dept: string; mapped: boolean } {
+  const override = nameFirstOverride(name);
+  if (override) return { dept: override, mapped: true };
+
   if (chain && nativeHint) {
     const m = CHAIN_LOOKUP.get(chain);
     const key = normalize(nativeHint);

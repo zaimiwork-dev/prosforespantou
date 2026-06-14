@@ -7,17 +7,11 @@ import { Icon } from './Icons';
 import { ShoppingList } from './ShoppingList';
 import { useShoppingListStore } from '@/lib/store';
 
-// Persistent bottom tab bar (phones only — CSS hides it ≥768px). The audience
-// is elderly + mobile-first; hunting for gear/basket icons in the top corners
-// is exactly what they won't do. Λίστα opens the drawer rather than routing —
-// the list IS a drawer everywhere else.
-// Ειδοποιήσεις is deliberately absent: /alerts is token-gated today and would
-// dead-end anonymous users. Add the tab when alerts work without an email link.
+// Persistent bottom tab bar (phones only; CSS hides it >=768px).
 const TABS = [
   { href: '/', label: 'Αρχική', icon: 'Home', match: (p) => p === '/' },
   { href: '/deals', label: 'Προσφορές', icon: 'Tag', match: (p) => p.startsWith('/deals') || p.startsWith('/offer') || p.startsWith('/supermarket') },
-  { href: '/catalog', label: 'Κατάλογος', icon: 'Grid', match: (p) => p.startsWith('/catalog') },
-  { href: '/search', label: 'Αναζήτηση', icon: 'Search', match: (p) => p.startsWith('/search') },
+  { href: '/search', label: 'Αναζήτηση', icon: 'Search', match: (p) => p.startsWith('/search') || p.startsWith('/catalog') },
 ];
 
 export function BottomNav() {

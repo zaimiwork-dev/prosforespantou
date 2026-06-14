@@ -13,6 +13,7 @@ import { hiResImage } from '@/lib/images';
 import { parsePack, perUnitPrice, unitPrice } from '@/lib/pack-info';
 import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
 import { recordInterest, WEIGHT } from '@/lib/interest-profile';
+import { displayCategoryForProduct } from '@/lib/display-category';
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -78,7 +79,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
   const displayName = offer.productName || offer.product_name || offer.product?.name;
   const description = offer.product?.description || offer.description;
   const supermarketId = offer.supermarket || offer.supermarket_id;
-  const category = offer.category;
+  const category = displayCategoryForProduct(displayName, offer.category);
 
   // Offer-own image first — see DiscountCard: the catalog product's image can
   // be another chain's rotated/dead URL; the offer's own is always current.

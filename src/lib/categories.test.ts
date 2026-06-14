@@ -23,6 +23,12 @@ describe('categorizeForChain — native maps are the primary signal', () => {
     expect(categorizeForChain('kritikos', 'ALMIRON GROWING UP 12-24 1L', 'Γάλα').dept).toBe('Βρεφικά Είδη');
   });
 
+  it('lets strong suncare words override ambiguous kids labels', () => {
+    const personalCare = categorizeForChain('mymarket', 'Nivea Sun Children Lotion SPF50+', 'Παιδικά').dept;
+    expect(categorizeForChain('kritikos', "NIVEA SUN KID'S LOTION SPF50+ 200ML", 'Παιδικά').dept)
+      .toBe(personalCare);
+  });
+
   it('map hit wins over misleading name words (the Klinex-Λεμόνι class)', () => {
     const r = categorizeForChain('kritikos', 'KLINEX ΥΓΡ.ΠΑΝ ΠΑΤΩΜΑΤΟΣ ΛΕΜΟΝΙ XXL 15', 'Πανιά Καθαρισμού');
     expect(r).toEqual({ dept: 'Είδη Καθαρισμού & Σπιτιού', mapped: true });

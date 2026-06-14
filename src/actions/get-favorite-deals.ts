@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 // Current offers for the user's ⭐ favourites (localStorage watchlist — no
 // account needed, per the product vision). Matched products come back across
@@ -32,7 +33,7 @@ export async function getFavoriteDeals(input: unknown) {
       if (names.length > 0) or.push({ productName: { in: names } });
 
       const deals = await prisma.discount.findMany({
-        where: { isActive: true, validUntil: { gt: new Date() }, OR: or },
+        where: withPublicDealVisibility({ isActive: true, validUntil: { gt: new Date() }, OR: or }),
         include: { store: true, leaflet: true, product: true },
         orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }, { id: 'asc' }],
         take: 30,

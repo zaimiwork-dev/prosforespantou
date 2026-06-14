@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { SUPERMARKETS } from "@/lib/constants";
+import { activePublicDealWhere } from "@/lib/public-deal-filters";
 
 export default async function sitemap() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://prosforespantou.gr";
@@ -7,10 +8,7 @@ export default async function sitemap() {
   // Get all active offers
   const now = new Date();
   const offers = await prisma.discount.findMany({
-    where: {
-      isActive: true,
-      validUntil: { gt: now },
-    },
+    where: activePublicDealWhere(now),
     select: {
       id: true,
       updatedAt: true,

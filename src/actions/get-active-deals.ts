@@ -3,14 +3,12 @@
 import prisma from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
 import { dedupeDeals } from '@/lib/dedupe-deals';
+import { activePublicDealWhere, withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 const getDefaultDeals = unstable_cache(
   async (limit: number) => {
     const now = new Date();
-    const where = {
-      isActive: true,
-      validUntil: { gt: now }
-    };
+    const where = activePublicDealWhere(now);
 
     const [deals, total] = await Promise.all([
       prisma.discount.findMany({
@@ -65,10 +63,7 @@ export async function getActiveDeals(
       }
 
       const now = new Date();
-      const where: any = {
-        isActive: true,
-        validUntil: { gt: now },
-      };
+      const where: any = activePublicDealWhere(now);
 
       if (supermarketId !== 'all') {
         where.supermarket = supermarketId;
@@ -110,12 +105,12 @@ const getTopDealsCached = unstable_cache(
   async (limit: number) => {
     const now = new Date();
     const featured = await prisma.discount.findMany({
-      where: {
+      where: withPublicDealVisibility({
         isActive: true,
         isFeatured: true,
         OR: [{ featuredUntil: null }, { featuredUntil: { gt: now } }],
         validUntil: { gt: now },
-      },
+      }),
       include: { store: true, leaflet: true, product: true },
       orderBy: { createdAt: 'desc' },
       take: 2,
@@ -125,11 +120,11 @@ const getTopDealsCached = unstable_cache(
     // %. This frees the widget from the ~5% of deals that carry a discountPercent
     // (previously Kritikos+AB only) so all chains can surface here.
     const pool = await prisma.discount.findMany({
-      where: {
+      where: withPublicDealVisibility({
         isActive: true,
         validUntil: { gt: now },
         id: { notIn: featured.map(f => f.id) },
-      },
+      }),
       include: { store: true, leaflet: true, product: true },
       orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }, { id: 'asc' }],
       take: 80,
@@ -144,12 +139,12 @@ const getTopDealsCached = unstable_cache(
     );
     const siblings = pids.length
       ? await prisma.discount.findMany({
-          where: {
+          where: withPublicDealVisibility({
             isActive: true,
             validUntil: { gt: now },
             productId: { in: pids },
             id: { notIn: [...featured.map((f) => f.id), ...pool.map((p) => p.id)] },
-          },
+          }),
           include: { store: true, leaflet: true, product: true },
         })
       : [];
@@ -201,23 +196,23 @@ const getEndingSoonCached = unstable_cache(
     const in7Days = new Date(now.getTime() + 7 * 86400000); // Expanded to 7 days so our new data shows
 
     const featured = await prisma.discount.findMany({
-      where: {
+      where: withPublicDealVisibility({
         isActive: true,
         isFeatured: true,
         OR: [{ featuredUntil: null }, { featuredUntil: { gt: now } }],
         validUntil: { gt: now },
-      },
+      }),
       include: { store: true, leaflet: true, product: true },
       orderBy: { createdAt: 'desc' },
       take: 2,
     });
 
     const deals = await prisma.discount.findMany({
-      where: {
+      where: withPublicDealVisibility({
         isActive: true,
         validUntil: { gt: now, lte: in7Days },
         id: { notIn: featured.map(f => f.id) }
-      },
+      }),
       include: { store: true, leaflet: true, product: true },
       orderBy: { validUntil: 'asc' },
       take: limit - featured.length,

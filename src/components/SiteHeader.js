@@ -6,8 +6,8 @@ import { Icon } from './Icons';
 import { useShoppingListStore } from '@/lib/store';
 
 export function SiteHeader({ onAdminTrigger = () => {}, cartCount = 0, onCartOpen = () => {}, onSettingsOpen = () => {} }) {
-  // Show how many "Τα καταστήματά μου" are active — without a visible state
-  // the filter feels like it does nothing (user feedback 2026-06-12).
+  // Show how many preferred stores are active; without visible state the filter
+  // feels like it does nothing.
   const preferredCount = useShoppingListStore((s) => s.preferredStores.length);
   const pathname = usePathname() || '/';
   return (
@@ -21,9 +21,6 @@ export function SiteHeader({ onAdminTrigger = () => {}, cartCount = 0, onCartOpe
         <nav className="topbar-nav" aria-label="Κύρια πλοήγηση">
           <Link href="/deals" className={`topbar-link${pathname.startsWith('/deals') || pathname.startsWith('/offer') || pathname.startsWith('/supermarket') ? ' active' : ''}`}>
             Προσφορές
-          </Link>
-          <Link href="/catalog" className={`topbar-link${pathname.startsWith('/catalog') ? ' active' : ''}`}>
-            Κατάλογος
           </Link>
         </nav>
 

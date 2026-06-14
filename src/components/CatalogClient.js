@@ -6,30 +6,39 @@ import { ProductCard } from './ProductCard';
 import { SiteHeader } from './SiteHeader';
 import { ShoppingList } from './ShoppingList';
 import { PreferredStoresSheet } from './PreferredStoresSheet';
+import { ProductSheet } from './ProductSheet';
 import { useShoppingListStore } from '@/lib/store';
+import { CATEGORIES, SUPERMARKETS } from '@/lib/constants';
 
 const PAGE = 24;
 
-// Full-catalog browse: offers first, then the wider Product catalog for search /
-// deeper browsing. On-offer products show an honest price + deep-link to the
-// offer; the rest are silent info tiles.
+// Full-catalog browse: active offers first, then the wider Product catalog for
+// search/deeper browsing. Offer products open the same sheet as the rest of the
+// app so the catalog does not feel like a separate, colder surface.
 export default function CatalogClient({ initial }) {
   const [products, setProducts] = useState(initial.products);
   const [total, setTotal] = useState(initial.total);
   const [offset, setOffset] = useState(initial.products.length);
-  const [query, setQuery] = useState('');     // live input
-  const [search, setSearch] = useState('');   // committed (debounced) term
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeStore, setActiveStore] = useState('all');
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const sentinelRef = useRef(null);
   const skipNextReloadRef = useRef(true);
   const cartCount = useShoppingListStore((s) => s.items.length);
+  const addItem = useShoppingListStore((s) => s.addItem);
 
+  const facets = initial.facets || { offerTotal: 0, catalogTotal: total, bySupermarket: {}, byCategory: {} };
   const hasMore = products.length < total;
+  const categoryItems = CATEGORIES.filter((c) => c.id !== 'all' && (facets.byCategory?.[c.id] || 0) > 0);
+  const storeItems = SUPERMARKETS
+    .filter((s) => (facets.bySupermarket?.[s.id] || 0) > 0)
+    .sort((a, b) => (facets.bySupermarket[b.id] || 0) - (facets.bySupermarket[a.id] || 0));
 
-  // Debounce the typed query into the committed search term (setState here runs
-  // in a timer callback, not synchronously in the effect body).
   useEffect(() => {
     const t = setTimeout(() => setSearch(query.trim()), 350);
     return () => clearTimeout(t);
@@ -40,7 +49,13 @@ export default function CatalogClient({ initial }) {
       setLoading(true);
       try {
         const currentOffset = reset ? 0 : offset;
-        const res = await getCatalogProducts({ search, limit: PAGE, offset: currentOffset });
+        const res = await getCatalogProducts({
+          search,
+          limit: PAGE,
+          offset: currentOffset,
+          category: activeCategory,
+          supermarket: activeStore,
+        });
         setTotal(res.total);
         setOffset(currentOffset + res.products.length);
         setProducts(reset ? res.products : (prev) => [...prev, ...res.products]);
@@ -49,21 +64,19 @@ export default function CatalogClient({ initial }) {
       }
       setLoading(false);
     },
-    [search, offset]
+    [search, activeCategory, activeStore, offset]
   );
 
-  // Refetch page 0 on a new committed search (skip the SSR-provided initial '').
   useEffect(() => {
     if (skipNextReloadRef.current) { skipNextReloadRef.current = false; return; }
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search, activeCategory, activeStore]);
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !loading) load(false);
   }, [hasMore, loading, load]);
 
-  // Infinite-scroll sentinel.
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -75,6 +88,11 @@ export default function CatalogClient({ initial }) {
     return () => obs.disconnect();
   }, [handleLoadMore]);
 
+  const resetFilters = () => {
+    setActiveCategory('all');
+    setActiveStore('all');
+  };
+
   return (
     <>
       <SiteHeader
@@ -82,44 +100,99 @@ export default function CatalogClient({ initial }) {
         onCartOpen={() => setIsCartOpen(true)}
         onSettingsOpen={() => setIsSettingsOpen(true)}
       />
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '16px 12px 80px' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '8px 0 4px' }}>Όλα τα προϊόντα</h1>
-        <p style={{ color: 'var(--ink-3, #888)', fontSize: 13, margin: '0 0 14px' }}>
-          Πρώτα όσα είναι σε προσφορά τώρα — και μετά όλος ο κατάλογος για αναζήτηση.
-        </p>
+      <main className="catalog-shell">
+        <section className="catalog-head">
+          <div>
+            <div className="eyebrow">Πλήρεις κατάλογοι</div>
+            <h1>Αναζήτηση προϊόντων</h1>
+            <p>
+              Πρώτα εμφανίζονται οι πιο δυνατές ενεργές προσφορές. Μετά μπορείς να ψάξεις βαθύτερα στον πλήρη κατάλογο.
+            </p>
+          </div>
+          <div className="catalog-stats" aria-label="Σύνοψη καταλόγου">
+            <span><b>{facets.offerTotal.toLocaleString('el-GR')}</b> προσφορές</span>
+            <span><b>{facets.catalogTotal.toLocaleString('el-GR')}</b> προϊόντα</span>
+          </div>
+        </section>
 
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Αναζήτηση προϊόντος ή μάρκας…"
+          placeholder="Αναζήτηση προϊόντος ή μάρκας..."
           aria-label="Αναζήτηση στον κατάλογο"
-          style={{
-            width: '100%', padding: '12px 14px', fontSize: 15,
-            border: '1px solid var(--line, #e3e3e3)', borderRadius: 12,
-            marginBottom: 14, background: 'var(--surface, #fff)',
-          }}
+          className="catalog-search"
         />
 
-        <div style={{ color: 'var(--ink-3, #888)', fontSize: 12, marginBottom: 10 }}>
-          {total.toLocaleString('el-GR')} προϊόντα{search ? ` για «${search}»` : ''}
+        <div className="catalog-controls" aria-label="Φίλτρα καταλόγου">
+          <div className="catalog-filter-row">
+            <button
+              type="button"
+              className={`catalog-chip${activeCategory === 'all' ? ' active' : ''}`}
+              onClick={() => setActiveCategory('all')}
+            >
+              Καυτές προσφορές
+            </button>
+            {categoryItems.slice(0, 10).map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`catalog-chip${activeCategory === c.id ? ' active' : ''}`}
+                onClick={() => setActiveCategory(c.id)}
+              >
+                {c.label} <span>{(facets.byCategory[c.id] || 0).toLocaleString('el-GR')}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="catalog-filter-row compact">
+            <button
+              type="button"
+              className={`catalog-chip${activeStore === 'all' ? ' active' : ''}`}
+              onClick={() => setActiveStore('all')}
+            >
+              Όλα τα καταστήματα
+            </button>
+            {storeItems.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`catalog-chip store${activeStore === s.id ? ' active' : ''}`}
+                onClick={() => setActiveStore(s.id)}
+                style={{ '--chip-color': s.color }}
+              >
+                {s.name} <span>{(facets.bySupermarket[s.id] || 0).toLocaleString('el-GR')}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="catalog-result-line">
+          <span>
+            {total.toLocaleString('el-GR')} προϊόντα{search ? ` για "${search}"` : ''}
+          </span>
+          {(activeCategory !== 'all' || activeStore !== 'all') && (
+            <button type="button" onClick={resetFilters}>Καθαρισμός φίλτρων</button>
+          )}
         </div>
 
         {products.length === 0 && !loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--ink-3, #888)', padding: '40px 0' }}>
-            Δεν βρέθηκαν προϊόντα.
+          <div className="empty-state">
+            <h4>Δεν βρέθηκαν προϊόντα</h4>
+            <p>Δοκίμασε άλλη αναζήτηση ή καθάρισε τα φίλτρα.</p>
           </div>
         ) : (
           <div className="products-grid">
-            {products.map((p) => <ProductCard key={p.id} p={p} />)}
+            {products.map((p) => <ProductCard key={p.id} p={p} onSelect={setSelectedProduct} />)}
           </div>
         )}
 
         {loading && (
-          <div style={{ textAlign: 'center', color: 'var(--ink-3, #888)', padding: '20px 0' }}>Φόρτωση…</div>
+          <div className="catalog-loading">Φόρτωση...</div>
         )}
         <div ref={sentinelRef} style={{ height: 1 }} />
-      </div>
+      </main>
+      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addItem} />
       <ShoppingList isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       <PreferredStoresSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </>

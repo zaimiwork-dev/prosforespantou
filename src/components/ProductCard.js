@@ -5,30 +5,37 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { CategoryIcon } from './CategoryIcon';
 import { SUPERMARKETS } from '@/lib/constants';
+import { displayCategoryForProduct } from '@/lib/display-category';
 
-// Catalog card: a Product from the full catalog, with its cheapest CURRENT offer
-// when one exists. Deliberately price-silent for non-offer items: the catalog is
-// browsable, but only true active offers get price treatment.
-export function ProductCard({ p }) {
+// Catalog card: a Product from the full catalog, with its current promoted
+// offer when one exists. Offer cards open the same quick-view sheet used by the
+// homepage/deals pages; non-offer products remain quiet info tiles.
+export function ProductCard({ p, onSelect }) {
   const [imgFailed, setImgFailed] = useState(false);
   const offer = p.offer;
-  const category = offer?.category || 'Άλλο';
+  const displayName = offer?.productName || p.name;
+  const category = displayCategoryForProduct(displayName, offer?.category || 'Άλλο');
   const sm = offer ? (SUPERMARKETS.find((s) => s.id === offer.supermarket) || { name: offer.supermarket, color: 'var(--ink-2)' }) : null;
   const pct = offer && offer.originalPrice && offer.discountedPrice
     ? Math.round((1 - offer.discountedPrice / offer.originalPrice) * 100)
     : null;
   const showMono = offer && !pct && (offer.offerType === 'mono' || !offer.originalPrice);
 
-  const img = p.imageUrl && !imgFailed ? (
+  let displayImage = offer?.imageUrl || p.imageUrl;
+  if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
+    displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
+  }
+
+  const img = displayImage && !imgFailed ? (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Image
-        src={p.imageUrl}
-        alt={p.name || ''}
+        src={displayImage}
+        alt={displayName || ''}
         fill
         sizes="(max-width: 768px) 180px, 220px"
         style={{ objectFit: 'contain' }}
         onError={() => setImgFailed(true)}
-        unoptimized={p.imageUrl.includes('www.ab.gr')}
+        unoptimized={displayImage.includes('www.ab.gr')}
       />
     </div>
   ) : (
@@ -58,7 +65,7 @@ export function ProductCard({ p }) {
       </div>
 
       <div className="card-body">
-        <h3 className="card-title" title={p.name}>{p.name}</h3>
+        <h3 className="card-title" title={displayName}>{displayName}</h3>
         {(p.brand || p.unitInfo) && (
           <div style={{ fontSize: 11, color: 'var(--ink-3, #888)', marginBottom: 6 }}>
             {[p.brand, p.unitInfo].filter(Boolean).join(' · ')}
@@ -78,12 +85,21 @@ export function ProductCard({ p }) {
     </>
   );
 
-  // On offer → tappable, deep-links to the offer page. Otherwise an info tile.
-  return offer ? (
-    <Link href={`/offer/${offer.id}`} className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
+  if (!offer) {
+    return <div className="card" aria-disabled="true">{body}</div>;
+  }
+
+  if (!onSelect) {
+    return (
+      <Link href={`/offer/${offer.id}`} className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
+        {body}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" className="card catalog-card-button" onClick={() => onSelect(offer)}>
       {body}
-    </Link>
-  ) : (
-    <div className="card" aria-disabled="true">{body}</div>
+    </button>
   );
 }

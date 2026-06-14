@@ -3,11 +3,12 @@
 import prisma from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
 import * as Sentry from '@sentry/nextjs';
+import { activePublicDealWhere } from '@/lib/public-deal-filters';
 
 const getCountsCached = unstable_cache(
   async () => {
     const now = new Date();
-    const where = { isActive: true, validUntil: { gt: now } };
+    const where = activePublicDealWhere(now);
 
     const [bySm, byCat, total] = await Promise.all([
       prisma.discount.groupBy({
