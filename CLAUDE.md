@@ -92,6 +92,7 @@ Components are `.js` (not `.tsx`) — the project hasn't migrated. Don't convert
 
 - **Schema field renames without `db push + rm -rf .next`** → runtime errors that look like "column not found".
 - **Forgetting `source` filter** → leaflet run wipes web rows or vice versa. There are explicit "Do NOT conflate" warnings in PHASES.md for a reason.
+- **Mixing Product counts with Discount counts on `/catalog`** → owner caught this on 2026-06-14. Full-catalog mode must use Product counts/filtering; offer mode must use active public Discount counts/filtering. Lidl is the canary: `152` products vs `71` offers.
 - **Importing prisma before dotenv in `.mjs` scripts** → ECONNREFUSED because `DATABASE_URL` isn't loaded yet.
 - **Auto-creating SKUs from the matcher's "NEW" verdict** → polluted catalog. The Review Queue (Admin Panel "🧐 Review" tab) is the manual gate; matcher only routes, never creates products.
 - **Pipe stdout through `tail` to monitor a long-running script** → buffering hides progress until exit. Redirect to a log file (`> matcher.log 2>&1`) and tail the file separately.

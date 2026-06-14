@@ -21,6 +21,7 @@ export default function CatalogClient({ initial }) {
   const [offset, setOffset] = useState(initial.products.length);
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
+  const [mode, setMode] = useState('catalog');
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeStore, setActiveStore] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -32,12 +33,13 @@ export default function CatalogClient({ initial }) {
   const cartCount = useShoppingListStore((s) => s.items.length);
   const addItem = useShoppingListStore((s) => s.addItem);
 
-  const facets = initial.facets || { offerTotal: 0, catalogTotal: total, bySupermarket: {}, byCategory: {} };
+  const facets = initial.facets || { offerTotal: 0, catalogTotal: total, bySupermarket: {}, offerBySupermarket: {}, byCategory: {} };
   const hasMore = products.length < total;
   const categoryItems = CATEGORIES.filter((c) => c.id !== 'all' && (facets.byCategory?.[c.id] || 0) > 0);
+  const storeCounts = mode === 'offers' ? (facets.offerBySupermarket || {}) : (facets.bySupermarket || {});
   const storeItems = SUPERMARKETS
-    .filter((s) => (facets.bySupermarket?.[s.id] || 0) > 0)
-    .sort((a, b) => (facets.bySupermarket[b.id] || 0) - (facets.bySupermarket[a.id] || 0));
+    .filter((s) => (storeCounts[s.id] || 0) > 0)
+    .sort((a, b) => (storeCounts[b.id] || 0) - (storeCounts[a.id] || 0));
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(query.trim()), 350);
@@ -53,7 +55,8 @@ export default function CatalogClient({ initial }) {
           search,
           limit: PAGE,
           offset: currentOffset,
-          category: activeCategory,
+          mode,
+          category: mode === 'offers' ? activeCategory : 'all',
           supermarket: activeStore,
         });
         setTotal(res.total);
@@ -64,14 +67,14 @@ export default function CatalogClient({ initial }) {
       }
       setLoading(false);
     },
-    [search, activeCategory, activeStore, offset]
+    [search, mode, activeCategory, activeStore, offset]
   );
 
   useEffect(() => {
     if (skipNextReloadRef.current) { skipNextReloadRef.current = false; return; }
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, activeCategory, activeStore]);
+  }, [search, mode, activeCategory, activeStore]);
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !loading) load(false);
@@ -93,6 +96,11 @@ export default function CatalogClient({ initial }) {
     setActiveStore('all');
   };
 
+  const selectMode = (nextMode) => {
+    setMode(nextMode);
+    if (nextMode === 'catalog') setActiveCategory('all');
+  };
+
   return (
     <>
       <SiteHeader
@@ -106,7 +114,7 @@ export default function CatalogClient({ initial }) {
             <div className="eyebrow">Πλήρεις κατάλογοι</div>
             <h1>Αναζήτηση προϊόντων</h1>
             <p>
-              Πρώτα εμφανίζονται οι πιο δυνατές ενεργές προσφορές. Μετά μπορείς να ψάξεις βαθύτερα στον πλήρη κατάλογο.
+              Βλέπεις τον πλήρη κατάλογο προϊόντων. Άνοιξε τις προσφορές μόνο όταν θέλεις ενεργές εκπτώσεις.
             </p>
           </div>
           <div className="catalog-stats" aria-label="Σύνοψη καταλόγου">
@@ -124,26 +132,45 @@ export default function CatalogClient({ initial }) {
           className="catalog-search"
         />
 
+        <div className="catalog-mode-tabs" aria-label="Τύπος καταλόγου">
+          <button
+            type="button"
+            className={mode === 'catalog' ? 'active' : ''}
+            onClick={() => selectMode('catalog')}
+          >
+            Όλα τα προϊόντα <span>{facets.catalogTotal.toLocaleString('el-GR')}</span>
+          </button>
+          <button
+            type="button"
+            className={mode === 'offers' ? 'active' : ''}
+            onClick={() => selectMode('offers')}
+          >
+            Προσφορές τώρα <span>{facets.offerTotal.toLocaleString('el-GR')}</span>
+          </button>
+        </div>
+
         <div className="catalog-controls" aria-label="Φίλτρα καταλόγου">
-          <div className="catalog-filter-row">
-            <button
-              type="button"
-              className={`catalog-chip${activeCategory === 'all' ? ' active' : ''}`}
-              onClick={() => setActiveCategory('all')}
-            >
-              Καυτές προσφορές
-            </button>
-            {categoryItems.slice(0, 10).map((c) => (
+          {mode === 'offers' && (
+            <div className="catalog-filter-row">
               <button
-                key={c.id}
                 type="button"
-                className={`catalog-chip${activeCategory === c.id ? ' active' : ''}`}
-                onClick={() => setActiveCategory(c.id)}
+                className={`catalog-chip${activeCategory === 'all' ? ' active' : ''}`}
+                onClick={() => setActiveCategory('all')}
               >
-                {c.label} <span>{(facets.byCategory[c.id] || 0).toLocaleString('el-GR')}</span>
+                Όλες οι προσφορές
               </button>
-            ))}
-          </div>
+              {categoryItems.slice(0, 10).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`catalog-chip${activeCategory === c.id ? ' active' : ''}`}
+                  onClick={() => setActiveCategory(c.id)}
+                >
+                  {c.label} <span>{(facets.byCategory[c.id] || 0).toLocaleString('el-GR')}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="catalog-filter-row compact">
             <button
@@ -161,7 +188,7 @@ export default function CatalogClient({ initial }) {
                 onClick={() => setActiveStore(s.id)}
                 style={{ '--chip-color': s.color }}
               >
-                {s.name} <span>{(facets.bySupermarket[s.id] || 0).toLocaleString('el-GR')}</span>
+                {s.name} <span>{(storeCounts[s.id] || 0).toLocaleString('el-GR')}</span>
               </button>
             ))}
           </div>
@@ -169,7 +196,7 @@ export default function CatalogClient({ initial }) {
 
         <div className="catalog-result-line">
           <span>
-            {total.toLocaleString('el-GR')} προϊόντα{search ? ` για "${search}"` : ''}
+            {total.toLocaleString('el-GR')} {mode === 'offers' ? 'προσφορές' : 'προϊόντα'}{search ? ` για "${search}"` : ''}
           </span>
           {(activeCategory !== 'all' || activeStore !== 'all') && (
             <button type="button" onClick={resetFilters}>Καθαρισμός φίλτρων</button>

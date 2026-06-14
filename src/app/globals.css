@@ -500,6 +500,16 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   display: grid; place-items: center;
   color: color-mix(in oklab, var(--brand) 25%, var(--line-2));
 }
+.catalog-img-empty {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--surface-2), color-mix(in oklab, var(--bg-soft) 55%, #fff));
+}
+.catalog-card-muted {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
 
 .discount-badge {
   position: absolute; top: 10px; left: 10px;
@@ -701,6 +711,37 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   box-shadow: var(--shadow-sm);
 }
 .catalog-search::placeholder { color: var(--ink-4); }
+.catalog-mode-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 12px;
+}
+.catalog-mode-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 900;
+}
+.catalog-mode-tabs button.active {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+.catalog-mode-tabs span {
+  font-size: 11px;
+  font-weight: 900;
+  opacity: .78;
+  font-variant-numeric: tabular-nums;
+}
 .catalog-controls {
   display: flex;
   flex-direction: column;
@@ -712,8 +753,9 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   gap: 8px;
   overflow-x: auto;
   padding: 2px 0 4px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.catalog-filter-row::-webkit-scrollbar { display: none; }
 .catalog-filter-row.compact { gap: 6px; }
 .catalog-chip {
   flex: none;
@@ -746,15 +788,12 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   color: var(--brand-ink);
 }
 .catalog-chip.active span { color: color-mix(in oklab, var(--brand-ink) 74%, transparent); }
-.catalog-chip.store.active {
-  background: var(--chip-color, var(--brand));
-  border-color: var(--chip-color, var(--brand));
-}
 .catalog-result-line {
   min-height: 28px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
   color: var(--ink-3);
   font-size: 12px;
@@ -765,6 +804,10 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   color: var(--accent);
   font-size: 12px;
   font-weight: 800;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--line));
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--accent) 7%, var(--surface));
 }
 .catalog-loading {
   text-align: center;
@@ -802,6 +845,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 @media (max-width: 720px) {
   .catalog-head { grid-template-columns: 1fr; align-items: start; }
   .catalog-stats { justify-content: flex-start; }
+  .catalog-mode-tabs { display: flex; width: 100%; }
+  .catalog-mode-tabs button { flex: 1; justify-content: center; }
   .catalog-cta { grid-template-columns: 1fr; }
   .catalog-cta .btn { width: 100%; justify-content: center; }
 }

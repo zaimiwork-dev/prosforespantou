@@ -3,25 +3,53 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CategoryIcon } from './CategoryIcon';
 import { SUPERMARKETS } from '@/lib/constants';
-import { displayCategoryForProduct } from '@/lib/display-category';
+
+function normalize(value) {
+  return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+const CHAIN_ALIASES = {
+  ab: ['ab', 'αβ'],
+};
+
+function cleanMeta(value) {
+  const text = String(value || '').trim();
+  return text && text !== '-' && text !== '—' ? text : null;
+}
+
+function isDifferentChainBrand(brand, supermarketId) {
+  if (!brand || !supermarketId) return false;
+  const b = normalize(brand);
+  return SUPERMARKETS.some((s) => {
+    if (s.id === supermarketId) return false;
+    return [s.id, s.name, s.short, s.heroLabel, `${s.heroLabel || ''} ${s.heroSub || ''}`, ...(CHAIN_ALIASES[s.id] || [])]
+      .filter(Boolean)
+      .some((label) => normalize(label) === b);
+  });
+}
 
 // Catalog card: a Product from the full catalog, with its current promoted
 // offer when one exists. Offer cards open the same quick-view sheet used by the
 // homepage/deals pages; non-offer products remain quiet info tiles.
 export function ProductCard({ p, onSelect }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [imgIndex, setImgIndex] = useState(0);
   const offer = p.offer;
   const displayName = offer?.productName || p.name;
-  const category = displayCategoryForProduct(displayName, offer?.category || 'Άλλο');
-  const sm = offer ? (SUPERMARKETS.find((s) => s.id === offer.supermarket) || { name: offer.supermarket, color: 'var(--ink-2)' }) : null;
+  const supermarketId = offer?.supermarket || p.supermarket;
+  const sm = supermarketId ? (SUPERMARKETS.find((s) => s.id === supermarketId) || { name: supermarketId, color: 'var(--ink-2)' }) : null;
+  const brand = cleanMeta(p.brand);
+  const unitInfo = cleanMeta(p.unitInfo);
+  const visibleBrand = isDifferentChainBrand(brand, supermarketId) ? null : brand;
+  const visibleUnitInfo = isDifferentChainBrand(unitInfo, supermarketId) ? null : unitInfo;
   const pct = offer && offer.originalPrice && offer.discountedPrice
     ? Math.round((1 - offer.discountedPrice / offer.originalPrice) * 100)
     : null;
   const showMono = offer && !pct && (offer.offerType === 'mono' || !offer.originalPrice);
 
-  let displayImage = offer?.imageUrl || p.imageUrl;
+  const imageCandidates = Array.from(new Set([offer?.imageUrl, p.imageUrl].filter(Boolean)));
+  let displayImage = imageCandidates[imgIndex];
   if (displayImage && !displayImage.startsWith('http') && !displayImage.startsWith('/')) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
   }
@@ -34,14 +62,18 @@ export function ProductCard({ p, onSelect }) {
         fill
         sizes="(max-width: 768px) 180px, 220px"
         style={{ objectFit: 'contain' }}
-        onError={() => setImgFailed(true)}
+        onError={() => {
+          if (imgIndex < imageCandidates.length - 1) {
+            setImgIndex((i) => i + 1);
+          } else {
+            setImgFailed(true);
+          }
+        }}
         unoptimized={displayImage.includes('www.ab.gr')}
       />
     </div>
   ) : (
-    <div className="card-img-placeholder">
-      <CategoryIcon id={category} size={48} />
-    </div>
+    <div className="catalog-img-empty" aria-hidden="true" />
   );
 
   const body = (
@@ -66,9 +98,9 @@ export function ProductCard({ p, onSelect }) {
 
       <div className="card-body">
         <h3 className="card-title" title={displayName}>{displayName}</h3>
-        {(p.brand || p.unitInfo) && (
+        {(visibleBrand || visibleUnitInfo) && (
           <div style={{ fontSize: 11, color: 'var(--ink-3, #888)', marginBottom: 6 }}>
-            {[p.brand, p.unitInfo].filter(Boolean).join(' · ')}
+            {[visibleBrand, visibleUnitInfo].filter(Boolean).join(' · ')}
           </div>
         )}
         <div className="card-price-row">
@@ -78,7 +110,7 @@ export function ProductCard({ p, onSelect }) {
               {offer.originalPrice && <div className="price-old">{offer.originalPrice.toFixed(2)}€</div>}
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: 'var(--ink-3, #999)' }}>Όχι σε προσφορά τώρα</div>
+            <div className="catalog-card-muted">Κατάλογος</div>
           )}
         </div>
       </div>

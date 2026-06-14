@@ -16,6 +16,7 @@ const InputSchema = z.object({
   search: z.string().max(120).optional().default(''),
   limit: z.number().int().min(1).max(48).optional().default(24),
   offset: z.number().int().min(0).optional().default(0),
+  mode: z.enum(['catalog', 'offers']).optional().default('catalog'),
   // 'withImage' (default) hides the long tail of image-less catalog rows so the
   // grid looks like a real store; 'all' shows everything.
   scope: z.enum(['withImage', 'all']).optional().default('withImage'),
@@ -29,6 +30,7 @@ export type CatalogProduct = {
   brand: string | null;
   unitInfo: string | null;
   imageUrl: string | null;
+  supermarket: string | null;
   offer: null | {
     id: string;
     supermarket: string | null;
@@ -59,6 +61,7 @@ function mapRows(rows: any[]): CatalogProduct[] {
     brand: p.brand,
     unitInfo: p.unitInfo,
     imageUrl: p.imageUrl,
+    supermarket: p.supermarket,
     offer: p.discounts[0] ?? null,
   }));
 }
@@ -67,16 +70,19 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
   return await Sentry.withServerActionInstrumentation('getCatalogProducts', { recordResponse: true }, async () => {
     const parsed = InputSchema.safeParse(rawInput ?? {});
     if (!parsed.success) return { products: [], total: 0 };
-    const { search, limit, offset, scope, category, supermarket } = parsed.data;
+    const { search, limit, offset, mode, scope, category, supermarket } = parsed.data;
     const now = new Date();
 
     const q = search.trim();
     const baseParts: any[] = [];
     if (scope === 'withImage') baseParts.push({ imageUrl: { not: null } });
+    if (mode === 'catalog' && supermarket && supermarket !== 'all') {
+      baseParts.push({ supermarket });
+    }
     const currentOfferWhere: any = activePublicDealWhere(now);
-    if (category && category !== 'all') currentOfferWhere.category = category;
+    if (mode === 'offers' && category && category !== 'all') currentOfferWhere.category = category;
     if (supermarket && supermarket !== 'all') currentOfferWhere.supermarket = supermarket;
-    const filteredToOffers = (category && category !== 'all') || (supermarket && supermarket !== 'all');
+    const filteredToOffers = mode === 'offers';
 
     try {
       const select = {
@@ -85,6 +91,7 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
         brand: true,
         unitInfo: true,
         imageUrl: true,
+        supermarket: true,
         updatedAt: true,
         // Cheapest CURRENT offer for this product, if any — the only price we
         // promote in the catalog.
@@ -124,12 +131,16 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
         const imageClause = scope === 'withImage'
           ? Prisma.sql`AND p.image_url IS NOT NULL`
           : Prisma.empty;
+        const productSupermarketClause = mode === 'catalog' && supermarket && supermarket !== 'all'
+          ? Prisma.sql`AND p.supermarket = ${supermarket}`
+          : Prisma.empty;
         const candidateLimit = Math.min(Math.max(offset + limit + 500, 700), 1800);
         const idRows = await prisma.$queryRaw<{ id: string }[]>`
           SELECT p.id
           FROM products p
           WHERE 1 = 1
             ${imageClause}
+            ${productSupermarketClause}
             AND (${Prisma.join(conditions, ' OR ')})
           ORDER BY p.updated_at DESC
           LIMIT ${candidateLimit}
@@ -175,14 +186,22 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
       }
 
       const baseWhere = compactWhere(baseParts);
+      if (!filteredToOffers) {
+        const [rows, total] = await Promise.all([
+          prisma.product.findMany({
+            where: baseWhere,
+            select,
+            orderBy: { updatedAt: 'desc' },
+            skip: offset,
+            take: limit,
+          }),
+          prisma.product.count({ where: baseWhere }),
+        ]);
+        return { products: mapRows(rows), total };
+      }
+
       const withOfferWhere = compactWhere([...baseParts, { discounts: { some: currentOfferWhere } }]);
-      const withoutOfferWhere = compactWhere([...baseParts, { NOT: { discounts: { some: currentOfferWhere } } }]);
-
-      const [offerTotal, total] = await Promise.all([
-        prisma.product.count({ where: withOfferWhere }),
-        filteredToOffers ? prisma.product.count({ where: withOfferWhere }) : prisma.product.count({ where: baseWhere }),
-      ]);
-
+      const offerTotal = await prisma.product.count({ where: withOfferWhere });
       const rows: any[] = [];
       if (offset < offerTotal) {
         const take = Math.min(offset + limit, offerTotal);
@@ -200,19 +219,7 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
         });
         rows.push(...offerRows.slice(offset, offset + limit));
       }
-
-      if (!filteredToOffers && rows.length < limit) {
-        const nonOfferOffset = Math.max(0, offset - offerTotal);
-        rows.push(...await prisma.product.findMany({
-          where: withoutOfferWhere,
-          select,
-          orderBy: { updatedAt: 'desc' },
-          skip: nonOfferOffset,
-          take: limit - rows.length,
-        }));
-      }
-
-      return { products: mapRows(rows), total };
+      return { products: mapRows(rows), total: offerTotal };
     } catch (error) {
       Sentry.captureException(error);
       console.error('Error fetching catalog products:', error);
@@ -225,6 +232,7 @@ export async function getCatalogFacets(): Promise<{
   offerTotal: number;
   catalogTotal: number;
   bySupermarket: Record<string, number>;
+  offerBySupermarket: Record<string, number>;
   byCategory: Record<string, number>;
 }> {
   return await Sentry.withServerActionInstrumentation('getCatalogFacets', { recordResponse: true }, async () => {
@@ -234,18 +242,21 @@ export async function getCatalogFacets(): Promise<{
       const [offerTotal, catalogTotal, bySm, byCat] = await Promise.all([
         prisma.discount.count({ where }),
         prisma.product.count({ where: { imageUrl: { not: null } } }),
-        prisma.discount.groupBy({ by: ['supermarket'], where, _count: { _all: true } }),
+        prisma.product.groupBy({ by: ['supermarket'], where: { imageUrl: { not: null } }, _count: { _all: true } }),
         prisma.discount.groupBy({ by: ['category'], where, _count: { _all: true } }),
       ]);
       const bySupermarket: Record<string, number> = {};
       for (const r of bySm) if (r.supermarket) bySupermarket[r.supermarket] = r._count._all;
+      const byOfferSm = await prisma.discount.groupBy({ by: ['supermarket'], where, _count: { _all: true } });
+      const offerBySupermarket: Record<string, number> = {};
+      for (const r of byOfferSm) if (r.supermarket) offerBySupermarket[r.supermarket] = r._count._all;
       const byCategory: Record<string, number> = {};
       for (const r of byCat) if (r.category) byCategory[r.category] = r._count._all;
-      return { offerTotal, catalogTotal, bySupermarket, byCategory };
+      return { offerTotal, catalogTotal, bySupermarket, offerBySupermarket, byCategory };
     } catch (error) {
       Sentry.captureException(error);
       console.error('Error fetching catalog facets:', error);
-      return { offerTotal: 0, catalogTotal: 0, bySupermarket: {}, byCategory: {} };
+      return { offerTotal: 0, catalogTotal: 0, bySupermarket: {}, offerBySupermarket: {}, byCategory: {} };
     }
   });
 }

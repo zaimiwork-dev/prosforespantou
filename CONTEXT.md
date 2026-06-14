@@ -55,6 +55,49 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-14 — catalog UX correction after owner QA)
+
+**Owner QA caught a real bug:** `/catalog` said "Πλήρεις κατάλογοι" and showed `34.218 προϊόντα`, but the filter chips were active-offer counts. Clicking Lidl showed `71 προϊόντα` even though `71` is the active-offer count, not the full catalog count. This was wrong and must not regress.
+
+**Correct mental model now:**
+- `Product` catalog = full catalog surface. Counts are product rows with images.
+- `Discount` / active public offers = offers surface. Counts are offer rows after `activePublicDealWhere()`.
+- `/catalog` has explicit modes:
+  - `Όλα τα προϊόντα` -> Product counts/filtering.
+  - `Προσφορές τώρα` -> active public Discount counts/filtering + category chips.
+- Product rows do not have a stable category field, so category chips appear only in offer mode.
+
+**Live DB facts measured 2026-06-14:**
+- Product rows with images: `34.218`.
+- Product store counts: AB `14.669`, Μασούτης `7.924`, Κρητικός `6.878`, My Market `4.577`, Lidl `152`, Σκλαβενίτης `18`.
+- Public active offers shown in the app: `7.118`.
+- Offer store counts: Σκλαβενίτης `2.846`, Κρητικός `2.238`, Μασούτης `1.171`, My Market `417`, AB `375`, Lidl `71`.
+
+**Files changed by the fix:**
+- [get-catalog-products.ts](src/actions/get-catalog-products.ts): added `mode: 'catalog' | 'offers'`, separated Product vs Discount counts, and returns `offerBySupermarket`.
+- [CatalogClient.js](src/components/CatalogClient.js): mode segmented control, Product-count store chips in catalog mode, offer-count category/store chips in offer mode.
+- [ProductCard.js](src/components/ProductCard.js): removed category-icon fallbacks from catalog cards, tries offer image then product image, hides wrong-chain metadata such as `ΑΒ` under Lidl.
+- [globals.css](src/app/globals.css): mode tabs, hidden chip scrollbar, local clear-filter pill, quiet image-empty state.
+
+**Verified locally before handoff:**
+- `npx eslint src/actions/get-catalog-products.ts src/components/CatalogClient.js src/components/ProductCard.js`
+- `npm run build`
+- Browser DOM:
+  - default `/catalog` -> `34.218 προϊόντα`
+  - Lidl catalog filter -> `152 προϊόντα`
+  - Lidl + offer mode -> `71 προσφορές`
+  - visible icon fallback count -> `0`
+- Screenshots:
+  - `C:\Users\Work\AppData\Local\Temp\prosfores-catalog-fix-2026-06-14\catalog-default-fixed.png`
+  - `C:\Users\Work\AppData\Local\Temp\prosfores-catalog-fix-2026-06-14\catalog-lidl-products-fixed.png`
+  - `C:\Users\Work\AppData\Local\Temp\prosfores-catalog-fix-2026-06-14\catalog-lidl-offers-fixed.png`
+
+**Known remaining data issue:** Lidl offer rows often have `Discount.imageUrl = null` and can be linked to a cross-chain canonical `Product.imageUrl`; when that cross-chain image fails, the UI shows a quiet blank image area. Do not bring back random icons. Real fix is a Lidl own-image backfill/mirror from Lidl catalog/detail/leaflet data and better same-chain product matching for Lidl offers.
+
+**Repo hygiene:** root scratch files still exist and should not be staged unless intentionally reviewed: `claude-search.txt`, `findstr-output.txt`, `hash_search.txt`, `passwords.txt` (security smell; move out of repo root).
+
+---
+
 ## ⚡ Pick up here (2026-06-14 — FULL-CATALOG engine + 5 chains done; sklavenitis needs proxy; images draining)
 
 **Goal (owner):** full, self-renewing product catalogs for all 6 live chains, plus self-hosted
