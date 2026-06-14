@@ -55,38 +55,60 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
-## ⚡ Pick up here (2026-06-14 — FULL-CATALOG engine + My Market done; per-chain catalog scrapers are the remaining work)
+## ⚡ Pick up here (2026-06-14 — FULL-CATALOG engine + 4 chains done; AB writing; sklavenitis needs proxy; images draining)
 
-**Goal (owner):** full, self-renewing product catalogs for all 6 live chains. **Reusable engine
-shipped + proven:** [ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs) `ingestCatalog({chain,items})`
-— the ONE place allowed to grow the Product catalog, with a DETERMINISTIC identity only (real
-barcode, else the chain's own SKU via ChainProductMapping — never an LLM guess, so no pollution;
-same shape as the existing barcode-less Masoutis rows). Writes `kind:'normal'` shelf baselines
-on-change, and creating the SKU mapping auto-links that chain's future offers (link-rate → 100%).
-Exported `SM_MAPPING`/`normalizeBarcode`/`withDbRetry` from ingest-offers for reuse.
+**Goal (owner):** full, self-renewing product catalogs for all 6 live chains, plus self-hosted
+images ("own every product+pic, survive a block"). **ALL CODE COMMITTED + PUSHED** (working tree
+clean apart from `.tmp_*` logs + root scratch `.txt`). Check live numbers anytime: `npm run catalog:coverage`.
 
-**Per-chain catalog status (coverage tool = `npm run catalog:coverage`):**
-- **kritikos** ✅ full (6,872, barcoded, daily CI baseline).
-- **mymarket** ✅ **done this session** — [mymarket-catalog.mjs](src/scripts/mymarket-catalog.mjs)
-  walks /offers (which paginates the whole offers-heavy listing, ~5.5k) → **1,453 → 4,613**;
-  wired into the weekly `mymarket-canonical` CI job (autonomous). NOTE: /offers is offer-heavy,
-  not the entire store — a complete catalog needs category-tree walking (follow-up).
-- **masoutis** 🟡 7,924 (stale snapshot from the OLD pipeline; NOT self-renewing). Serves this
-  machine. Needs a Playwright network-capture probe to find its category/full-catalog endpoint,
-  then a masoutis-catalog feeder → ingestCatalog.
-- **ab** 🟡 3,433. **CI-only** (Akamai blocks this machine). Needs a CI discovery run for its
-  catalog GraphQL (CATEGORY_SEARCH listing type + category codes; gtin likely absent → SKU-keyed),
-  then an ab-catalog feeder. Template: [ab.mjs](src/scripts/adapters/ab.mjs) + ingestCatalog.
-- **sklavenitis** 🔴 18, BARCODE-LESS + CI-blocked. **Needs owner `PROXY_URL`** (heavy-scraping the
-  home IP risks a ban). Then a category-tree walk → ingestCatalog (reuse sklavenitis.mjs card parser).
-- **lidl** 🔴 0 — **no product catalog exists** (flyer/OCR only). Offers-only is the honest ceiling.
+**Reusable engine (the load-bearing piece):** [ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs)
+`ingestCatalog({chain,items})` — the ONLY place allowed to GROW the Product catalog, with a
+DETERMINISTIC identity (real barcode, else the chain's own SKU via ChainProductMapping — never an
+LLM guess → no pollution; same shape as the existing barcode-less Masoutis rows). Writes
+`kind:'normal'` shelf baselines on-change; creating the SKU mapping **auto-links that chain's future
+offers** (the proven bonus: mymarket's offer link-rate jumped 63%→84%). Exported
+`SM_MAPPING`/`normalizeBarcode`/`withDbRetry` from ingest-offers for reuse.
 
-**Recipe for a new catalog feeder (mechanical now):** scrape the chain's full listing → map each
+**Recipe for any new catalog feeder (mechanical now):** scrape the chain's full listing → map each
 product to `{chainItemcode, name, price, imageUrl?, brand?, barcode?, baseline?}` → `ingestCatalog`.
-mymarket-catalog.mjs is the reference. `baseline:false` for on-offer rows (their price is the promo).
+[mymarket-catalog.mjs](src/scripts/mymarket-catalog.mjs) is the reference; `baseline:false` for
+on-offer rows (their price is the promo, not the shelf price).
 
-**Also live:** `catalog-coverage` now reports `mirroredImageRate` (self-hosted images). Κρητικός
-image drain (`mirror-catalog.mjs`) was running in the background — re-check `npm run catalog:coverage`.
+**Per-chain catalog status:**
+- **kritikos** ✅ full (6,881, barcoded). Daily CI offers run does `BASELINE=1`; weekly canonical refreshes.
+- **mymarket** ✅ **DONE** — [mymarket-catalog.mjs](src/scripts/mymarket-catalog.mjs) walks /offers
+  (whole offers-heavy listing, ~5.5k) → **1,453 → 4,613**, offer link-rate **63%→84%**. Wired weekly
+  (`mymarket-canonical` job). (/offers ≠ the entire store; full store would need category-tree walking.)
+- **ab** 🔧 **11,723 scraped** (vs 3,433 from Wolt) — [ab-catalog.mjs](src/scripts/ab-catalog.mjs)
+  walks the `productListingType:'CATEGORY'` GraphQL listing across ~14 root category codes (SKU-keyed,
+  no GTIN). First run **timed out at the inline image-mirror**; fixed (mirror now OFF by default, set
+  `MIRROR_IMAGES=1` to opt in) + re-dispatched (`gh run 27496725838`). **VERIFY it wrote ~11.7k:**
+  `npm run catalog:coverage` (ab sourceProducts should be ~11.7k, not 3,433). Wired weekly (Sun 04:30 UTC).
+- **lidl** ✅ **CORRECTED + DONE** (owner caught my "flyer-only" error) — lidl-hellas.gr HAS an e-shop.
+  [lidl-catalog.mjs](src/scripts/lidl-catalog.mjs) discovers categories from the sitemap, decodes the
+  **index-dehydrated** product JSON (flat array; field values are indices), → **152 priced products**.
+  Wired weekly (Sun 03:30 UTC). HONEST LIMITS: grid pages carry the national price but only surface
+  ~hundreds; product *detail* pages list ~426 + real GTINs but OMIT price (store-dependent, separate
+  client call). Full priced coverage needs Lidl's per-store price API (future). Flyer-OCR offers
+  ([adapters/lidl.mjs](src/scripts/adapters/lidl.mjs)) still provide Lidl's deal prices on top.
+- **masoutis** 🟡 7,924 (best-covered; stale snapshot from the OLD pipeline, not self-renewing).
+  PARKED — its category API is JS-gated (homepage nav 0 links; would need a Playwright capture). Low ROI.
+- **sklavenitis** 🔴 **18 — blocked on owner `PROXY_URL`.** Barcode-less + CI-IP-blocked, and heavy-
+  scraping the home IP risks a ban. Once the proxy secret is set: write `sklavenitis-catalog.mjs`
+  (walk category tree, reuse the [sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) card parser)
+  → ingestCatalog, run via proxy in CI.
+
+**Images self-hosted: still 0%** (`mirroredImageRate`). The local Κρητικός drain (8,686 imgs) was a
+mistake — sequential mirroring is far too slow and never wrote back (mirror-catalog writes at the END;
+Supabase uploads persist for resume). It drains incrementally via the weekly `mirror-catalog` CI steps,
+but the REAL fix = make [mirror-images.mjs](src/scripts/lib/mirror-images.mjs) **concurrent** (parallel
+uploads) — worthwhile follow-up. `mirror-catalog.mjs` HOST_MATCH covers kritikos/ab/mymarket/masoutis/
+sklavenitis/wolt; add a lidl (schwarz CDN) host if mirroring Lidl images.
+
+**NEXT (ranked):** ① verify AB wrote ~11.7k (coverage). ② owner sets `PROXY_URL` → build sklavenitis
+catalog. ③ make image mirroring concurrent, then drain. ④ (optional) masoutis self-renewing catalog;
+Lidl full-426 via per-store price API. **App track (Capacitor) + sklavenitis OFFERS scrape both still
+need `PROXY_URL`** — that one secret is the biggest single unblock.
 
 ---
 
