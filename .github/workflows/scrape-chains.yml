@@ -62,6 +62,7 @@ on:
         options:
           - kritikos-offers
           - ab-offers
+          - ab-catalog-probe
           - sklavenitis-offers
           - mymarket-offers
           - lidl-offers
@@ -266,6 +267,21 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+  ab-catalog-probe:
+    # One-shot discovery (manual only): what AB GraphQL listing type returns the
+    # full catalog (vs promos)? Logs only, no DB. See probe-ab-catalog.mjs.
+    if: github.event.inputs.chain == 'ab-catalog-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: node src/scripts/probe-ab-catalog.mjs
 
   ab-resolver-only:
     if: github.event.inputs.chain == 'ab-resolver-only'
