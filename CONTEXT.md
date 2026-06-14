@@ -99,14 +99,15 @@ on-offer rows (their price is the promo, not the shelf price).
   (walk category tree, reuse the [sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) card parser)
   → ingestCatalog, run via proxy in CI.
 
-**Images self-hosted: started draining.** [mirror-images.mjs](src/scripts/lib/mirror-images.mjs) is
-now concurrent (default 6 workers; override `MIRROR_CONCURRENCY`; `maxNew` stays shared across workers).
-Two local Kritikos reuse-only drains wrote back already-uploaded Supabase objects: coverage now
-**1,955 mirrored Products / 6% total**, with **Kritikos 1,535 / 22%**. Keep draining via
-`CHAIN=kritikos MIRROR_MAX_NEW=0 MIRROR_CONCURRENCY=16 node src/scripts/mirror-catalog.mjs` to write
-back existing uploads, then allow fresh uploads by raising `MIRROR_MAX_NEW`. `mirror-catalog.mjs`
-HOST_MATCH covers kritikos/ab/mymarket/masoutis/sklavenitis/wolt; add a lidl (schwarz CDN) host if
-mirroring Lidl images.
+**Images self-hosted: 25% overall — Κρητικός now 100%.** [mirror-images.mjs](src/scripts/lib/mirror-images.mjs)
+is concurrent (default 6 workers; override `MIRROR_CONCURRENCY`; `maxNew` shared across workers). The
+long Κρητικός drain completed (6,737 uploaded + 1,885 reused → 8,622 `Product.imageUrl` rewritten; 64
+timeouts kept original): coverage now **8,660 mirrored Products / 25% total**, **Κρητικός ~6,845 / 100%**.
+REMAINING: ab/mymarket/masoutis/lidl catalog images — drain with
+`CHAIN=<x> MIRROR_CONCURRENCY=16 node src/scripts/mirror-catalog.mjs` (ab + www.ab.gr = CI-only;
+sklavenitis needs `PROXY_URL`). Only the `kritikos-canonical` CI job has a `mirror-catalog` step so far
+— wire the others (or one combined image-mirror job). HOST_MATCH covers
+kritikos/ab/mymarket/masoutis/sklavenitis/wolt; add a lidl (schwarz CDN) host for Lidl images.
 
 **NEXT (ranked):** ① **owner sets `PROXY_URL`** → build sklavenitis catalog (also unblocks the
 sklavenitis OFFERS scrape AND the Capacitor app track — the biggest single unblock). ② continue
