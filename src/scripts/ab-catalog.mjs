@@ -124,14 +124,16 @@ async function run() {
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
   console.log(`   ${items.length} catalog products ready`);
 
-  // Self-host AB images (only CI can reach www.ab.gr). Bounded per run; drains
-  // across runs (HEAD-reuse is free). No-op without SUPABASE creds.
-  if (!DRY_RUN) {
+  // Self-host AB images — OFF by default: with ~8k products the per-item writes
+  // already fill the job budget, and inline mirroring (1k+ slow uploads) timed
+  // the run out. Images drain separately/incrementally via mirror-catalog
+  // (CHAIN=ab). Set MIRROR_IMAGES=1 to mirror inline (bounded by MIRROR_MAX_NEW).
+  if (!DRY_RUN && process.env.MIRROR_IMAGES === '1') {
     await mirrorImages({
       chain: 'ab',
       items,
       match: (u) => u.includes('www.ab.gr'),
-      maxNew: parseInt(process.env.MIRROR_MAX_NEW || '1200', 10),
+      maxNew: parseInt(process.env.MIRROR_MAX_NEW || '800', 10),
       headers: {
         'User-Agent': HEADERS['User-Agent'],
         Accept: 'image/avif,image/webp,image/png,image/*,*/*;q=0.8',
