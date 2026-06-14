@@ -55,7 +55,7 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
-## ⚡ Pick up here (2026-06-14 — FULL-CATALOG engine + 4 chains done; AB writing; sklavenitis needs proxy; images draining)
+## ⚡ Pick up here (2026-06-14 — FULL-CATALOG engine + 5 chains done; sklavenitis needs proxy; images draining)
 
 **Goal (owner):** full, self-renewing product catalogs for all 6 live chains, plus self-hosted
 images ("own every product+pic, survive a block"). **ALL CODE COMMITTED + PUSHED** (working tree
@@ -79,11 +79,11 @@ on-offer rows (their price is the promo, not the shelf price).
 - **mymarket** ✅ **DONE** — [mymarket-catalog.mjs](src/scripts/mymarket-catalog.mjs) walks /offers
   (whole offers-heavy listing, ~5.5k) → **1,453 → 4,613**, offer link-rate **63%→84%**. Wired weekly
   (`mymarket-canonical` job). (/offers ≠ the entire store; full store would need category-tree walking.)
-- **ab** 🔧 **11,723 scraped** (vs 3,433 from Wolt) — [ab-catalog.mjs](src/scripts/ab-catalog.mjs)
-  walks the `productListingType:'CATEGORY'` GraphQL listing across ~14 root category codes (SKU-keyed,
-  no GTIN). First run **timed out at the inline image-mirror**; fixed (mirror now OFF by default, set
-  `MIRROR_IMAGES=1` to opt in) + re-dispatched (`gh run 27496725838`). **VERIFY it wrote ~11.7k:**
-  `npm run catalog:coverage` (ab sourceProducts should be ~11.7k, not 3,433). Wired weekly (Sun 04:30 UTC).
+- **ab** ✅ **DONE — 11,728 products** (vs 3,433 from Wolt; created 11,238 + 490 existing, 11,664
+  baselines, 0 err) — [ab-catalog.mjs](src/scripts/ab-catalog.mjs) walks the
+  `productListingType:'CATEGORY'` GraphQL listing across ~14 root category codes (SKU-keyed, no GTIN).
+  Wired weekly (Sun 04:30 UTC). Inline image mirror is OFF (`MIRROR_IMAGES=1` to opt in) — it timed
+  the run out otherwise; AB images drain via `mirror-catalog CHAIN=ab` in CI instead.
 - **lidl** ✅ **CORRECTED + DONE** (owner caught my "flyer-only" error) — lidl-hellas.gr HAS an e-shop.
   [lidl-catalog.mjs](src/scripts/lidl-catalog.mjs) discovers categories from the sitemap, decodes the
   **index-dehydrated** product JSON (flat array; field values are indices), → **152 priced products**.
@@ -105,10 +105,11 @@ but the REAL fix = make [mirror-images.mjs](src/scripts/lib/mirror-images.mjs) *
 uploads) — worthwhile follow-up. `mirror-catalog.mjs` HOST_MATCH covers kritikos/ab/mymarket/masoutis/
 sklavenitis/wolt; add a lidl (schwarz CDN) host if mirroring Lidl images.
 
-**NEXT (ranked):** ① verify AB wrote ~11.7k (coverage). ② owner sets `PROXY_URL` → build sklavenitis
-catalog. ③ make image mirroring concurrent, then drain. ④ (optional) masoutis self-renewing catalog;
-Lidl full-426 via per-store price API. **App track (Capacitor) + sklavenitis OFFERS scrape both still
-need `PROXY_URL`** — that one secret is the biggest single unblock.
+**NEXT (ranked):** ① **owner sets `PROXY_URL`** → build sklavenitis catalog (also unblocks the
+sklavenitis OFFERS scrape AND the Capacitor app track — the biggest single unblock). ② make image
+mirroring concurrent ([mirror-images.mjs](src/scripts/lib/mirror-images.mjs)) then drain — still 0%
+self-hosted. ③ (optional) masoutis self-renewing catalog; Lidl full-426 via Lidl's per-store price
+API; the Android app build. Catalog now ~31k products across 5 chains (kritikos+mymarket+ab+lidl+masoutis).
 
 ---
 
