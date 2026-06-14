@@ -50,6 +50,7 @@ on:
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
     - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
+    - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis canonical (Wolt)
     - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market canonical (Wolt)
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
@@ -62,6 +63,7 @@ on:
         options:
           - kritikos-offers
           - ab-offers
+          - ab-catalog
           - ab-catalog-probe
           - sklavenitis-offers
           - mymarket-offers
@@ -267,6 +269,28 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+  ab-catalog:
+    # Weekly Sun 04:30 UTC + manual. Walks AB's ~14 root categories via the
+    # ProductList CATEGORY listing → SKU-keyed Products + shelf-price baselines
+    # (+ self-hosted images). Auto-links AB offers as SKU mappings fill in.
+    if: github.event.schedule == '30 4 * * 0' || github.event.inputs.chain == 'ab-catalog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/ab-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   ab-catalog-probe:
     # One-shot discovery (manual only): what AB GraphQL listing type returns the
