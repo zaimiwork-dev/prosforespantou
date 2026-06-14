@@ -55,6 +55,41 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-14 — FULL-CATALOG engine + My Market done; per-chain catalog scrapers are the remaining work)
+
+**Goal (owner):** full, self-renewing product catalogs for all 6 live chains. **Reusable engine
+shipped + proven:** [ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs) `ingestCatalog({chain,items})`
+— the ONE place allowed to grow the Product catalog, with a DETERMINISTIC identity only (real
+barcode, else the chain's own SKU via ChainProductMapping — never an LLM guess, so no pollution;
+same shape as the existing barcode-less Masoutis rows). Writes `kind:'normal'` shelf baselines
+on-change, and creating the SKU mapping auto-links that chain's future offers (link-rate → 100%).
+Exported `SM_MAPPING`/`normalizeBarcode`/`withDbRetry` from ingest-offers for reuse.
+
+**Per-chain catalog status (coverage tool = `npm run catalog:coverage`):**
+- **kritikos** ✅ full (6,872, barcoded, daily CI baseline).
+- **mymarket** ✅ **done this session** — [mymarket-catalog.mjs](src/scripts/mymarket-catalog.mjs)
+  walks /offers (which paginates the whole offers-heavy listing, ~5.5k) → **1,453 → 4,613**;
+  wired into the weekly `mymarket-canonical` CI job (autonomous). NOTE: /offers is offer-heavy,
+  not the entire store — a complete catalog needs category-tree walking (follow-up).
+- **masoutis** 🟡 7,924 (stale snapshot from the OLD pipeline; NOT self-renewing). Serves this
+  machine. Needs a Playwright network-capture probe to find its category/full-catalog endpoint,
+  then a masoutis-catalog feeder → ingestCatalog.
+- **ab** 🟡 3,433. **CI-only** (Akamai blocks this machine). Needs a CI discovery run for its
+  catalog GraphQL (CATEGORY_SEARCH listing type + category codes; gtin likely absent → SKU-keyed),
+  then an ab-catalog feeder. Template: [ab.mjs](src/scripts/adapters/ab.mjs) + ingestCatalog.
+- **sklavenitis** 🔴 18, BARCODE-LESS + CI-blocked. **Needs owner `PROXY_URL`** (heavy-scraping the
+  home IP risks a ban). Then a category-tree walk → ingestCatalog (reuse sklavenitis.mjs card parser).
+- **lidl** 🔴 0 — **no product catalog exists** (flyer/OCR only). Offers-only is the honest ceiling.
+
+**Recipe for a new catalog feeder (mechanical now):** scrape the chain's full listing → map each
+product to `{chainItemcode, name, price, imageUrl?, brand?, barcode?, baseline?}` → `ingestCatalog`.
+mymarket-catalog.mjs is the reference. `baseline:false` for on-offer rows (their price is the promo).
+
+**Also live:** `catalog-coverage` now reports `mirroredImageRate` (self-hosted images). Κρητικός
+image drain (`mirror-catalog.mjs`) was running in the background — re-check `npm run catalog:coverage`.
+
+---
+
 ## ⚡ Pick up here (2026-06-13 — AUTONOMY + APP slice: proxy, full-image self-hosting, browse catalog, Capacitor scaffold)
 
 **Owner ask:** make the product self-sufficient — own every product/price/picture so nothing
