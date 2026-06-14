@@ -1,8 +1,8 @@
-// AB catalog discovery v2 (CI). PROMOTION_SEARCH works but the full catalog
-// needs a category code. Goal of this pass: find (a) the product field that
-// holds category code(s), (b) any barcode/gtin field, (c) a category-code source
-// (facets / breadcrumbs), then confirm CATEGORY_SEARCH returns a category's
-// products. Output is everything needed to build the category-walking feeder.
+// AB catalog discovery v3 (CI). v2 found: category codes are 3-digit
+// (firstLevelCategory.code "005" = Κατεψυγμένα, url /c/005), rootCategoryFacet
+// lists roots. CATEGORY_SEARCH("006") gave 0 — but the sample product lives in
+// 005. Pin down the working listing-type + categoryCode + flag combo, then dump
+// the rootCategoryFacet codes so the feeder can walk every department.
 
 const ENDPOINT = 'https://www.ab.gr/api/v1/';
 const PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800';
@@ -12,7 +12,6 @@ const HEADERS = {
   Origin: 'https://www.ab.gr', Referer: 'https://www.ab.gr/search',
   'x-apollo-operation-name': 'ProductList', 'apollo-require-preflight': 'true',
 };
-
 function buildUrl(vars) {
   const variables = encodeURIComponent(JSON.stringify({
     productCodes: '', categoryCode: '', excludedProductCodes: '', brands: '',
@@ -24,50 +23,31 @@ function buildUrl(vars) {
   const ext = encodeURIComponent(JSON.stringify({ persistedQuery: { version: 1, sha256Hash: PQ_HASH } }));
   return `${ENDPOINT}?operationName=ProductList&variables=${variables}&extensions=${ext}`;
 }
-async function call(vars) {
-  const res = await fetch(buildUrl(vars), { headers: HEADERS });
-  const j = await res.json().catch(() => null);
-  return j?.data?.productList || null;
+async function total(label, vars) {
+  try {
+    const res = await fetch(buildUrl(vars), { headers: HEADERS });
+    const j = await res.json().catch(() => null);
+    if (j?.errors) { console.log(`  ${label}: ERROR ${(j.errors[0]?.message||'').slice(0,120)}`); return; }
+    const pl = j?.data?.productList;
+    console.log(`  ${label}: total=${pl?.pagination?.totalResults ?? '?'} got=${pl?.products?.length ?? 0}`);
+  } catch (e) { console.log(`  ${label}: threw ${e.message}`); }
 }
 
 async function run() {
-  console.log('🔎 AB catalog discovery v2');
-  const pl = await call({ productListingType: 'PROMOTION_SEARCH' });
-  if (!pl) { console.log('no productList'); return; }
+  console.log('🔎 AB catalog discovery v3 — category-walk combos');
+  // Dump root category codes (departments) for the feeder.
+  const res = await fetch(buildUrl({ productListingType: 'PROMOTION_SEARCH' }), { headers: HEADERS });
+  const pl = (await res.json())?.data?.productList;
+  const rootFacet = (pl?.facets || []).find((f) => /rootCategor/i.test(f.code || f.name || ''));
+  const roots = (rootFacet?.values || []).map((v) => v.code || v.name);
+  console.log(`rootCategoryFacet codes: ${roots.join(', ') || 'none'}\n`);
 
-  console.log('\nproductList top-level keys:', Object.keys(pl).join(', '));
-
-  // Facets often carry the full category tree with codes + counts.
-  const facets = pl.facets || pl.facetData || [];
-  console.log(`\nfacets: ${Array.isArray(facets) ? facets.length : typeof facets}`);
-  if (Array.isArray(facets)) {
-    for (const f of facets.slice(0, 12)) {
-      const code = f.code || f.name || f.key;
-      const vals = (f.values || f.facetValues || []).slice(0, 4)
-        .map((v) => `${v.code || v.name}=${v.code || v.query?.query?.value || ''}(${v.count ?? '?'})`).join(' ');
-      console.log(`  facet ${code}: ${vals}`);
-    }
-  }
-  if (pl.breadcrumbs) console.log('\nbreadcrumbs:', JSON.stringify(pl.breadcrumbs).slice(0, 300));
-  if (pl.categories) console.log('\ncategories:', JSON.stringify(pl.categories).slice(0, 400));
-
-  const p = pl.products?.[0];
-  if (p) {
-    console.log('\nproduct keys:', Object.keys(p).join(', '));
-    console.log('\nfull first product:', JSON.stringify(p).slice(0, 1400));
-  }
-
-  // Try a CATEGORY_SEARCH with any category code we can find.
-  let catCode = null;
-  if (Array.isArray(facets)) {
-    const catFacet = facets.find((f) => /categor/i.test(f.code || f.name || ''));
-    catCode = catFacet?.values?.[0]?.code || catFacet?.values?.[0]?.name || null;
-  }
-  catCode = catCode || p?.categories?.[0]?.code || p?.firstLevelCategory?.code || p?.superCategoryCode || null;
-  console.log(`\nharvested categoryCode candidate: ${catCode}`);
-  if (catCode) {
-    const cat = await call({ productListingType: 'CATEGORY_SEARCH', categoryCode: String(catCode) });
-    console.log(`CATEGORY_SEARCH("${catCode}") → totalResults=${cat?.pagination?.totalResults ?? '?'}`);
+  for (const code of ['005', '006', '010']) {
+    console.log(`categoryCode ${code}:`);
+    await total('CATEGORY_SEARCH +promoFlags', { productListingType: 'CATEGORY_SEARCH', categoryCode: code });
+    await total('CATEGORY_SEARCH cleanFlags', { productListingType: 'CATEGORY_SEARCH', categoryCode: code, hideProductsWithoutPromo: false, includePotentialActivatableOffers: false });
+    await total('CATEGORY (no _SEARCH)', { productListingType: 'CATEGORY', categoryCode: code });
+    await total('no type, categoryCode only', { categoryCode: code });
   }
 }
 run().catch((e) => { console.error(e); process.exit(1); });
