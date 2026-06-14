@@ -20,7 +20,7 @@
 //   CHAIN=kritikos node src/scripts/mirror-catalog.mjs
 //   CHAIN=sklavenitis PROXY_URL=http://user:pass@host:port node src/scripts/mirror-catalog.mjs
 //   CHAIN=kritikos DRY_RUN=1 node src/scripts/mirror-catalog.mjs   # no DB writes
-//   MIRROR_MAX_NEW=500 QUERY_LIMIT=2000 ...                        # tune the drain
+//   MIRROR_MAX_NEW=500 MIRROR_CONCURRENCY=8 QUERY_LIMIT=2000 ...   # tune the drain
 //
 // dotenv first (ESM hoist trap — DB import comes later).
 import 'dotenv/config';

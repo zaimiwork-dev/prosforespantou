@@ -69,7 +69,18 @@ async function ensureBucket({ url, key }) {
 // and within a few days the whole catalog is HEAD-reuse.
 // `rewrite` maps a source URL to the variant worth keeping forever (e.g.
 // mymarket medium → original) before download/hashing.
-export async function mirrorImages({ chain, items, match, headers = {}, paceMs = 150, maxNew = Infinity, rewrite = null }) {
+// `concurrency` / MIRROR_CONCURRENCY controls parallel HEAD/download/upload
+// workers; maxNew is still shared across the whole run.
+export async function mirrorImages({
+  chain,
+  items,
+  match,
+  headers = {},
+  paceMs = 150,
+  maxNew = Infinity,
+  rewrite = null,
+  concurrency = parseInt(process.env.MIRROR_CONCURRENCY || '6', 10),
+}) {
   const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, skipped: 0, warnings: [] };
 
   const config = resolveStorageConfig();
@@ -87,14 +98,26 @@ export async function mirrorImages({ chain, items, match, headers = {}, paceMs =
   }
   result.enabled = true;
 
-  let lastError = null;
+  const candidates = [];
   for (const item of items) {
     let src = item.imageUrl;
     if (!src || !match(src)) continue;
     if (rewrite) src = rewrite(src) || src;
     result.attempted++;
     const path = mirrorPathFor(chain, src);
-    const publicUrl = publicUrlFor(config.url, path);
+    candidates.push({ item, src, publicUrl: publicUrlFor(config.url, path), path });
+  }
+
+  let lastError = null;
+  let nextIndex = 0;
+  let freshDownloadsReserved = 0;
+  const parsedConcurrency = parseInt(concurrency, 10);
+  const workerCount = Math.max(1, Math.min(
+    candidates.length || 1,
+    Number.isFinite(parsedConcurrency) && parsedConcurrency > 0 ? parsedConcurrency : 1
+  ));
+
+  async function mirrorOne({ item, src, publicUrl, path }) {
     try {
       // Already mirrored on a previous run? Public-bucket HEAD needs no auth.
       // Per-request timeouts so one hung fetch can't stall the whole run.
@@ -102,10 +125,11 @@ export async function mirrorImages({ chain, items, match, headers = {}, paceMs =
       if (head.ok) {
         item.imageUrl = publicUrl;
         result.reused++;
-        continue;
+        return;
       }
 
-      if (result.mirrored >= maxNew) { result.skipped++; continue; }
+      if (freshDownloadsReserved >= maxNew) { result.skipped++; return; }
+      freshDownloadsReserved++;
 
       const dl = await fetch(src, { headers, redirect: 'follow', signal: AbortSignal.timeout(15000) });
       const contentType = dl.headers.get('content-type') || '';
@@ -136,6 +160,15 @@ export async function mirrorImages({ chain, items, match, headers = {}, paceMs =
       lastError = e.message;
     }
   }
+
+  async function worker() {
+    while (nextIndex < candidates.length) {
+      const current = candidates[nextIndex++];
+      await mirrorOne(current);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
   if (result.failed > 0) {
     result.warnings.push(
