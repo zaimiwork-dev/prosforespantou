@@ -76,7 +76,17 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 - **Images self-hosted: 128/128 offers + 256/256 catalog mirrored to Supabase** (Lidl hosts photos on TWO hosts — `imgproxy-retcat.assets.schwarz` AND `www.lidl-hellas.gr/assets/`; match both). Both scrapers mirror **inline** each run via `mirrorImages` (small assortment → no timeout), so Lidl photos survive a CDN rotation/block. `mirror-catalog.mjs` also gained a `lidl` host entry for manual drains.
 - Workflow: `lidl-offers` (Thu) no longer needs `GROQ_API_KEY`; `lidl-catalog` (Sun). Both run free/fast (~1–2 min).
 
-**NOT yet done:** CONTEXT/commit (this). **Open:** the offer mix is heavy on Carroten sun-care (a real Lidl summer ΜΟΝΟ promo in Food's health/beauty subcategory) — legit, but eyeball on prod. Untracked root scratch `.txt` files (incl. `passwords.txt`) still deferred.
+**SHIPPED to `origin/main`** (commits `9625b6d` + `c4e022a`; ran both scrapers + image mirror locally, so prod DB already holds the clean data). Nothing left on this task.
+
+**Verify next session (prod):** Lidl offer cards show clean Greek names + real photos (not Lidl-hosted — should be `…/storage/v1/object/public/chain-images/…`); confirm the **Thu `lidl-offers`** + **Sun `lidl-catalog`** CI runs go green in the Υγεία tab (they no longer need `GROQ_API_KEY`).
+
+**Open / next candidates:**
+- **Other chains still OCR/flyer-based?** The structured-API pattern (shared lib + inline mirror + nav discovery + session/Retry-After) is now the template — apply it to any chain still scraping fragile sources.
+- **Sklavenitis images** are the only un-mirrored set (its host IP-blocks us) — gated on the residential-proxy decision already in OPEN DECISIONS above.
+- Offer mix is heavy on Carroten sun-care (a real Lidl summer ΜΟΝΟ promo in Food's health/beauty subcat) — legit, just eyeball it.
+- Untracked root scratch `.txt` files (incl. a `passwords.txt` security smell) + root `MEMORY.md` still deferred — move out / .gitignore.
+
+**Key gotcha for whoever touches Lidl next:** the search API filter param is **`category.id`** (with the dot) + `version=v2.0.0`; plain `categories=` is silently ignored → fixed default set. Needs a **session cookie** (load a page first) or it soft-blocks to `numFound:0`. Don't sweep all sitemap entries — that throttles the IP; use the landing-nav departments. All of this is in [src/scripts/lib/lidl-eshop.mjs](src/scripts/lib/lidl-eshop.mjs).
 
 ---
 
