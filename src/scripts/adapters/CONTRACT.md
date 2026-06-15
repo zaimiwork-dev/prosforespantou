@@ -30,7 +30,7 @@ await ingestOffers({
   showUnmatched: true,      // optional — false = unmatched items go ONLY to the
                             // Review Queue, not to the public site. Turn off for
                             // feeds whose data isn't trustworthy enough to
-                            // publish unreviewed (e.g. Lidl's vision-OCR output).
+                            // publish unreviewed (e.g. raw OCR output).
   extraWarnings: [],        // optional — pre-ingest notes from the adapter
                             // (e.g. image-mirror failures) that should appear in
                             // the IngestRun record / Υγεία tab. Never affect
@@ -92,7 +92,7 @@ Two rules that exist because of real incidents:
 
 - **`chainItemcode` is the offer's identity.** A productless offer cannot be
   written without one (no stable dedup key across runs). Use the chain's real
-  SKU; only hash the name as a last resort (see lidl.mjs).
+  SKU (e.g. Lidl's `productId`); only hash the name as a last resort.
 - **Winner-takes-row.** When two chain SKUs are mapped to the same `productId`
   (usually a stale mis-mapping), the first item this run owns the Discount row
   and later ones are skipped — otherwise the visible price flip-flops between
