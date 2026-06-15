@@ -55,6 +55,32 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-16 — GDPR opt-in consent + legal pages SHIPPED)
+
+**The privacy/consent layer is live on `main` (PR #2, merge `3061220`).** This closes the legal/GDPR launch blocker and makes the behavioural analytics legally collectable (owner wants click/behaviour data as an investor selling point — now opt-in, defensible in due diligence).
+
+**Consent model = Option 1 (opt-in gate).** Nothing behavioural is tracked until the visitor presses «Αποδοχή». Chosen over an "anonymous-for-everyone" tier because the existing analytics use a persistent `sessionId` (not anonymous in the GDPR sense) and a clean opt-in story is the stronger DD asset.
+
+**Architecture (all new unless noted):**
+- [src/lib/consent.js](src/lib/consent.js) — single source of truth: `accepted`|`rejected`|not-asked, **default OFF**. `hasAnalyticsConsent()`, `onConsentChange()` store.
+- [src/lib/track.js](src/lib/track.js) — **the only path components may use to log events**. Hard no-op until consent → the `trackEvent` server action is never called (so no `sessionId`/IP/user-agent reaches the server) for non-consenters. Do NOT call the `trackEvent` action directly from a component; it bypasses the gate.
+- [src/lib/session-id.js](src/lib/session-id.js) — persistent `sid` is created **only after** consent; reject wipes it.
+- [src/components/CookieConsent.js](src/components/CookieConsent.js) — banner; **equal-prominence Αποδοχή/Απόρριψη** (do NOT make reject harder — that invalidates ALL consent; this was an explicit owner ask we talked down). `useSyncExternalStore` (no SSR flash). Re-openable via the footer's "Ρυθμίσεις cookies" → `open-consent` window event. Mounted in [layout.js](src/app/layout.js).
+- Refactored 4 call sites (DiscountCard, OfferDetails, ProductSheet, SupermarketClient) off the raw action onto `track()`.
+
+**Analytics funnel broadened (server-action contract changed).** [track-event.ts](src/actions/track-event.ts) schema now also accepts `page_view`, `search`, `filter`, `store_select`, `favorite`, `outbound_click`; `supermarket` is now optional (defaults to `'site'`); `category` doubles as a free-form context label (search term / filter value / route path) — **no DB migration** (reuses `ClickEvent`). [PageViewTracker.js](src/components/PageViewTracker.js) fires consent-gated `page_view` on route change (mounted in layout). The other new event types are wired in the schema but not yet emitted from components — wire them when you want that data.
+
+**Legal pages (static, footer-linked + cross-linked):** [/aporrito](src/app/aporrito/page.js) (Privacy), [/cookies](src/app/cookies/page.js) (Cookies), [/oroi-chrisis](src/app/oroi-chrisis/page.js) (Terms), via shared [LegalLayout.js](src/components/LegalLayout.js). Data inventory + processors (Vercel/Supabase/Sentry/Resend), GDPR rights, retention (email until unsubscribe; analytics ≤14 months), and an explicit **"δεν αποτελούν επίσημα δεδομένα των αλυσίδων" / independent-service / not-affiliated** disclaimer in Terms §1–3 (owner confirmed buried-in-Terms is legally fine; no banner needed). **Controller: Σίλβι Ζαΐμι (φυσικό πρόσωπο)** — launching as an individual, no company; contact **`zaimiwork@gmail.com`** for now.
+
+**⛔ Follow-ups on owner (not blockers):**
+1. **Set up `privacy@prosforespantou.gr`** (forwarding alias → Gmail, free; do it when you add Resend DNS) → then swap the contact email on all 3 pages from `zaimiwork@gmail.com`. A bouncing privacy contact is itself a GDPR problem, so until the alias exists the Gmail is the correct live value.
+2. If you later register a business, swap the controller name for the company + ΑΦΜ/ΓΕΜΗ (2-min edit; shields your personal name).
+3. The 3 legal pages are accurate-skeleton — fine to launch, but you can hand the prose to ChatGPT to polish (€0-budget rule) without touching the factual lists.
+
+**Verify on prod:** incognito → banner appears bottom-center above the nav; press Απόρριψη → no `track:*`/ClickEvent network calls; press Αποδοχή → `page_view`/`deal_click` fire; `/aporrito`, `/cookies`, `/oroi-chrisis` render + footer links work; "Ρυθμίσεις cookies" re-opens the banner.
+
+---
+
 ## ⚡ Pick up here (2026-06-15 — Lidl flyer-OCR REPLACED by structured e-shop API)
 
 **Lidl now reads clean structured data instead of OCR'ing flyer images. Shipped to prod (ran both scrapers locally).** This kills the ~15% garbled-name problem for good — names/prices/dates/photos are now Lidl's own structured data, zero OCR.
