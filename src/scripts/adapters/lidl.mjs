@@ -85,6 +85,34 @@ Use plain numbers (1.99 not "1,99€"). Return only the JSON object, no prose.`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Light, deterministic OCR cleanup for the displayed name. Only fixes that are
+// unambiguous and safe — we do NOT attempt semantic typo repair (καρπόζί→
+// καρπούζι etc.); that needs a language model (Groq) and runs server-side.
+// Lidl's own private-label brands are printed in Latin caps; vision OCR often
+// splits them ("PARK SIDE") or homoglyphs the leading cap to a Greek look-alike
+// (Β→B, Τ→T). Canonicalising the brand token keeps unmatched cards looking real.
+const LIDL_BRANDS = ['PARKSIDE', 'CRIVIT', 'ESMARA', 'CIEN', 'VITASIA', 'MILBONA',
+  'LUPILU', 'SILVERCREST', 'DELUXE', 'ALESTO', 'FLORALYS', 'TRONIC', 'BESTWAY'];
+// Greek capitals that share a glyph with the Latin caps used in those brands.
+const HOMOGLYPH = { 'Β': 'B', 'Ε': 'E', 'Ζ': 'Z', 'Η': 'H', 'Ι': 'I', 'Κ': 'K',
+  'Μ': 'M', 'Ν': 'N', 'Ο': 'O', 'Ρ': 'P', 'Τ': 'T', 'Υ': 'Y', 'Χ': 'X' };
+function cleanOcrName(name) {
+  let s = String(name || '').replace(/\s+/g, ' ').trim();
+  // De-homoglyph a leading token only if doing so reveals a known brand
+  // (avoids touching real Greek words that happen to start with these caps).
+  const deglyph = (tok) => tok.replace(/[ΒΕΖΗΙΚΜΝΟΡΤΥΧ]/g, (c) => HOMOGLYPH[c] || c);
+  for (const brand of LIDL_BRANDS) {
+    // collapse a one-space split: "PARK SIDE" → "PARKSIDE"
+    const split = brand.slice(0, 4) + ' ' + brand.slice(4);
+    if (split.length > 5) s = s.replace(new RegExp('\\b' + split + '\\b', 'i'), brand);
+  }
+  const first = s.split(' ')[0];
+  if (first && deglyph(first).toUpperCase() !== first.toUpperCase() && LIDL_BRANDS.includes(deglyph(first).toUpperCase())) {
+    s = deglyph(first) + s.slice(first.length);
+  }
+  return s;
+}
+
 // "PUMMARO Ντομάτα Πασσάτα 3x250g" → stable 16-char hex.
 // Used as chainItemcode so re-runs of the same product across weeks hit the
 // ChainProductMapping cache and skip re-matching.
@@ -199,11 +227,12 @@ async function extractPageOffers(imageUrl, apiKey) {
 }
 
 function toOfferItem(deal, validFrom, validUntil) {
+  const name = cleanOcrName(deal.productName);
   return {
-    name: String(deal.productName).trim(),
+    name,
     price: Number(deal.discountedPrice),
     originalPrice: deal.originalPrice ? Number(deal.originalPrice) : null,
-    chainItemcode: nameHash(deal.productName),
+    chainItemcode: nameHash(name),
     barcode: null,
     brand: null,
     unit: deal.description ? String(deal.description).trim() : null,
@@ -266,10 +295,13 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limitPages = LIMIT_PAGE
     console.log('   no offers extracted — safety net in ingest-offers will skip deactivation');
   }
 
-  // showUnmatched off: names/prices here come from vision OCR, not a chain
-  // API — don't publish unmatched items unreviewed. Flip after eyeballing a
-  // real run's quality in the admin Review tab.
-  const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: allOffers, dryRun, showUnmatched: false });
+  // showUnmatched ON (2026-06-15): most unmatched Lidl items are real food
+  // deals that simply have no cross-chain canonical (Lidl is barcode-less +
+  // own-brand heavy), so hiding them dropped ~135 genuine offers. Names come
+  // from vision OCR and carry minor typos; owner accepts that over hiding the
+  // deals. Brand garbling is cleaned by cleanOcrName; deep semantic typo repair
+  // is a future Groq pass.
+  const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: allOffers, dryRun, showUnmatched: true });
   printReport(report);
 
   // Lidl offers carry no leaflet image; stamp each with a Lidl-sourced catalog

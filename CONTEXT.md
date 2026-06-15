@@ -55,6 +55,20 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-15 — Lidl OCR cleanup + showUnmatched ON)
+
+**Goal:** surface the ~135 real Lidl food deals stuck unshown in the review queue. 171 Lidl items sit in PendingMatch unmatched (Lidl is barcode-less + own-brand heavy → no cross-chain canonical to match). Owner confirmed: show everything incl. the ~36 non-food middle-aisle items (no filter).
+
+**Changed in [adapters/lidl.mjs](src/scripts/adapters/lidl.mjs):**
+- `showUnmatched: false → true` — unmatched offers now written as productless Discounts (display-first), claimed later by the resolver.
+- New `cleanOcrName()` — *deterministic, safe-only* OCR cleanup applied to the displayed name + used for the `chainItemcode` hash: collapses split private-label brands ("PARK SIDE"→"PARKSIDE") and de-homoglyphs a leading brand cap ("ΒESTWAY"→"BESTWAY"). Verified locally on real examples. Does NOT touch semantic Greek typos (καρπόζί→καρπούζι, Τσαουρεκάκια…) — those need a Groq pass (CI-only) and are left as a future step; owner accepts minor typos over hiding deals.
+
+**⚠️ Verification is CI-only:** the Lidl adapter OCRs the leaflet via Groq vision, and **Groq is IP-blocked on this dev machine** — the adapter cannot run/verify locally. Path: push → `gh workflow run scrape-chains.yml -f chain=lidl-offers` (gh CLI works here) → check DB. The Lidl image backfill (prev section) also runs at the end of this same adapter, so a fresh run re-images too.
+
+**Next:** confirm the triggered CI run wrote productless Lidl Discounts with cleaned names + that the app renders them; then the other open task = drain mymarket/masoutis/lidl catalog images (fully local-doable).
+
+---
+
 ## ⚡ Pick up here (2026-06-15 — Lidl own-images backfill)
 
 **Follows the 2026-06-14 catalog fix's "known remaining data issue."** All 71 active Lidl offers had `Discount.imageUrl = null` (leaflet OCR carries no per-tile image), so cards fell back to the linked canonical Product's image — for ~40% of them a *different chain's* packaging, and a blank tile when that cross-chain host failed.
