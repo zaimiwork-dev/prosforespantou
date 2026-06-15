@@ -55,6 +55,25 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-15 — Lidl own-images backfill)
+
+**Follows the 2026-06-14 catalog fix's "known remaining data issue."** All 71 active Lidl offers had `Discount.imageUrl = null` (leaflet OCR carries no per-tile image), so cards fell back to the linked canonical Product's image — for ~40% of them a *different chain's* packaging, and a blank tile when that cross-chain host failed.
+
+**Fix — stamp each Lidl offer with a Lidl-sourced image** (the card prefers `offer.imageUrl`): [lidl-image-backfill.mjs](src/scripts/lib/lidl-image-backfill.mjs) `backfillLidlImages()`:
+1. Linked product is a Lidl product with an image → copy it (authoritative).
+2. Else fuzzy-match the OCR name against the 152-row Lidl catalog, **gated on a brand-safety rule** (the offer's head/brand token must appear in the candidate) — this is load-bearing: without it, branded offers (ΗΠΕΙΡΟΣ/LURPAK/ΔΩΔΩΝΗ) get matched to Lidl's own-brand *generic* ("Φέτα Π.Ο.Π.") = wrong packaging. Threshold 0.6.
+3. No confident source → leave null (unchanged cross-chain fallback; never stamp a wrong image).
+
+**Applied to prod (2026-06-15):** 44/71 imaged (43 linked + 1 safe fuzzy), 27 left null — all 27 still have a working linked-product fallback (**0 offers imageless**, no regression). Imaged URLs are Lidl's own hosts (`www.lidl-hellas.gr`, `imgproxy-retcat.assets.schwarz`), verified 200 + real image content-type.
+
+- Idempotent (fills nulls only); re-run via `node src/scripts/backfill-lidl-images.mjs` (`DRY_RUN=1` to preview the fuzzy matches).
+- **Auto-applies each weekly Lidl scrape** — wired into [adapters/lidl.mjs](src/scripts/adapters/lidl.mjs) `runLidlAdapter` after `ingestOffers` (skipped on dryRun).
+- Verified: eslint clean, `npm run build` green.
+
+**Still open for Lidl:** the 27 cross-chain-linked offers keep a cross-chain image (acceptable when the canonical product genuinely matches); better same-chain linking would need the offer to carry a Lidl SKU/barcode, which OCR doesn't give. OCR name-cleanup pass + `showUnmatched` flip still pending.
+
+---
+
 ## ⚡ Pick up here (2026-06-14 — catalog UX correction after owner QA)
 
 **Owner QA caught a real bug:** `/catalog` said "Πλήρεις κατάλογοι" and showed `34.218 προϊόντα`, but the filter chips were active-offer counts. Clicking Lidl showed `71 προϊόντα` even though `71` is the active-offer count, not the full catalog count. This was wrong and must not regress.

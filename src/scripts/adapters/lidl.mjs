@@ -45,6 +45,7 @@ import { load as loadHtml } from 'cheerio';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { backfillLidlImages } from '../lib/lidl-image-backfill.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT_PAGES = process.env.LIMIT_PAGES ? parseInt(process.env.LIMIT_PAGES, 10) : Infinity;
@@ -270,6 +271,14 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limitPages = LIMIT_PAGE
   // real run's quality in the admin Review tab.
   const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: allOffers, dryRun, showUnmatched: false });
   printReport(report);
+
+  // Lidl offers carry no leaflet image; stamp each with a Lidl-sourced catalog
+  // image (own packaging, reliable host) instead of a cross-chain fallback.
+  if (!dryRun) {
+    try { await backfillLidlImages({}); }
+    catch (err) { console.log(`   ⚠️ Lidl image backfill skipped: ${err.message}`); }
+  }
+
   return report;
 }
 
