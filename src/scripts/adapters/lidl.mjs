@@ -32,6 +32,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import { mirrorImages } from '../lib/mirror-images.mjs';
 import { discoverCategoryNumbers, scrapeAllProducts, productId, classifyOffer } from '../lib/lidl-eshop.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
@@ -105,6 +106,19 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
       const d = `${o.validFrom.slice(5, 10)}→${o.validUntil.slice(5, 10)}`;
       console.log(`   ${o.offerType.padEnd(13)} ${String(o.price).padStart(6)} was=${String(o.originalPrice ?? '').padStart(5)}  ${d}  img=${o.imageUrl ? 'Y' : 'N'}  ${o.name}`);
     }
+  }
+
+  // Self-host offer images on the Supabase mirror so Lidl photos survive even if
+  // schwarz's CDN rotates its (signed) URLs or blocks us. Mutates item.imageUrl
+  // in place → mirror URL; HEAD-reuses anything the catalog already uploaded.
+  // No-op (originals kept + warning) without SUPABASE creds.
+  if (!dryRun) {
+    const mirror = await mirrorImages({
+      chain: 'lidl', items: finalOffers,
+      match: (u) => u.includes('assets.schwarz') || u.includes('lidl-hellas.gr'),
+      maxNew: 500, paceMs: 60,
+    });
+    extraWarnings.push(...mirror.warnings);
   }
 
   // showUnmatched ON: names/prices/images are clean structured data, safe to

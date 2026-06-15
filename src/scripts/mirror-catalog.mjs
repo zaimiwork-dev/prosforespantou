@@ -11,6 +11,7 @@
 //   CHAIN=ab          → www.ab.gr                                    (CI only)
 //   CHAIN=mymarket    → cdn.mymarket.gr
 //   CHAIN=masoutis    → masoutisimagesneu.blob.core.windows.net
+//   CHAIN=lidl        → imgproxy-retcat.assets.schwarz  (any IP)
 //   CHAIN=sklavenitis → s1.sklavenitis.gr        (needs PROXY_URL / residential)
 // Run it wherever the host is reachable (CI for ab/kritikos/mymarket/masoutis;
 // PROXY_URL or this dev PC for sklavenitis). Images the offer adapters already
@@ -40,6 +41,7 @@ const HOST_MATCH = {
   mymarket: ['mymarket.gr'],
   masoutis: ['blob.core.windows.net'],
   sklavenitis: ['sklavenitis.gr'],
+  lidl: ['assets.schwarz', 'lidl-hellas.gr'], // schwarz imgproxy + own /assets/ host
   wolt: ['wolt.com'], // mostly dead links; low yield, kept for completeness
 };
 

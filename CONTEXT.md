@@ -71,8 +71,9 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 - **Catalog** [lidl-catalog.mjs](src/scripts/lidl-catalog.mjs) — FULL assortment (discounted + full-price); `baseline:false` for on-offer items so their promo price isn't snapshotted as 'normal'. Full-price items show plain/no badge, like every other chain.
 
 **Live prod after the runs:**
-- **Offers: 128 active** (48 strikethrough + 80 ΜΟΝΟ), **128/128 imaged**, **76 auto-linked** to Lidl Products via `productId`→ChainProductMapping, 52 shown-unmatched (clean). **181 old OCR rows deactivated.** Names verified clean (no homoglyphs).
+- **Offers: 128 active** (48 strikethrough + 80 ΜΟΝΟ), **76→128 auto-linked** to Lidl Products via `productId`→ChainProductMapping. **181 old OCR rows deactivated.** Names verified clean (no homoglyphs).
 - **Catalog: 256 products** (104 new), 152→256 SKUs, 52 baseline snapshots.
+- **Images self-hosted: 128/128 offers + 256/256 catalog mirrored to Supabase** (Lidl hosts photos on TWO hosts — `imgproxy-retcat.assets.schwarz` AND `www.lidl-hellas.gr/assets/`; match both). Both scrapers mirror **inline** each run via `mirrorImages` (small assortment → no timeout), so Lidl photos survive a CDN rotation/block. `mirror-catalog.mjs` also gained a `lidl` host entry for manual drains.
 - Workflow: `lidl-offers` (Thu) no longer needs `GROQ_API_KEY`; `lidl-catalog` (Sun). Both run free/fast (~1–2 min).
 
 **NOT yet done:** CONTEXT/commit (this). **Open:** the offer mix is heavy on Carroten sun-care (a real Lidl summer ΜΟΝΟ promo in Food's health/beauty subcategory) — legit, but eyeball on prod. Untracked root scratch `.txt` files (incl. `passwords.txt`) still deferred.

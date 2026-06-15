@@ -24,6 +24,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 import { ingestCatalog } from './lib/ingest-catalog.mjs';
+import { mirrorImages } from './lib/mirror-images.mjs';
 import { discoverCategoryNumbers, scrapeAllProducts, productId, classifyOffer } from './lib/lidl-eshop.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
@@ -71,6 +72,16 @@ async function run() {
   console.log(`   ${finalItems.length} catalog products ready (${onOffer} on offer, ${finalItems.length - onOffer} full-price)`);
   if (stats.throttledCats || stats.incompleteCats) {
     console.log(`   ⚠️ Lidl API throttled: ${stats.throttledCats} categories unreadable, ${stats.incompleteCats} cut short — partial catalog, re-run later.`);
+  }
+
+  // Self-host catalog images on the Supabase mirror (small assortment → inline is
+  // fine; no timeout risk) so Lidl photos survive a schwarz CDN rotation/block.
+  if (!DRY_RUN) {
+    await mirrorImages({
+      chain: 'lidl', items: finalItems,
+      match: (u) => u.includes('assets.schwarz') || u.includes('lidl-hellas.gr'),
+      maxNew: 600, paceMs: 60,
+    });
   }
 
   const report = await ingestCatalog({ chain: 'lidl', items: finalItems, dryRun: DRY_RUN });
