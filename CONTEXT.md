@@ -55,6 +55,21 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## ⚡ Pick up here (2026-06-15 — Lidl OCR verified in CI + mymarket/masoutis images drained)
+
+Two follow-through tasks closed out this session.
+
+**1. Lidl OCR cleanup + showUnmatched — VERIFIED on prod.** CI run [`27539376113`](https://github.com/zaimiwork-dev/prosforespantou/actions/runs/27539376113) (`gh workflow run scrape-chains.yml -f chain=lidl-offers`) succeeded. DB after: **active Lidl offers 71 → 186** (all productless, as expected for unmatched OCR items), **54 imaged** by the auto-backfill, brand cleanup confirmed on live data (TRONIC/LIVARNO/etc. clean). Remaining deep Greek OCR typos (κουμπι, Φωταλίες, ραδιοκουμπάτων…) are the **Groq semantic typo-fix pass — still deferred** (CI-only); owner accepts minor typos over hiding deals.
+
+**2. Catalog image draining — mymarket + masoutis DONE (local).** `CHAIN=<x> MIRROR_MAX_NEW=3000 QUERY_LIMIT=3000 MIRROR_CONCURRENCY=16 node src/scripts/mirror-catalog.mjs`, looped until drained. Results (live prod `Product.imageUrl`):
+- **mymarket:** 3,152 mirrored, only **7 still on chain host** (persistent fetch timeouts — keep chain URL, retry next scheduled run).
+- **masoutis:** 3,589 mirrored, only **57 still on chain host** (same — timeout stragglers).
+- The other imaged products per chain sit on *other* chains' hosts (GTIN-canonical product first surfaced elsewhere) — out of scope for a per-chain drain.
+- ⚠️ Loop gotcha: `grep -q "0 catalog images to consider"` matches as a **substring of "3000 catalog…"** — anchor it (`grep -qE "^[[:space:]]*0 catalog"`) or the loop exits after one pass.
+- **Still un-drained:** `ab` (CI-only host) and `sklavenitis` (needs `PROXY_URL`/residential). lidl catalog images come via `lidl-catalog.mjs` + the offer backfill, not this drain.
+
+---
+
 ## ⚡ Pick up here (2026-06-15 — Lidl OCR cleanup + showUnmatched ON)
 
 **Goal:** surface the ~135 real Lidl food deals stuck unshown in the review queue. 171 Lidl items sit in PendingMatch unmatched (Lidl is barcode-less + own-brand heavy → no cross-chain canonical to match). Owner confirmed: show everything incl. the ~36 non-food middle-aisle items (no filter).
