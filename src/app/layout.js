@@ -47,6 +47,8 @@ export const viewport = {
 
 import { BottomNav } from "@/components/BottomNav";
 import { PushRegistrar } from "@/components/PushRegistrar";
+import { CookieConsent } from "@/components/CookieConsent";
+import { PageViewTracker } from "@/components/PageViewTracker";
 
 export default function RootLayout({ children }) {
   return (
@@ -61,6 +63,10 @@ export default function RootLayout({ children }) {
         <BottomNav />
         {/* Native-only push registration (no-op on web). */}
         <PushRegistrar />
+        {/* GDPR opt-in cookie banner — gates all behavioural analytics. */}
+        <CookieConsent />
+        {/* Consent-gated page_view funnel signal (no-op until opt-in). */}
+        <PageViewTracker />
       </body>
     </html>
   );

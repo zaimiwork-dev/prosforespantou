@@ -68,7 +68,20 @@ export function Footer() {
         {status === 'rate_limited' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>⏳ Πολλές προσπάθειες. Δοκίμασε σε λίγο.</p>}
         {status === 'error' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>❌ Κάτι πήγε στραβά. Δοκίμασε ξανά.</p>}
 
-        <div style={{ marginTop: 48, fontSize: 12, color: '#999' }}>
+        <nav style={{ marginTop: 40, display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 13 }}>
+          <a href="/aporrito" style={{ color: '#666', textDecoration: 'none' }}>Απόρρητο</a>
+          <a href="/cookies" style={{ color: '#666', textDecoration: 'none' }}>Cookies</a>
+          <a href="/oroi-chrisis" style={{ color: '#666', textDecoration: 'none' }}>Όροι Χρήσης</a>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('open-consent'))}
+            style={{ background: 'none', border: 'none', padding: 0, color: '#666', font: 'inherit', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Ρυθμίσεις cookies
+          </button>
+        </nav>
+
+        <div style={{ marginTop: 24, fontSize: 12, color: '#999' }}>
           © {new Date().getFullYear()} Προσφορές Παντού. Με επιφύλαξη παντός δικαιώματος.
         </div>
       </div>

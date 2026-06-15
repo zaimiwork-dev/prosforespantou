@@ -7,8 +7,7 @@ import { Icon } from './Icons';
 import { PriceHistory } from './PriceHistory';
 import { PriceComparison } from './PriceComparison';
 import { SUPERMARKETS } from '@/lib/constants';
-import { trackEvent } from '@/actions/track-event';
-import { getSessionId } from '@/lib/session-id';
+import { track } from '@/lib/track';
 import { hiResImage } from '@/lib/images';
 import { parsePack, perUnitPrice, unitPrice } from '@/lib/pack-info';
 import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
@@ -107,13 +106,12 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
   const notStartedYet = offer.validFrom ? new Date(offer.validFrom).getTime() > nowMs : false;
 
   const handleAdd = () => {
-    trackEvent({
+    track({
       eventType: 'list_add',
       supermarket: supermarketId,
       discountId: offer.id,
       category,
-      sessionId: getSessionId(),
-    }).catch(() => {});
+    });
     recordInterest({ category, productName: displayName }, WEIGHT.listAdd);
     for (let i = 0; i < qty; i++) onAdd(offer);
     setAdded(true);
