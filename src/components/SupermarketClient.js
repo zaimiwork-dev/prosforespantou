@@ -11,8 +11,7 @@ import { Sheet } from "@/components/Sheet";
 import { Icon } from "@/components/Icons";
 import { Footer } from "@/components/Footer";
 import { CATEGORIES } from "@/lib/constants";
-import { trackEvent } from '@/actions/track-event';
-import { getSessionId } from '@/lib/session-id';
+import { track } from '@/lib/track';
 import { searchDeals } from '@/actions/search-deals';
 import { dedupeDeals } from '@/lib/dedupe-deals';
 
@@ -295,12 +294,11 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
                   target="_blank"
                   rel="noreferrer"
                   onClick={() => {
-                    trackEvent({
+                    track({
                       eventType: 'leaflet_click',
                       supermarket: sm.id,
                       leafletId: leaflet?.id,
-                      sessionId: getSessionId(),
-                    }).catch(() => {});
+                    });
                   }}
                   style={{ color: sm.color, textDecoration: "underline", textUnderlineOffset: 3 }}
                 >

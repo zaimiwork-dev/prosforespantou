@@ -6,8 +6,7 @@ import { Sheet } from './Sheet';
 import { OfferDetails } from './OfferDetails';
 import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
-import { trackEvent } from '@/actions/track-event';
-import { getSessionId } from '@/lib/session-id';
+import { track } from '@/lib/track';
 import { getPriceComparison } from '@/actions/get-price-comparison';
 import { getPriceHistory } from '@/actions/get-price-history';
 import { getSimilarOffers } from '@/actions/get-similar-offers';
@@ -106,7 +105,7 @@ function ProductSheetInner({ product, onClose, onAdd }) {
       <Link href={`/offer/${product.id}`} className="modal-link" onClick={(e) => {
         // Full navigation, not the pushState'd URL — let Next render the page.
         e.preventDefault();
-        trackEvent({ eventType: 'deal_click', supermarket: product.supermarket, discountId: product.id, sessionId: getSessionId() }).catch(() => {});
+        track({ eventType: 'deal_click', supermarket: product.supermarket, discountId: product.id });
         window.location.href = `/offer/${product.id}`;
       }}>
         Δες αναλυτικά <Icon.ArrowRight size={12} />

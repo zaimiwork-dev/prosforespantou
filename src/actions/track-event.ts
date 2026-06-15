@@ -7,12 +7,20 @@ import { headers } from 'next/headers';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { CLICK_WEIGHT } from '@/lib/hotness';
 
+// Consent-gated behavioural events (client only fires these after opt-in — see
+// lib/track.js + lib/consent.js). The new funnel events (page_view…outbound_click)
+// piggy-back on the existing ClickEvent table: `supermarket` defaults to 'site'
+// when not store-scoped, and `category` doubles as a free-form context label
+// (search term / filter value / route path) so no schema migration is needed yet.
 const schema = z.object({
-  eventType: z.enum(['deal_click', 'leaflet_click', 'list_add']),
-  supermarket: z.string().min(1).max(32),
+  eventType: z.enum([
+    'deal_click', 'leaflet_click', 'list_add', // original
+    'page_view', 'search', 'filter', 'store_select', 'favorite', 'outbound_click', // funnel
+  ]),
+  supermarket: z.string().min(1).max(32).optional(), // optional for non-store events (page_view…)
   discountId: z.string().uuid().optional(),
   leafletId: z.string().uuid().optional(),
-  category: z.string().max(64).optional(),
+  category: z.string().max(120).optional(), // also carries search term / filter value / path
   sessionId: z.string().max(64).optional(),
 });
 
@@ -56,7 +64,7 @@ export async function trackEvent(input: unknown) {
       await prisma.clickEvent.create({
         data: {
           eventType: d.eventType,
-          supermarket: d.supermarket,
+          supermarket: d.supermarket ?? 'site', // non-store events (page_view…) aren't store-scoped
           discountId: d.discountId,
           leafletId: d.leafletId,
           category: d.category,

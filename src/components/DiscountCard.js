@@ -5,8 +5,7 @@ import Image from 'next/image';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
-import { trackEvent } from '@/actions/track-event';
-import { getSessionId } from '@/lib/session-id';
+import { track } from '@/lib/track';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { displayCategoryForProduct } from '@/lib/display-category';
 
@@ -92,13 +91,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
       role="button"
       tabIndex={0}
       onClick={() => {
-        trackEvent({
+        track({
           eventType: 'deal_click',
           supermarket: supermarketId,
           discountId: d.id,
           category: category,
-          sessionId: getSessionId(),
-        }).catch(() => {});
+        });
         onSelect(d);
       }}
       onKeyDown={(e) => { if (e.key === 'Enter') onSelect(d); }}
@@ -213,13 +211,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
             className={`add-btn${inCart ? " added" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
-              trackEvent({
+              track({
                 eventType: 'list_add',
                 supermarket: supermarketId,
                 discountId: d.id,
                 category: category,
-                sessionId: getSessionId(),
-              }).catch(() => {});
+              });
               onAdd(d);
             }}
             aria-label={inCart ? "Στη λίστα" : "Προσθήκη στη λίστα"}
