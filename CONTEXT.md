@@ -55,6 +55,28 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## Pick up here (2026-06-16 -- Sklavenitis safer unblock probe)
+
+Sklavenitis is currently reachable from this dev machine again, but treat it gently. A one-page probe against `https://www.sklavenitis.gr/sylloges/prosfores/?pg=1` returned real markup (`200`, 24 `data-productsku` cards, total reported `3038` offers), not an Akamai block page.
+
+Safety changes from this session:
+- [src/scripts/adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs) now defaults to slower page pacing (`PACE_MS=1200` + `JITTER_MS=600`) instead of a hard 250ms, and exposes `MAX_PAGES`, `PACE_MS`, `JITTER_MS`.
+- One-page dry-run probe command: `DRY_RUN=1 ALLOW_PARTIAL_DRY_RUN=1 LIMIT=24 MAX_PAGES=1 PACE_MS=3000 JITTER_MS=1000 node src/scripts/adapters/sklavenitis.mjs`.
+- The probe intentionally trips the shared "partial scrape" health warning because 24 < active 2830, but with `ALLOW_PARTIAL_DRY_RUN=1` it exits 0 if it scraped at least one item and had no errors. It still writes nothing and deactivates nothing.
+- [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml) has a new manual `sklavenitis-offers-probe` option that runs the exact one-page dry run in CI **without `PROXY_URL`**. Use this before trying the full GitHub `sklavenitis-offers` run, so we do not hammer the site if GitHub is still blocked.
+
+Verified locally:
+- `DRY_RUN=1 ALLOW_PARTIAL_DRY_RUN=1 LIMIT=24 MAX_PAGES=1 PACE_MS=3000 JITTER_MS=1000 node src/scripts/adapters/sklavenitis.mjs`
+- Result: 24 scraped, 22 via mapping, 2 review queue, 0 errors, 0 writes/deactivations.
+
+Next safe escalation path:
+1. Push this change.
+2. Trigger `gh workflow run scrape-chains.yml -f chain=sklavenitis-offers-probe`.
+3. If the CI probe gets real cards, then run a slightly larger dry-run (`LIMIT=120 MAX_PAGES=5`) before any full run.
+4. Only run full `sklavenitis-offers` after the probes pass; keep the slower pacing.
+
+---
+
 ## ⚡ Pick up here (2026-06-16 — GDPR opt-in consent + legal pages SHIPPED)
 
 **The privacy/consent layer is live on `main` (PR #2, merge `3061220`).** This closes the legal/GDPR launch blocker and makes the behavioural analytics legally collectable (owner wants click/behaviour data as an investor selling point — now opt-in, defensible in due diligence).

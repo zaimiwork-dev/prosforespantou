@@ -8,6 +8,7 @@
 //   node src/scripts/adapters/sklavenitis.mjs            # all offers
 //   DRY_RUN=1 node src/scripts/adapters/sklavenitis.mjs  # fetch + match, no DB writes
 //   LIMIT=50 node src/scripts/adapters/sklavenitis.mjs   # smoke test (skips deactivation)
+//   DRY_RUN=1 LIMIT=24 MAX_PAGES=1 node ...              # one-page unblock probe
 //
 // How it works:
 //   1. GET /sylloges/prosfores/?pg=N for N = 1..totalPages.
@@ -32,9 +33,12 @@ import { mirrorImages } from '../lib/mirror-images.mjs';
 import { installProxyFromEnv } from '../lib/proxy-fetch.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
+const ALLOW_PARTIAL_DRY_RUN = process.env.ALLOW_PARTIAL_DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 const PAGE_SIZE = 24;
-const MAX_PAGES = 200;
+const MAX_PAGES = process.env.MAX_PAGES ? parseInt(process.env.MAX_PAGES, 10) : 200;
+const PACE_MS = process.env.PACE_MS ? parseInt(process.env.PACE_MS, 10) : 1200;
+const JITTER_MS = process.env.JITTER_MS ? parseInt(process.env.JITTER_MS, 10) : 600;
 const BASE = 'https://www.sklavenitis.gr/sylloges/prosfores/';
 
 const HEADERS = {
@@ -81,6 +85,16 @@ async function fetchPage(pg) {
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) throw new Error(`page ${pg} HTTP ${res.status}`);
   return res.text();
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pace() {
+  if (PACE_MS <= 0) return;
+  const jitter = JITTER_MS > 0 ? Math.floor(Math.random() * JITTER_MS) : 0;
+  await sleep(PACE_MS + jitter);
 }
 
 function extractItemsFromHtml(html) {
@@ -168,6 +182,7 @@ function toOfferItem(raw) {
 
 export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
   console.log(`🛒 Sklavenitis adapter${dryRun ? ' (DRY_RUN)' : ''}`);
+  console.log(`   max pages: ${MAX_PAGES}, pace: ${PACE_MS}ms + jitter ${JITTER_MS}ms`);
 
   // sklavenitis.gr (Akamai) 403s datacenter IPs (GitHub Actions, Vercel) but
   // serves residential ones. In CI, PROXY_URL routes the global fetch — page
@@ -195,7 +210,7 @@ export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } 
     if (byCode.size >= limit) break;
     if (totalCount != null && byCode.size >= totalCount) break;
     if (items.length < PAGE_SIZE && page > 1) break; // short page = end
-    await new Promise((r) => setTimeout(r, 250));
+    await pace();
   }
   console.log('');
 
@@ -225,6 +240,12 @@ const isMain = import.meta.url === `file://${process.argv[1]}` ||
   import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/'));
 if (isMain) {
   runSklavenitisAdapter()
-    .then((report) => process.exit(report.healthOk ? 0 : 1))
+    .then((report) => {
+      const probeOk = DRY_RUN && ALLOW_PARTIAL_DRY_RUN && report.scrapedItems > 0 && report.errors === 0;
+      if (probeOk && !report.healthOk) {
+        console.log('   probe passed despite partial-run health warning (ALLOW_PARTIAL_DRY_RUN=1)');
+      }
+      process.exit(report.healthOk || probeOk ? 0 : 1);
+    })
     .catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
 }

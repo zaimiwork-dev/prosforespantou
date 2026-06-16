@@ -66,6 +66,7 @@ on:
           - ab-offers
           - ab-catalog
           - ab-catalog-probe
+          - sklavenitis-offers-probe
           - sklavenitis-offers
           - mymarket-offers
           - lidl-offers
@@ -160,6 +161,32 @@ jobs:
           # secret the adapter no-ops the proxy and 403s as before (set it to
           # make the daily run autonomous). See src/scripts/lib/proxy-fetch.mjs.
           PROXY_URL: ${{ secrets.PROXY_URL }}
+
+  sklavenitis-offers-probe:
+    if: github.event.inputs.chain == 'sklavenitis-offers-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Probe Sklavenitis adapter safely
+        run: node src/scripts/adapters/sklavenitis.mjs
+        env:
+          DRY_RUN: '1'
+          ALLOW_PARTIAL_DRY_RUN: '1'
+          LIMIT: '24'
+          MAX_PAGES: '1'
+          PACE_MS: '3000'
+          JITTER_MS: '1000'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          # Intentionally no PROXY_URL: this tests whether GitHub's direct IP is
+          # currently served. One dry-run page only; no writes/deactivation.
 
   mymarket-offers:
     if: github.event.schedule == '0 0 * * *' || github.event.inputs.chain == 'mymarket-offers'
