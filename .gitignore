@@ -62,6 +62,14 @@ next-env.d.ts
 # local agent state
 .claude/
 
+# local handoff / agent scratch artifacts
+/MEMORY.md
+/.local-scratch/
+/claude-search.txt
+/findstr-output.txt
+/hash_search.txt
+/passwords.txt
+
 # stray installers
 public/logos/*.exe
 
