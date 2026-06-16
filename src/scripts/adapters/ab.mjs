@@ -142,7 +142,8 @@ function toOfferItem(p) {
     category: p.firstLevelCategory?.name?.trim() || 'Άλλο',
     imageUrl: pickImage(p.images),
     validUntil: validUntil ? validUntil.toISOString() : undefined,
-    offerType: primaryType,
+    description: originalPrice ? null : primaryType,
+    offerType: originalPrice ? 'strikethrough' : 'mono',
   };
 }
 

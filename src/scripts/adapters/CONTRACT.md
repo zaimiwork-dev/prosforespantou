@@ -35,6 +35,9 @@ await ingestOffers({
                             // (e.g. image-mirror failures) that should appear in
                             // the IngestRun record / Υγεία tab. Never affect
                             // healthOk.
+  partial: false,           // optional — true when the adapter knows it missed
+                            // pages/categories. Writes may still happen, but
+                            // stale deactivation is forcibly disabled.
 });
 ```
 
@@ -66,7 +69,7 @@ on the next run — no backfill needed. See `ab.mjs` for the pattern.
 | `imageUrl`      | optional | Used for the Review Queue when matching fails. |
 | `validFrom`     | optional | ISO date. Defaults to run time. |
 | `validUntil`    | optional | ISO date. Defaults to run time + 14 days. |
-| `offerType`     | optional | `'strikethrough'` \| `'mono'` \| `'multibuy'` — diagnostic only. |
+| `offerType`     | optional | Normalized: `'strikethrough'` when the chain published a trustworthy original→offer price, `'mono'` when the reference price is hidden/implicit. Preserve chain-specific wording in `description`, not here. |
 
 ## What the shared pipeline does with it (so adapter authors know)
 

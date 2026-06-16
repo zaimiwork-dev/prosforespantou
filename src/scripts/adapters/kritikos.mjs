@@ -137,7 +137,7 @@ function toOfferItem(p) {
     category: p.category?.name?.trim() || 'Άλλο',
     imageUrl: img,
     description,
-    offerType: (p.offerType && p.offerType !== 'none') ? p.offerType : null,
+    offerType: original ? 'strikethrough' : 'mono',
   };
 }
 
@@ -181,6 +181,10 @@ async function run() {
     await pace(PACE_MS, JITTER_MS);
   }
   console.log(`\n   fetched ${bySku.size} unique products (${jsonOk} json paths, ${spaFallback} SPA-fallback, ${errs} errors)`);
+  const partial = errs > 0;
+  const extraWarnings = partial
+    ? [`${errs} Kritikos category path request(s) failed; treating run as partial.`]
+    : [];
 
   let items = [...bySku.values()].map(toOfferItem).filter((it) => it && it.name);
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
@@ -203,7 +207,7 @@ async function run() {
     mirrorWarnings = mirror.warnings;
   }
 
-  const report = await ingestOffers({ chain: 'kritikos', source: 'web', items, dryRun: DRY_RUN, extraWarnings: mirrorWarnings });
+  const report = await ingestOffers({ chain: 'kritikos', source: 'web', items, dryRun: DRY_RUN, extraWarnings: [...extraWarnings, ...mirrorWarnings], partial });
 
   // Phase 9 baseline (opt-in BASELINE=1): snapshot the NON-offer products we
   // already have in hand at their shelf price. Excludes anything that ingested

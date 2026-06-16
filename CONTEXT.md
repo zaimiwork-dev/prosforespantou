@@ -55,6 +55,34 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## Pick up here (2026-06-16 -- autonomous collection contract hardened)
+
+Goal from owner: every autonomous collector must be polite/safe enough not to trigger avoidable blocks, and every chain must clearly distinguish current offers vs full-catalog products vs normal-price baselines, including `MONO`/hidden-reference promos.
+
+Shipped locally in this session:
+- Shared offer ingest now normalizes every `Discount.offerType` / offer-derived `PriceSnapshot.kind` to the stable vocabulary: `strikethrough` (published original -> offer price) or `mono` (hidden/implicit reference, including SUPER/MONO/multibuy-style promos). Chain-native labels belong in `description`, not `offerType`.
+- Existing prod data was normalized with [normalize-offer-kinds.mjs](src/scripts/normalize-offer-kinds.mjs): `13,840` Discount rows + `377` PriceSnapshot rows fixed. After cleanup, `STRICT=1 npm run audit:collection` reports **0 unexpected offer/snapshot kinds** and **0 active offers missing offerType**.
+- Shared `ingestOffers()` now accepts `partial: true`. If an adapter knows it missed pages/categories, it may still write what it safely collected, but stale deactivation is forcibly disabled regardless of item count. Wired into Lidl, My Market, and Kritikos partial paths.
+- Shared `ingestCatalog()` now writes `IngestRun` rows with `source='catalog'` for real catalog runs, including warnings/errors. `ingestBaseline()` now writes `source='baseline'` rows for normal-price baseline passes.
+- Catalog scrapers now propagate partial-catalog warnings into that run log: AB category failure, My Market page failure, Lidl throttled/incomplete category or max-offset cap.
+- Lidl shared paginator now marks a category incomplete if `maxOffset` caps pagination instead of silently stopping.
+- New read-only audit: `npm run audit:collection` / `STRICT=1 npm run audit:collection`.
+
+Verified:
+- Focused `npx eslint` on all touched scripts: clean.
+- `npm run audit:collection`: clean after data normalization.
+- `STRICT=1 npm run audit:collection`: exit 0.
+- `npm run test:run` could not be completed in this sandbox: Vite/Rolldown hit `spawn EPERM`; escalated rerun was rejected by the app usage limit.
+
+Current truth from audit:
+- Full-catalog baseline exists for AB, Kritikos, Lidl, My Market.
+- Masoutis and Sklavenitis are still `offers-only` for normal-price baselines.
+- Sklavenitis automation is still not autonomous from GitHub direct IP; direct CI probe run `27607052007` got `HTTP 403`. Use `PROXY_URL` or a scheduled dev-PC run.
+- Sklavenitis offer coverage is good but not fully linked: `2,859` active, `1,934` linked, `925` productless.
+- Masoutis offer linking still has room: `1,167` active, `788` linked, `379` productless.
+
+---
+
 ## Pick up here (2026-06-16 -- autonomous scraper safety pass)
 
 Autonomous scraping is now deliberately slower and safer so we do not re-trigger chain/CDN blocks while the system runs unattended.

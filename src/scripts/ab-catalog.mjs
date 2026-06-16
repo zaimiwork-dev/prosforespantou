@@ -104,12 +104,18 @@ async function run() {
   console.log(`   ${roots.length} root categories: ${roots.join(',')}`);
 
   const byCode = new Map();
+  const extraWarnings = [];
   for (const code of roots) {
     let total = null, pages = null;
     for (let page = 0; page < MAX_PAGES; page++) {
       let pl;
       try { pl = await fetchList({ productListingType: 'CATEGORY', categoryCode: String(code), pageNumber: page }); }
-      catch (e) { console.log(`\n   cat ${code} p${page} — ${e.message}, skipping rest of category`); break; }
+      catch (e) {
+        const warning = `Category ${code} page ${page} failed (${e.message}); skipped rest of category.`;
+        console.log(`\n   ${warning}`);
+        extraWarnings.push(warning);
+        break;
+      }
       if (total == null) { total = pl?.pagination?.totalResults; pages = pl?.pagination?.totalPages; }
       const prods = pl?.products || [];
       for (const p of prods) if (p.code != null) byCode.set(String(p.code), p);
@@ -146,7 +152,7 @@ async function run() {
     });
   }
 
-  const report = await ingestCatalog({ chain: 'ab', items, dryRun: DRY_RUN });
+  const report = await ingestCatalog({ chain: 'ab', items, dryRun: DRY_RUN, extraWarnings });
   console.log(`\n✅ AB catalog — created=${report.created} existing=${report.existing} mapped=${report.mapped} snapshots=${report.snapshots} err=${report.errors} (of ${report.total})`);
   process.exit(0);
 }

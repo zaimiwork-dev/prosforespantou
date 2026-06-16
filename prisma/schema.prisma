@@ -335,7 +335,7 @@ model ChainProductMapping {
 model IngestRun {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   chain        String   // chain slug — 'masoutis', 'ab', ...
-  source       String   // 'web' | 'leaflet'
+  source       String   // 'web' | 'leaflet' | 'catalog' | 'baseline'
   startedAt    DateTime @map("started_at")
   finishedAt   DateTime @default(now()) @map("finished_at")
   scrapedItems Int      @default(0) @map("scraped_items")

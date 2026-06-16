@@ -70,8 +70,10 @@ async function run() {
   const onOffer = finalItems.filter((it) => it.baseline === false).length;
   console.log(`   ${stats.catsWithProducts} categories had products, ${stats.unique} unique products`);
   console.log(`   ${finalItems.length} catalog products ready (${onOffer} on offer, ${finalItems.length - onOffer} full-price)`);
+  const extraWarnings = [];
   if (stats.throttledCats || stats.incompleteCats) {
-    console.log(`   ⚠️ Lidl API throttled: ${stats.throttledCats} categories unreadable, ${stats.incompleteCats} cut short — partial catalog, re-run later.`);
+    extraWarnings.push(`Lidl API throttled: ${stats.throttledCats} categories unreadable, ${stats.incompleteCats} cut short — partial catalog, re-run later.`);
+    console.log(`   ⚠️ ${extraWarnings[0]}`);
   }
 
   // Self-host catalog images on the Supabase mirror (small assortment → inline is
@@ -84,7 +86,7 @@ async function run() {
     });
   }
 
-  const report = await ingestCatalog({ chain: 'lidl', items: finalItems, dryRun: DRY_RUN });
+  const report = await ingestCatalog({ chain: 'lidl', items: finalItems, dryRun: DRY_RUN, extraWarnings });
   console.log(`\n✅ Lidl catalog — created=${report.created} existing=${report.existing} mapped=${report.mapped} snapshots=${report.snapshots} err=${report.errors} (of ${report.total})`);
   process.exit(0);
 }

@@ -95,10 +95,16 @@ async function run() {
 
   const byCode = new Map();
   let totalCount = null, lastPage = 0;
+  const extraWarnings = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     let html;
     try { html = await fetchPage(page); }
-    catch (e) { console.log(`\n   page ${page} failed: ${e.message}, stopping`); break; }
+    catch (e) {
+      const warning = `Page ${page} failed (${e.message}); partial catalog.`;
+      console.log(`\n   ${warning}`);
+      extraWarnings.push(warning);
+      break;
+    }
     if (page === 1) {
       const m = html.match(/([0-9][0-9.]*)\s*προϊόντα/);
       totalCount = m ? parseGreekInt(m[1]) : null;
@@ -119,7 +125,7 @@ async function run() {
   let items = [...byCode.values()];
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
 
-  const report = await ingestCatalog({ chain: 'mymarket', items, dryRun: DRY_RUN });
+  const report = await ingestCatalog({ chain: 'mymarket', items, dryRun: DRY_RUN, extraWarnings });
   console.log(`\n✅ done — created=${report.created} existing=${report.existing} mapped=${report.mapped} snapshots=${report.snapshots} err=${report.errors}`);
   process.exit(0);
 }

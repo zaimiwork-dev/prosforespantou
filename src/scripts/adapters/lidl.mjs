@@ -92,10 +92,11 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
   // A throttled scrape is a PARTIAL scrape — record it so the run is flagged and
   // (via ingest-offers' size check) stale offers aren't wrongly deactivated.
   const extraWarnings = [];
-  if (stats.throttledCats || stats.incompleteCats) {
+  const partial = !!(stats.throttledCats || stats.incompleteCats);
+  if (partial) {
     extraWarnings.push(
       `Lidl API throttled: ${stats.throttledCats} categories unreadable, ${stats.incompleteCats} cut short — ` +
-      `this run is partial. Re-run later; stale offers were NOT deactivated if the size check tripped.`
+      `this run is partial. Re-run later; stale offers will NOT be deactivated.`
     );
     console.log(`   ⚠️ ${extraWarnings[0]}`);
   }
@@ -124,7 +125,7 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
   // showUnmatched ON: names/prices/images are clean structured data, safe to
   // publish even before a Product match. chainItemcode is the Lidl productId, so
   // anything the catalog already ingested links straight through.
-  const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: finalOffers, dryRun, showUnmatched: true, extraWarnings });
+  const report = await ingestOffers({ chain: 'lidl', source: 'leaflet', items: finalOffers, dryRun, showUnmatched: true, extraWarnings, partial });
   printReport(report);
   return report;
 }

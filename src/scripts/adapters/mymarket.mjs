@@ -218,13 +218,18 @@ export async function runMyMarketAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {
   const byCode = new Map();
   let totalCount = null;
   let lastNonEmptyPage = 0;
+  let partial = false;
+  const extraWarnings = [];
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     let html;
     try {
       html = await fetchPage(page);
     } catch (err) {
-      console.log(`\n   page ${page} fetch failed: ${err.message}, stopping`);
+      const warning = `Page ${page} fetch failed (${err.message}); treating run as partial.`;
+      console.log(`\n   ${warning}`);
+      extraWarnings.push(warning);
+      partial = true;
       break;
     }
     if (page === 1) {
@@ -270,7 +275,7 @@ export async function runMyMarketAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {
     mirrorWarnings = mirror.warnings;
   }
 
-  const report = await ingestOffers({ chain: 'mymarket', source: 'web', items: offers, dryRun, extraWarnings: mirrorWarnings });
+  const report = await ingestOffers({ chain: 'mymarket', source: 'web', items: offers, dryRun, extraWarnings: [...extraWarnings, ...mirrorWarnings], partial });
   printReport(report);
   return report;
 }

@@ -109,6 +109,38 @@ async function matchItem(prisma, item, chain, dryRun) {
   return { productId: null, via: 'none' };
 }
 
+function normalizeOfferType(raw, originalPrice) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value === 'strikethrough') return 'strikethrough';
+  if (value === 'mono' || value === 'multibuy') return 'mono';
+
+  // Chain-native labels that mean "published before/after price" when an
+  // original price is present. If the adapter could not prove an original
+  // price, keep it in the hidden-reference bucket (`mono`).
+  if (
+    value === 'amount' ||
+    value === 'percentage' ||
+    value.includes('percent') ||
+    value.includes('price promotion') ||
+    value.includes('discount')
+  ) {
+    return originalPrice ? 'strikethrough' : 'mono';
+  }
+
+  // Chain-native labels for single-price / mechanic promos where the reference
+  // price is hidden or not trustworthy enough to compute a percent.
+  if (
+    value === 'super' ||
+    value.includes('multi') ||
+    value.includes('free') ||
+    value.includes('grocery')
+  ) {
+    return 'mono';
+  }
+
+  return originalPrice ? 'strikethrough' : 'mono';
+}
+
 // ── Write/update one Discount + a PriceSnapshot if the price moved ───────────
 // productId may be NULL (display-first): the offer is shown to users with the
 // chain's own data, and the resolver/admin claims the row with a productId
@@ -127,6 +159,7 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
   const discountPercent = originalPrice
     ? Math.round((1 - item.price / originalPrice) * 100)
     : null;
+  const offerType = normalizeOfferType(item.offerType, originalPrice);
 
   // The adapter's item.category is the chain's native label → keep it as the
   // subcategory (provenance!) and derive the department through the per-chain
@@ -142,10 +175,9 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     discountedPrice: item.price,
     originalPrice,
     discountPercent,
-    // Phase 9: persist WHY this is an offer. Trust the adapter's classification;
-    // fall back to the price shape (a published original ⇒ strikethrough, else
-    // mono — the chain hid the reference price).
-    offerType: item.offerType || (originalPrice ? 'strikethrough' : 'mono'),
+    // Phase 9: persist WHY this is an offer using the shared vocabulary only:
+    // strikethrough = published reference price, mono = hidden/implicit reference.
+    offerType,
     validFrom,
     validUntil,
     imageUrl: item.imageUrl || null,
@@ -252,13 +284,44 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
 // only NON-offer items at their shelf price — an on-offer item's price is
 // already captured by ingestOffers as mono/strikethrough, and labelling it
 // 'normal' would poison the very baseline this exists to build.
+async function recordBaselineRun(prisma, chain, runStart, out, dryRun) {
+  if (dryRun) return;
+  try {
+    await prisma.ingestRun.create({
+      data: {
+        chain,
+        source: 'baseline',
+        startedAt: runStart,
+        scrapedItems: out.total,
+        matched: out.matched,
+        reviewQueued: out.unmatched,
+        unmatchedShown: 0,
+        priceChanges: out.written,
+        deactivated: 0,
+        errors: out.errors,
+        healthOk: out.healthOk,
+        warnings: out.warnings,
+      },
+    });
+  } catch (e) {
+    console.log(`   ⚠️ could not record baseline IngestRun: ${e.message}`);
+  }
+}
+
 export async function ingestBaseline({ chain, items, dryRun = false }) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
   const { default: prisma } = await import('../../lib/prisma.ts');
-  const out = { total: items.length, matched: 0, written: 0, unchanged: 0, unmatched: 0, errors: 0 };
+  const runStart = new Date();
+  const out = { total: items.length, matched: 0, written: 0, unchanged: 0, unmatched: 0, errors: 0, healthOk: true, warnings: [] };
   const valid = items.filter((it) => it && it.price > 0);
-  if (valid.length === 0) { console.log('   📒 baseline: no valid items'); return out; }
+  if (valid.length === 0) {
+    out.healthOk = false;
+    out.warnings.push('Baseline adapter returned 0 valid shelf-price items.');
+    console.log('   📒 baseline: no valid items');
+    await recordBaselineRun(prisma, chain, runStart, out, dryRun);
+    return out;
+  }
 
   // Batched, not per-item: a full catalog is 10k–20k rows and per-item queries
   // would blow the CI timeout. Preload the three lookups in a handful of
@@ -298,6 +361,11 @@ export async function ingestBaseline({ chain, items, dryRun = false }) {
     if (!wantPrice.has(pid)) wantPrice.set(pid, it.price);
   }
   if (dryRun || wantPrice.size === 0) {
+    if (wantPrice.size === 0) {
+      out.healthOk = false;
+      out.warnings.push('No baseline items matched a Product; no normal-price snapshots could be written.');
+      await recordBaselineRun(prisma, chain, runStart, out, dryRun);
+    }
     console.log(`   📒 baseline (dry=${dryRun}): ${out.matched} matched / ${out.unmatched} unmatched (of ${out.total})`);
     return out;
   }
@@ -328,6 +396,7 @@ export async function ingestBaseline({ chain, items, dryRun = false }) {
     out.written += chunk.length;
   }
   console.log(`   📒 baseline: ${out.written} written, ${out.unchanged} unchanged, ${out.matched} matched / ${out.unmatched} unmatched (of ${out.total})`);
+  await recordBaselineRun(prisma, chain, runStart, out, dryRun);
   return out;
 }
 
@@ -380,9 +449,10 @@ async function fireWatchAlerts(prisma, alertable) {
 // alongside their PendingMatch row. Opt OUT for feeds whose item data isn't
 // trustworthy enough to publish unreviewed (e.g. Lidl's vision-OCR output).
 // extraWarnings: pre-ingest notes from the adapter (e.g. image-mirror failures)
-// that should ride along into the IngestRun record / Υγεία tab. They never
-// affect healthOk.
-export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true, extraWarnings = [] }) {
+// that should ride along into the IngestRun record / Υγεία tab.
+// partial: true means the adapter KNOWS it missed pages/categories. Writes may
+// still happen, but stale deactivation is disabled regardless of item count.
+export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true, extraWarnings = [], partial = false }) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (source !== 'web' && source !== 'leaflet') throw new Error(`source must be 'web' or 'leaflet', got "${source}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
@@ -393,6 +463,10 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     reviewQueued: 0, unmatchedShown: 0, priceChanges: 0, errors: 0, deactivated: 0,
     healthOk: true, warnings: [...extraWarnings],
   };
+  if (partial) {
+    report.healthOk = false;
+    report.warnings.push('Adapter marked this run partial — stale offers will NOT be deactivated.');
+  }
 
   const { default: prisma } = await import('../../lib/prisma.ts');
   const runStart = new Date();

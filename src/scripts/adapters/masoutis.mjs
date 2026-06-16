@@ -71,17 +71,18 @@ function toOfferItem(raw) {
   const start = Number(raw.StartPrice);
   if (!price || price <= 0) return null; // unpriced row — skip
   const offerDescr = (raw.OfferDescr || raw.Discount || '').trim();
+  const originalPrice = start > price ? start : null;
   return {
     name: (raw.ItemDescr || '').trim(),
     price,
-    originalPrice: start > price ? start : null,
+    originalPrice,
     chainItemcode: String(raw.Itemcode),
     barcode: null, // Masoutis offers API does not expose GTIN
     brand: (raw.BrandNameDesciption || '').trim() || null,
     unit: (raw.ItemSize || raw.ItemVolume || '').toString().trim() || null,
     category: (raw.OfferCategoryDescr || '').trim() || 'Άλλο',
     imageUrl: raw.PhotoData || raw.PhotoLink || null,
-    offerType: /%/.test(offerDescr) ? 'strikethrough' : (offerDescr ? 'mono' : null),
+    offerType: originalPrice ? 'strikethrough' : (offerDescr ? 'mono' : null),
   };
 }
 

@@ -26,15 +26,61 @@
 
 import { SM_MAPPING, normalizeBarcode, withDbRetry } from './ingest-offers.mjs';
 
-export async function ingestCatalog({ chain, items, dryRun = false }) {
+async function recordCatalogRun(prisma, chain, runStart, out, dryRun) {
+  if (dryRun) return;
+  try {
+    await prisma.ingestRun.create({
+      data: {
+        chain,
+        source: 'catalog',
+        startedAt: runStart,
+        scrapedItems: out.total,
+        matched: out.existing + out.mapped,
+        reviewQueued: out.skipped,
+        unmatchedShown: 0,
+        priceChanges: out.snapshots,
+        deactivated: 0,
+        errors: out.errors,
+        healthOk: out.healthOk,
+        warnings: out.warnings,
+      },
+    });
+  } catch (e) {
+    console.log(`   ⚠️ could not record catalog IngestRun: ${e.message}`);
+  }
+}
+
+export async function ingestCatalog({ chain, items, dryRun = false, extraWarnings = [] }) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
-  const out = { total: items.length, created: 0, existing: 0, mapped: 0, snapshots: 0, unchanged: 0, skipped: 0, errors: 0 };
+  const runStart = new Date();
+  const out = {
+    total: items.length,
+    created: 0,
+    existing: 0,
+    mapped: 0,
+    snapshots: 0,
+    unchanged: 0,
+    skipped: 0,
+    errors: 0,
+    healthOk: extraWarnings.length === 0,
+    warnings: [...extraWarnings],
+  };
 
   // A catalog item needs a stable per-chain SKU (identity), a name, and a price.
   const valid = items.filter((it) => it && it.name && it.chainItemcode && it.price > 0);
   out.skipped = items.length - valid.length;
-  if (valid.length === 0) { console.log(`   🗂️ catalog [${chain}]: no valid items — skipping (nothing deleted)`); return out; }
+  if (valid.length === 0) {
+    out.healthOk = false;
+    out.warnings.push('Catalog adapter returned 0 valid items — treated as a broken scrape.');
+    console.log(`   🗂️ catalog [${chain}]: no valid items — skipping (nothing deleted)`);
+    if (!dryRun) {
+      const { default: prisma } = await import('../../lib/prisma.ts');
+      await recordCatalogRun(prisma, chain, runStart, out, dryRun);
+      await prisma.$disconnect();
+    }
+    return out;
+  }
 
   const { default: prisma } = await import('../../lib/prisma.ts');
 
@@ -141,6 +187,12 @@ export async function ingestCatalog({ chain, items, dryRun = false }) {
     out.snapshots += chunk.length;
   }
 
+  if (out.errors > 0) {
+    out.healthOk = false;
+    out.warnings.push(`${out.errors} catalog item(s) failed while writing.`);
+  }
+
   console.log(`   🗂️ catalog [${chain}]: ${out.created} created, ${out.existing} existing (+${out.mapped} newly mapped), ${out.snapshots} snapshots, ${out.unchanged} unchanged, ${out.errors} err (of ${out.total})`);
+  await recordCatalogRun(prisma, chain, runStart, out, dryRun);
   return out;
 }

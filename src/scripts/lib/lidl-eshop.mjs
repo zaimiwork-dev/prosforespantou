@@ -227,7 +227,11 @@ export async function scrapeAllProducts({ cats, pace = 800, maxOffset = 3000, on
     const numFound = numFoundOf(r0.json);
     if (!numFound) { await jitter(pace); continue; } // valid response, genuinely empty
     catsWithProducts++;
-    for (let offset = 0; offset < numFound && offset <= maxOffset; offset += FETCH_SIZE) {
+    for (let offset = 0; offset < numFound; offset += FETCH_SIZE) {
+      if (offset > maxOffset) {
+        incompleteCats++;
+        break;
+      }
       const r = offset === 0 ? r0 : await fetchSearchPage(num, offset);
       if (!r.ok) { incompleteCats++; break; } // throttle mid-category — don't pretend it's done
       const prods = productsFromResponse(r.json);
