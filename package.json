@@ -11,6 +11,7 @@
     "test:run": "vitest run",
     "catalog:coverage": "node src/scripts/catalog-coverage.mjs",
     "audit:collection": "node src/scripts/audit-collection-contracts.mjs",
+    "catalog:masoutis": "node src/scripts/masoutis-catalog.mjs",
     "cap:sync": "cap sync",
     "cap:android": "cap open android"
   },

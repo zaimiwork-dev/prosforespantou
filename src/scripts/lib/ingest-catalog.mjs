@@ -22,6 +22,11 @@
 //                     e.g. an on-offer card — its real shelf price arrives on a
 //                     future run when it's off-offer).
 //
+// writeMappings:false is for supplemental catalogs whose item id is NOT the
+// chain's own SKU (e.g. Wolt venue item ids). Products/baselines can still be
+// enriched by barcode, but we do not poison ChainProductMapping with fake SKUs.
+// requireBarcode:true skips rows that cannot be deterministically canonicalized.
+//
 // Batched for 10k–20k-row catalogs. Safety: 0 valid items → no-op, never deletes.
 
 import { SM_MAPPING, normalizeBarcode, withDbRetry } from './ingest-offers.mjs';
@@ -50,7 +55,14 @@ async function recordCatalogRun(prisma, chain, runStart, out, dryRun) {
   }
 }
 
-export async function ingestCatalog({ chain, items, dryRun = false, extraWarnings = [] }) {
+export async function ingestCatalog({
+  chain,
+  items,
+  dryRun = false,
+  extraWarnings = [],
+  writeMappings = true,
+  requireBarcode = false,
+} = {}) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
   const runStart = new Date();
@@ -67,8 +79,13 @@ export async function ingestCatalog({ chain, items, dryRun = false, extraWarning
     warnings: [...extraWarnings],
   };
 
-  // A catalog item needs a stable per-chain SKU (identity), a name, and a price.
-  const valid = items.filter((it) => it && it.name && it.chainItemcode && it.price > 0);
+  // A catalog item needs a name, a price, and either a stable chain SKU
+  // (normal chain catalogs) or a barcode (supplemental canonical catalogs).
+  const valid = items.filter((it) => {
+    if (!it || !it.name || !(it.price > 0)) return false;
+    if (requireBarcode && !normalizeBarcode(it.barcode)) return false;
+    return writeMappings ? Boolean(it.chainItemcode) : Boolean(it.chainItemcode || normalizeBarcode(it.barcode));
+  });
   out.skipped = items.length - valid.length;
   if (valid.length === 0) {
     out.healthOk = false;
@@ -85,8 +102,10 @@ export async function ingestCatalog({ chain, items, dryRun = false, extraWarning
   const { default: prisma } = await import('../../lib/prisma.ts');
 
   // Preload this chain's SKU→productId map + a barcode index in a few queries.
-  const mappings = await withDbRetry('catalog mappings', () =>
-    prisma.chainProductMapping.findMany({ where: { supermarket: chain }, select: { chainItemcode: true, productId: true } }));
+  const mappings = writeMappings
+    ? await withDbRetry('catalog mappings', () =>
+        prisma.chainProductMapping.findMany({ where: { supermarket: chain }, select: { chainItemcode: true, productId: true } }))
+    : [];
   const skuToPid = new Map(mappings.map((m) => [String(m.chainItemcode), m.productId]));
 
   const barcodes = [...new Set(valid.map((it) => normalizeBarcode(it.barcode)).filter(Boolean))];
@@ -125,7 +144,7 @@ export async function ingestCatalog({ chain, items, dryRun = false, extraWarning
       if (pid) {
         out.existing++;
         // Matched by barcode but no SKU mapping yet → add it (links offers next run).
-        if (!skuToPid.has(sku)) {
+        if (writeMappings && !skuToPid.has(sku)) {
           await withDbRetry('catalog map', () => prisma.chainProductMapping.upsert({
             where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: sku } },
             create: { supermarket: chain, chainItemcode: sku, productId: pid },
@@ -147,12 +166,14 @@ export async function ingestCatalog({ chain, items, dryRun = false, extraWarning
           },
         }));
         pid = created.id;
-        await withDbRetry('catalog map-new', () => prisma.chainProductMapping.upsert({
-          where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: sku } },
-          create: { supermarket: chain, chainItemcode: sku, productId: pid },
-          update: { productId: pid },
-        }));
-        skuToPid.set(sku, pid);
+        if (writeMappings) {
+          await withDbRetry('catalog map-new', () => prisma.chainProductMapping.upsert({
+            where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: sku } },
+            create: { supermarket: chain, chainItemcode: sku, productId: pid },
+            update: { productId: pid },
+          }));
+          skuToPid.set(sku, pid);
+        }
         if (bc) barcodeToPid.set(bc, pid);
         out.created++;
       }

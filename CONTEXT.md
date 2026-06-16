@@ -55,6 +55,33 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## Pick up here (2026-06-16 -- Masoutis catalog completed, Wolt made supplemental)
+
+Goal from owner: continue making every chain collect complete official data safely, while keeping Wolt only as a helper when the chain site does not expose enough identity/barcode data.
+
+Shipped locally in this session:
+- Added [masoutis-catalog.mjs](src/scripts/masoutis-catalog.mjs): first-party Masoutis full-catalog scraper using the chain's own e-shop API. It discovers 250 shelf categories from `GetScanNShopMenuAllLevelsAutoScheduler`, pages each category through the Masoutis product API, keys Products by official Masoutis `Itemcode`, and excludes current official web/leaflet offer Itemcodes from normal baselines so `MONO` promo prices do not become reference prices.
+- Ran the Masoutis catalog against prod DB: `10,404` unique Masoutis products collected, `7,174` normal-price snapshots written, `3,176` current official offer items skipped for baseline, `0` write errors. Masoutis audit mode is now `full-catalog-baseline` instead of `offers-only`.
+- Added weekly/manual `masoutis-catalog` GitHub Actions job plus `npm run catalog:masoutis`. The workflow mirrors Masoutis catalog images afterward with `mirror-catalog.mjs`.
+- Refactored [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs) into Wolt supplemental barcode enrichment only. It no longer writes `source='wolt'` Discount rows. It feeds barcode-backed Wolt rows through `ingestCatalog({ writeMappings:false, requireBarcode:true })` so Wolt item ids do not poison `ChainProductMapping`.
+- Added `writeMappings` / `requireBarcode` options to [ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs) for supplemental catalogs. Existing first-party catalog scripts keep default behavior.
+- Soft-deactivated `356` old active `source='wolt'` discounts in prod so user-facing offers now come from official chain feeds only. Product/barcode enrichment remains.
+- Normalized `11` newly active legacy offer rows with null `offerType` after the scrape.
+
+Verified:
+- `STRICT=1 npm run audit:collection`: exit 0.
+- Focused `npx eslint src/scripts/masoutis-catalog.mjs src/scripts/wolt-canonical-scraper.mjs src/scripts/lib/ingest-catalog.mjs`: clean.
+- `DRY_RUN=1 LIMIT=5 node src/scripts/wolt-canonical-scraper.mjs masoutis-makedonias masoutis`: clean smoke.
+- `DRY_RUN=1 MAX_CATEGORIES=1 MAX_PAGES_PER_CATEGORY=2 MAX_OFFER_PAGES=2 node src/scripts/masoutis-catalog.mjs`: clean smoke.
+
+Current truth from audit:
+- Full-catalog baseline exists for AB, Kritikos, Lidl, Masoutis, and My Market.
+- Sklavenitis remains the only `offers-only` chain: `2,831` active official offers, `1,907` linked, `924` productless, `0` normal baseline products.
+- Masoutis still has offer linking to improve (`1,168` active, `792` linked, `376` productless), but future official offer runs should link more as the new Itemcode mappings are used.
+- Wolt is now enrichment-only by default (`WOLT_BASELINE=0` in Actions). If we ever choose Wolt baselines for Sklavenitis, make that an explicit product/data-quality decision because Wolt prices are venue/third-party prices, not official chain-site prices.
+
+---
+
 ## Pick up here (2026-06-16 -- autonomous collection contract hardened)
 
 Goal from owner: every autonomous collector must be polite/safe enough not to trigger avoidable blocks, and every chain must clearly distinguish current offers vs full-catalog products vs normal-price baselines, including `MONO`/hidden-reference promos.

@@ -52,9 +52,10 @@ on:
     - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
     - cron: '30 3 * * 0'  # weekly Sun 03:30 UTC — Lidl catalog (e-shop grid)
     - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
-    - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis canonical (Wolt)
-    - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market canonical (Wolt)
+    - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis Wolt barcode enrichment
+    - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market Wolt barcode enrichment
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
+    - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
   workflow_dispatch:
     inputs:
       chain:
@@ -80,6 +81,7 @@ on:
           - mymarket-canonical
           - sklavenitis-canonical
           - kritikos-canonical
+          - masoutis-catalog
 
 permissions:
   contents: read
@@ -509,6 +511,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           PACE_MS: '1000'
           JITTER_MS: '500'
+          WOLT_BASELINE: '0'
       - name: My Market full catalog (site listing → Product + shelf-price baseline)
         # mymarket.gr/offers paginates the WHOLE catalogue (~5.5k) offers-first;
         # this captures every product (SKU-keyed) so the catalog is complete and
@@ -540,6 +543,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           PACE_MS: '1000'
           JITTER_MS: '500'
+          WOLT_BASELINE: '0'
 
   kritikos-canonical:
     if: github.event.schedule == '0 6 * * 0' || github.event.inputs.chain == 'kritikos-canonical'
@@ -569,6 +573,43 @@ jobs:
         run: node src/scripts/mirror-catalog.mjs
         env:
           CHAIN: kritikos
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MIRROR_MAX_NEW: '2500'
+          MIRROR_CONCURRENCY: '3'
+          QUERY_LIMIT: '4000'
+
+  masoutis-catalog:
+    # Weekly Sun 06:30 UTC + manual. Walks Masoutis' own e-shop category API
+    # (GetScanNShopMenuAllLevelsAutoScheduler -> category pages) into
+    # SKU-keyed Products + normal shelf-price baselines. Current official web
+    # and leaflet offer Itemcodes are excluded from normal baselines so MONO
+    # promos don't poison the reference price.
+    if: github.event.schedule == '30 6 * * 0' || github.event.inputs.chain == 'masoutis-catalog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/masoutis-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '900'
+          JITTER_MS: '400'
+          MAX_OFFER_PAGES: '80'
+      - name: Self-host Masoutis catalog images
+        continue-on-error: true
+        run: node src/scripts/mirror-catalog.mjs
+        env:
+          CHAIN: masoutis
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
