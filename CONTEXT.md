@@ -68,12 +68,14 @@ Safety changes from this session:
 Verified locally:
 - `DRY_RUN=1 ALLOW_PARTIAL_DRY_RUN=1 LIMIT=24 MAX_PAGES=1 PACE_MS=3000 JITTER_MS=1000 node src/scripts/adapters/sklavenitis.mjs`
 - Result: 24 scraped, 22 via mapping, 2 review queue, 0 errors, 0 writes/deactivations.
+- Slow 5-page local dry run also passed: `LIMIT=120 MAX_PAGES=5 PACE_MS=4000 JITTER_MS=1500` -> 120 scraped, 77 matched, 43 review queue, 0 errors, 0 writes/deactivations.
+- GitHub probe run `27607052007` (`sklavenitis-offers-probe`, no proxy) failed on the single request with `page 1 HTTP 403`. Conclusion: GitHub direct IP is still blocked; this dev machine is currently served.
 
 Next safe escalation path:
-1. Push this change.
-2. Trigger `gh workflow run scrape-chains.yml -f chain=sklavenitis-offers-probe`.
-3. If the CI probe gets real cards, then run a slightly larger dry-run (`LIMIT=120 MAX_PAGES=5`) before any full run.
-4. Only run full `sklavenitis-offers` after the probes pass; keep the slower pacing.
+1. Do not run the full GitHub `sklavenitis-offers` job without `PROXY_URL`; the direct CI probe still 403s.
+2. If refreshing Sklavenitis from this dev PC, run a full **dry-run** first with slow pacing (`DRY_RUN=1 ALLOW_PARTIAL_DRY_RUN=1 PACE_MS=4000 JITTER_MS=1500 node ...`) before any real write run.
+3. Only run a real local scrape after the dry-run completes with near-full count and no errors; keep the slower pacing.
+4. Durable automation is still residential proxy or a scheduled task from this dev PC.
 
 ---
 
