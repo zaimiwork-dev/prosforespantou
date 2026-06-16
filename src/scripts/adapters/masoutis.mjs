@@ -20,10 +20,13 @@
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
+import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const BASE = 'https://www.masoutis.gr/api/eshop';
 const PAGE_SIZE = 50;
-const MAX_PAGES = 60; // safety cap
+const MAX_PAGES = envInt('MAX_PAGES', 60); // safety cap
+const PACE_MS = envInt('PACE_MS', 650);
+const JITTER_MS = envInt('JITTER_MS', 300);
 
 const HEADERS = {
   Accept: 'application/json, text/plain, */*',
@@ -35,7 +38,9 @@ const HEADERS = {
 };
 
 async function getCred() {
-  const res = await fetch(`${BASE}/GetCred`, { headers: { ...HEADERS, authorization: 'Bearer null' } });
+  const res = await fetchWithBackoff(`${BASE}/GetCred`, {
+    headers: { ...HEADERS, authorization: 'Bearer null' },
+  }, { label: 'Masoutis GetCred' });
   if (!res.ok) throw new Error(`GetCred failed — HTTP ${res.status}`);
   const c = await res.json();
   if (!c.Uid || !c.Key) throw new Error(`GetCred returned no credential: ${JSON.stringify(c).slice(0, 200)}`);
@@ -50,11 +55,11 @@ async function fetchPage(cred, page, itemcodeFilter) {
     IfWeight: String(page),
     ServiceResponse: '', Token: '', Zip: '', BrandName: '', TeamId: '', ExtraFilter: '',
   };
-  const res = await fetch(`${BASE}/GetPromoItemWithListCouponsSubCategoriesAutoPromosv2`, {
+  const res = await fetchWithBackoff(`${BASE}/GetPromoItemWithListCouponsSubCategoriesAutoPromosv2`, {
     method: 'POST',
     headers: { ...HEADERS, uid: cred.uid, usl: cred.usl, key: cred.key },
     body: JSON.stringify(body),
-  });
+  }, { label: `Masoutis promo page ${page}` });
   if (!res.ok) throw new Error(`promo page ${page} failed — HTTP ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data : (data.items || data.Items || []);
@@ -96,7 +101,7 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
     log(`   page ${page} — ${rows.length} rows — unique items: ${byItemcode.size}`);
     if (rows.length < PAGE_SIZE) break;
     if (byItemcode.size >= limit) break;
-    await new Promise((r) => setTimeout(r, 300));
+    await pace(PACE_MS, JITTER_MS);
   }
 
   let items = [...byItemcode.values()].map(toOfferItem).filter((it) => it && it.name);

@@ -84,6 +84,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: scrape-${{ github.workflow }}-${{ github.event.schedule || github.event.inputs.chain || github.run_id }}
+  cancel-in-progress: false
+
 # Opt into Node 24 for the actions themselves (silences the deprecation
 # warning about checkout/setup-node running on Node 20 internally).
 env:
@@ -106,7 +110,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          PACE_MS: '150'
+          PACE_MS: '750'
+          JITTER_MS: '350'
           # Phase 9 pilot: also snapshot the full catalog's shelf prices
           # (kind='normal') for the price baseline. Kritikos already fetches
           # every product to find offers, so this is free + barcode-matched.
@@ -136,6 +141,8 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PACE_MS: '900'
+          JITTER_MS: '500'
 
   sklavenitis-offers:
     if: github.event.schedule == '0 1 * * *' || github.event.inputs.chain == 'sklavenitis-offers'
@@ -156,6 +163,9 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REQUIRE_PROXY: '1'
+          PACE_MS: '4000'
+          JITTER_MS: '1500'
           # sklavenitis.gr (Akamai) 403s GitHub's datacenter IPs — route the
           # scrape + image downloads through a residential proxy. Without the
           # secret the adapter no-ops the proxy and 403s as before (set it to
@@ -207,7 +217,8 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PACE_MS: '600'
+          PACE_MS: '1200'
+          JITTER_MS: '600'
 
   resolvers:
     # Daily 04:00 UTC + manual `resolvers-all`. Walks every chain's PendingMatch
@@ -437,6 +448,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '500'
 
   lidl-catalog:
     # Weekly Sun 03:30 UTC + manual. Walks Lidl's e-shop categories via the search
@@ -457,6 +469,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '500'
 
   lidl-resolver-only:
     if: github.event.inputs.chain == 'lidl-resolver-only'
@@ -494,7 +507,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          PACE_MS: '200'
+          PACE_MS: '1000'
+          JITTER_MS: '500'
       - name: My Market full catalog (site listing → Product + shelf-price baseline)
         # mymarket.gr/offers paginates the WHOLE catalogue (~5.5k) offers-first;
         # this captures every product (SKU-keyed) so the catalog is complete and
@@ -505,7 +519,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          PACE_MS: '600'
+          PACE_MS: '1200'
+          JITTER_MS: '600'
 
   sklavenitis-canonical:
     if: github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'sklavenitis-canonical'
@@ -523,7 +538,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          PACE_MS: '200'
+          PACE_MS: '1000'
+          JITTER_MS: '500'
 
   kritikos-canonical:
     if: github.event.schedule == '0 6 * * 0' || github.event.inputs.chain == 'kritikos-canonical'
@@ -541,7 +557,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-          PACE_MS: '150'
+          PACE_MS: '750'
+          JITTER_MS: '350'
       - name: Self-host Kritikos catalog images (non-offer Product pics)
         # Mirrors Product.imageUrl (the full browsable catalog) to Supabase so
         # pictures survive a CDN block / S3 key rotation. Incremental: caps fresh
@@ -557,4 +574,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MIRROR_MAX_NEW: '2500'
+          MIRROR_CONCURRENCY: '3'
           QUERY_LIMIT: '4000'

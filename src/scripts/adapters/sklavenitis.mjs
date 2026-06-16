@@ -31,14 +31,16 @@ import { load as loadHtml } from 'cheerio';
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
 import { installProxyFromEnv } from '../lib/proxy-fetch.mjs';
+import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const ALLOW_PARTIAL_DRY_RUN = process.env.ALLOW_PARTIAL_DRY_RUN === '1';
+const REQUIRE_PROXY = process.env.REQUIRE_PROXY === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 const PAGE_SIZE = 24;
-const MAX_PAGES = process.env.MAX_PAGES ? parseInt(process.env.MAX_PAGES, 10) : 200;
-const PACE_MS = process.env.PACE_MS ? parseInt(process.env.PACE_MS, 10) : 1200;
-const JITTER_MS = process.env.JITTER_MS ? parseInt(process.env.JITTER_MS, 10) : 600;
+const MAX_PAGES = envInt('MAX_PAGES', 200);
+const PACE_MS = envInt('PACE_MS', 1200);
+const JITTER_MS = envInt('JITTER_MS', 600);
 const BASE = 'https://www.sklavenitis.gr/sylloges/prosfores/';
 
 const HEADERS = {
@@ -82,19 +84,9 @@ function categoryFromHref(href) {
 
 async function fetchPage(pg) {
   const url = `${BASE}?pg=${pg}`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await fetchWithBackoff(url, { headers: HEADERS }, { label: `Sklavenitis page ${pg}`, retries: 1 });
   if (!res.ok) throw new Error(`page ${pg} HTTP ${res.status}`);
   return res.text();
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function pace() {
-  if (PACE_MS <= 0) return;
-  const jitter = JITTER_MS > 0 ? Math.floor(Math.random() * JITTER_MS) : 0;
-  await sleep(PACE_MS + jitter);
 }
 
 function extractItemsFromHtml(html) {
@@ -188,7 +180,23 @@ export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } 
   // serves residential ones. In CI, PROXY_URL routes the global fetch — page
   // scrapes AND the s1.sklavenitis.gr image-mirror downloads — through a
   // residential proxy. No-op locally / without the secret. See lib/proxy-fetch.mjs.
-  installProxyFromEnv();
+  const proxy = installProxyFromEnv();
+  if (REQUIRE_PROXY && !proxy.enabled) {
+    console.log('   skipping: REQUIRE_PROXY=1 but PROXY_URL is not set; avoiding direct CI request to Sklavenitis');
+    return {
+      chain: 'sklavenitis',
+      source: 'web',
+      scrapedItems: 0,
+      matched: 0,
+      reviewQueued: 0,
+      unmatchedShown: 0,
+      priceChanges: 0,
+      deactivated: 0,
+      errors: 0,
+      healthOk: true,
+      warnings: ['Skipped because REQUIRE_PROXY=1 and PROXY_URL is missing.'],
+    };
+  }
 
   const byCode = new Map();
   let totalCount = null;
@@ -210,7 +218,7 @@ export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } 
     if (byCode.size >= limit) break;
     if (totalCount != null && byCode.size >= totalCount) break;
     if (items.length < PAGE_SIZE && page > 1) break; // short page = end
-    await pace();
+    await pace(PACE_MS, JITTER_MS);
   }
   console.log('');
 

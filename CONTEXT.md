@@ -55,6 +55,28 @@ Fresh incognito: onboarding sheet + Για σένα rail; photos load; ΜΟΝΟ 
 
 ---
 
+## Pick up here (2026-06-16 -- autonomous scraper safety pass)
+
+Autonomous scraping is now deliberately slower and safer so we do not re-trigger chain/CDN blocks while the system runs unattended.
+
+What changed:
+- New shared helper [src/scripts/lib/polite-http.mjs](src/scripts/lib/polite-http.mjs): request timeout, gentle retry/backoff for transient `429/5xx`, honours `Retry-After`, and **does not retry hard blocks like 403**.
+- Wired into the scheduled/high-risk scrapers: AB offers/catalog, Kritikos offers/canonical, My Market offers/catalog, Masoutis Vercel cron adapter, Wolt canonical, Lidl session/discovery/search, and Sklavenitis offers.
+- Default pacing is slower: My Market `1200ms + 600ms jitter`, AB `900ms + 500ms`, Kritikos `750ms + 350ms`, Lidl `500ms`, Masoutis `650ms + 300ms`, Sklavenitis `1200ms + 600ms` locally and `4000ms + 1500ms` in GitHub full runs.
+- Image mirroring default concurrency reduced `6 -> 3`; scheduled Kritikos catalog mirror also sets `MIRROR_CONCURRENCY=3`.
+- GitHub workflow now has a `concurrency` group so the same scheduled/manual scraper does not overlap with itself.
+- Full GitHub `sklavenitis-offers` now sets `REQUIRE_PROXY=1`; if `PROXY_URL` is missing, the adapter exits 0 **before making any request**. This stops the daily direct GitHub 403 from poking Akamai forever.
+
+Verified:
+- `node --check` on all modified `.mjs` files.
+- Focused `npx eslint` on all modified scraper/helper files.
+- `git diff --check`.
+- Local Sklavenitis safety gate: `REQUIRE_PROXY=1` with no `PROXY_URL` exits 0 and skips before network.
+
+Rule going forward: autonomous jobs should prefer slow, jittered, retry-after-aware fetches; never retry/loop on 403; and any chain known to block CI must have either a proxy requirement or a dry-run probe before full writes.
+
+---
+
 ## Pick up here (2026-06-16 -- Sklavenitis safer unblock probe)
 
 Sklavenitis is currently reachable from this dev machine again, but treat it gently. A one-page probe against `https://www.sklavenitis.gr/sylloges/prosfores/?pg=1` returned real markup (`200`, 24 `data-productsku` cards, total reported `3038` offers), not an Akamai block page.

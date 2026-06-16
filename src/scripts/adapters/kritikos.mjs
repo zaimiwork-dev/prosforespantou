@@ -19,10 +19,12 @@
 
 import { ingestOffers, printReport, ingestBaseline } from '../lib/ingest-offers.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
+import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const PACE_MS = parseInt(process.env.PACE_MS || '200', 10);
+const PACE_MS = envInt('PACE_MS', 750);
+const JITTER_MS = envInt('JITTER_MS', 350);
 
 const HOME = 'https://www.kritikos-sm.gr';
 const TREE_API = 'https://kritikos-cxm-production.herokuapp.com/api/v2/categories/tree?collectionType=900';
@@ -33,7 +35,7 @@ const HEADERS = {
 };
 
 async function getBuildId() {
-  const r = await fetch(HOME + '/', { headers: { ...HEADERS, Accept: 'text/html' } });
+  const r = await fetchWithBackoff(HOME + '/', { headers: { ...HEADERS, Accept: 'text/html' } }, { label: 'Kritikos homepage' });
   if (!r.ok) throw new Error(`homepage HTTP ${r.status}`);
   const html = await r.text();
   const m = html.match(/"buildId":"([^"]+)"/);
@@ -42,7 +44,7 @@ async function getBuildId() {
 }
 
 async function getCategoryTree() {
-  const r = await fetch(TREE_API, { headers: HEADERS });
+  const r = await fetchWithBackoff(TREE_API, { headers: HEADERS }, { label: 'Kritikos category tree' });
   if (!r.ok) throw new Error(`tree API HTTP ${r.status}`);
   const j = await r.json();
   const cats = j.payload?.categories;
@@ -69,7 +71,7 @@ function collectAllPaths(tree) {
 
 async function fetchCategoryJson(buildId, path) {
   const url = `${HOME}/_next/data/${buildId}/categories/${path}.json`;
-  const r = await fetch(url, { headers: HEADERS });
+  const r = await fetchWithBackoff(url, { headers: HEADERS }, { label: `Kritikos category ${path}`, retries: 1 });
   if (!r.ok) return null;
   const ct = r.headers.get('content-type') || '';
   if (!/json/i.test(ct)) return null; // SPA fallback HTML → skip
@@ -176,7 +178,7 @@ async function run() {
       process.stdout.write(`\r   path ${i + 1}/${paths.length} — unique products: ${bySku.size} | json=${jsonOk} spa=${spaFallback}   `);
     }
     if (bySku.size >= LIMIT) break;
-    await new Promise((r) => setTimeout(r, PACE_MS));
+    await pace(PACE_MS, JITTER_MS);
   }
   console.log(`\n   fetched ${bySku.size} unique products (${jsonOk} json paths, ${spaFallback} SPA-fallback, ${errs} errors)`);
 

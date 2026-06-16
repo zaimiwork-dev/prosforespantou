@@ -24,6 +24,7 @@
 // subcategory products too, so global dedup by productId collapses any overlap.
 
 import { gunzipSync } from 'node:zlib';
+import { fetchWithBackoff } from './polite-http.mjs';
 
 export const ORIGIN = 'https://www.lidl-hellas.gr';
 const PAGES_SITEMAP = `${ORIGIN}/explore/assets/s/pages_el-GR_gr.xml.gz`;
@@ -47,7 +48,7 @@ async function ensureSession() {
   if (_sessionTried) return;
   _sessionTried = true;
   try {
-    const res = await fetch(LANDING, {
+    const res = await fetchWithBackoff(LANDING, {
       headers: {
         'User-Agent': UA,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -57,7 +58,7 @@ async function ensureSession() {
         'sec-fetch-site': 'none',
         'Upgrade-Insecure-Requests': '1',
       },
-    });
+    }, { label: 'Lidl landing session' });
     const set = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
     _cookie = set.map((c) => c.split(';')[0].trim()).filter((kv) => kv.includes('=')).join('; ');
     const html = await res.text();
@@ -91,7 +92,7 @@ export async function discoverCategoryNumbers(override = []) {
   await ensureSession();
   if (_deptNums.length) return _deptNums;
   try {
-    const res = await fetch(PAGES_SITEMAP, { headers: { 'User-Agent': UA } });
+    const res = await fetchWithBackoff(PAGES_SITEMAP, { headers: { 'User-Agent': UA } }, { label: 'Lidl pages sitemap' });
     const xml = gunzipSync(Buffer.from(await res.arrayBuffer())).toString('utf8');
     const nums = [...new Set([...xml.matchAll(/\/c\/[a-z0-9-]+\/s(\d+)/g)].map((m) => m[1]))];
     return nums.length ? nums : ['10068374'];
@@ -114,7 +115,10 @@ export async function fetchSearchPage(categoryNum, offset) {
   const url = `${SEARCH_API}?assortment=GR&locale=el_GR&version=v2.0.0&category.id=${categoryNum}&offset=${offset}&fetchsize=${FETCH_SIZE}`;
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
-      const res = await fetch(url, { headers: apiHeaders() });
+      const res = await fetchWithBackoff(url, { headers: apiHeaders() }, {
+        label: `Lidl search ${categoryNum}/${offset}`,
+        retries: 1,
+      });
       if (res.status === 404) return { ok: true, json: null };
       // Honour the server's own backoff signal instead of pushing through.
       if (res.status === 429 || res.status === 503) {

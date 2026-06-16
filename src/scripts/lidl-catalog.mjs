@@ -29,7 +29,7 @@ import { discoverCategoryNumbers, scrapeAllProducts, productId, classifyOffer } 
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const PACE_MS = parseInt(process.env.PACE_MS || '150', 10);
+const PACE_MS = parseInt(process.env.PACE_MS || '500', 10);
 const CATS_ENV = (process.env.LIDL_CATS || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 function toCatalogItem(p, now) {

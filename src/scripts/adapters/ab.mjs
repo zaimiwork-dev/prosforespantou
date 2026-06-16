@@ -22,15 +22,18 @@
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
+import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 const INCLUDE_POINTS = process.env.INCLUDE_POINTS === '1';
+const PACE_MS = envInt('PACE_MS', 900);
+const JITTER_MS = envInt('JITTER_MS', 500);
 
 const ENDPOINT = 'https://www.ab.gr/api/v1/';
 const PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800'; // ProductList
 const PAGE_SIZE = 10;
-const MAX_PAGES = 200;
+const MAX_PAGES = envInt('MAX_PAGES', 200);
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
@@ -66,7 +69,7 @@ function buildUrl(pageNumber) {
 }
 
 async function fetchPage(pageNumber) {
-  const res = await fetch(buildUrl(pageNumber), { headers: HEADERS });
+  const res = await fetchWithBackoff(buildUrl(pageNumber), { headers: HEADERS }, { label: `AB offers page ${pageNumber + 1}` });
   if (!res.ok) throw new Error(`page ${pageNumber} HTTP ${res.status}`);
   const j = await res.json();
   if (j.errors) {
@@ -160,7 +163,7 @@ async function run() {
     if (totalPages != null && page + 1 >= totalPages) break;
     if (products.length === 0) break;
     if (byCode.size >= LIMIT) break;
-    await new Promise((r) => setTimeout(r, 250));
+    await pace(PACE_MS, JITTER_MS);
   }
   console.log('');
 

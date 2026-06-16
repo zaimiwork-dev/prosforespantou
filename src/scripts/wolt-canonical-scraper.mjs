@@ -14,6 +14,7 @@
 //   PACE_MS=200 → throttle between category fetches (default 200)
 
 import 'dotenv/config';
+import { envInt, fetchWithBackoff, pace } from './lib/polite-http.mjs';
 
 const VENUE_SLUG = process.argv[2];
 if (!VENUE_SLUG) {
@@ -24,7 +25,8 @@ const CHAIN_SLUG = process.argv[3] || VENUE_SLUG.split('-')[0];
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const PACE_MS = parseInt(process.env.PACE_MS || '200', 10);
+const PACE_MS = envInt('PACE_MS', 750);
+const JITTER_MS = envInt('JITTER_MS', 350);
 
 const SM_MAPPING = {
   ab: 'AB Vassilopoulos',
@@ -71,7 +73,7 @@ function normalizeBarcode(raw) {
 }
 
 async function getJson(url) {
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await fetchWithBackoff(url, { headers: HEADERS }, { label: `Wolt ${url}` });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`HTTP ${res.status} on ${url} — ${text.slice(0, 200)}`);
@@ -110,7 +112,7 @@ async function fetchVenueItems(venueSlug) {
       console.log(`\n   ⚠️  failed category "${c.slug}": ${e.message}`);
     }
     if (itemsById.size >= LIMIT) break;
-    await new Promise((r) => setTimeout(r, PACE_MS));
+    await pace(PACE_MS, JITTER_MS);
   }
   console.log('');
   return [...itemsById.values()];

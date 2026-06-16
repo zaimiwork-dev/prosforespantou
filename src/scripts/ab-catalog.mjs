@@ -20,11 +20,14 @@ dotenv.config();
 
 import { ingestCatalog } from './lib/ingest-catalog.mjs';
 import { mirrorImages } from './lib/mirror-images.mjs';
+import { envInt, fetchWithBackoff, pace } from './lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
+const PACE_MS = envInt('PACE_MS', 900);
+const JITTER_MS = envInt('JITTER_MS', 500);
 const PAGE_SIZE = 50;
-const MAX_PAGES = 400;
+const MAX_PAGES = envInt('MAX_PAGES', 400);
 
 const ENDPOINT = 'https://www.ab.gr/api/v1/';
 const PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800';
@@ -40,8 +43,6 @@ const HEADERS = {
 // Fallback if the rootCategoryFacet ever comes back empty (departments rarely change).
 const FALLBACK_ROOTS = ['001','002','003','004','005','006','007','008','009','010','011','012','013','014'];
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 function buildUrl(vars) {
   const variables = encodeURIComponent(JSON.stringify({
     productCodes: '', categoryCode: '', excludedProductCodes: '', brands: '',
@@ -55,7 +56,9 @@ function buildUrl(vars) {
 }
 
 async function fetchList(vars) {
-  const res = await fetch(buildUrl(vars), { headers: HEADERS });
+  const res = await fetchWithBackoff(buildUrl(vars), { headers: HEADERS }, {
+    label: `AB catalog ${vars.categoryCode || vars.productListingType || 'roots'} p${vars.pageNumber ?? 0}`,
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const j = await res.json();
   if (j.errors) throw new Error(`GraphQL: ${JSON.stringify(j.errors).slice(0, 200)}`);
@@ -114,7 +117,7 @@ async function run() {
       if (pages != null && page + 1 >= pages) break;
       if (prods.length === 0) break;
       if (byCode.size >= LIMIT) break;
-      await sleep(250);
+      await pace(PACE_MS, JITTER_MS);
     }
     console.log('');
     if (byCode.size >= LIMIT) break;

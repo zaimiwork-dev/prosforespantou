@@ -32,12 +32,14 @@
 import { load as loadHtml } from 'cheerio';
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
+import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const PACE_MS = parseInt(process.env.PACE_MS || '600', 10); // ~1.6 req/s — observed 429 above ~5 req/s
+const PACE_MS = envInt('PACE_MS', 1200); // mymarket 429s above ~5 req/s; autonomous runs stay gentler
+const JITTER_MS = envInt('JITTER_MS', 600);
 const PAGE_SIZE = 35;
-const MAX_PAGES = 250;
+const MAX_PAGES = envInt('MAX_PAGES', 250);
 const BASE = 'https://www.mymarket.gr/offers';
 
 // NOTE: mymarket.gr returns 429 for older Chrome UA strings (Chrome 120 was
@@ -74,7 +76,7 @@ function parseEurNumber(s) {
 }
 
 async function fetchPage(pg) {
-  const res = await fetch(`${BASE}?page=${pg}`, { headers: HEADERS });
+  const res = await fetchWithBackoff(`${BASE}?page=${pg}`, { headers: HEADERS }, { label: `My Market page ${pg}` });
   if (!res.ok) throw new Error(`page ${pg} HTTP ${res.status}`);
   return res.text();
 }
@@ -244,7 +246,7 @@ export async function runMyMarketAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {
     if (byCode.size >= limit) break;
     // End of pagination: short page (fewer than PAGE_SIZE cards = last page).
     if (cardsThisPage < PAGE_SIZE && page > 1) break;
-    await new Promise((r) => setTimeout(r, PACE_MS));
+    await pace(PACE_MS, JITTER_MS);
   }
   console.log('');
   console.log(`   ${byCode.size} offers across ${lastNonEmptyPage} pages`);

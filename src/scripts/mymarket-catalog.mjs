@@ -25,12 +25,14 @@ dotenv.config();
 import { load as loadHtml } from 'cheerio';
 import { ingestCatalog } from './lib/ingest-catalog.mjs';
 import { installProxyFromEnv } from './lib/proxy-fetch.mjs';
+import { envInt, fetchWithBackoff, pace } from './lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const PACE_MS = parseInt(process.env.PACE_MS || '600', 10);
+const PACE_MS = envInt('PACE_MS', 1200);
+const JITTER_MS = envInt('JITTER_MS', 600);
 const PAGE_SIZE = 35;
-const MAX_PAGES = 250;
+const MAX_PAGES = envInt('MAX_PAGES', 250);
 const BASE = 'https://www.mymarket.gr/offers';
 
 const HEADERS = {
@@ -44,7 +46,7 @@ const parseEurNumber = (s) => { if (s == null) return null; const n = parseFloat
 const parseGreekInt = (s) => { const m = String(s || '').match(/([0-9][0-9.]*)/); return m ? parseInt(m[1].replace(/\./g, ''), 10) : null; };
 
 async function fetchPage(pg) {
-  const res = await fetch(`${BASE}?page=${pg}`, { headers: HEADERS });
+  const res = await fetchWithBackoff(`${BASE}?page=${pg}`, { headers: HEADERS }, { label: `My Market catalog page ${pg}` });
   if (!res.ok) throw new Error(`page ${pg} HTTP ${res.status}`);
   return res.text();
 }
@@ -110,7 +112,7 @@ async function run() {
     process.stdout.write(`\r   page ${page} — +${added} (total ${byCode.size}${totalCount ? '/' + totalCount : ''})   `);
     if (byCode.size >= LIMIT) break;
     if (cards.length < PAGE_SIZE && page > 1) break;
-    await new Promise((r) => setTimeout(r, PACE_MS));
+    await pace(PACE_MS, JITTER_MS);
   }
   console.log(`\n   ${byCode.size} catalog products across ${lastPage} pages`);
 

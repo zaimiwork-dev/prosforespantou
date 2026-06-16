@@ -79,7 +79,7 @@ export async function mirrorImages({
   paceMs = 150,
   maxNew = Infinity,
   rewrite = null,
-  concurrency = parseInt(process.env.MIRROR_CONCURRENCY || '6', 10),
+  concurrency = parseInt(process.env.MIRROR_CONCURRENCY || '3', 10),
 }) {
   const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, skipped: 0, warnings: [] };
 
