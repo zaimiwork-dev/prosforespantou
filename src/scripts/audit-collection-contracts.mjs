@@ -9,6 +9,8 @@
 // Usage:
 //   node src/scripts/audit-collection-contracts.mjs
 //   STRICT=1 node src/scripts/audit-collection-contracts.mjs  # non-zero on invalid kinds
+//   STRICT_COMPLETENESS=1 ...  # also fail partial/missing full-catalog coverage
+//   COMPLETENESS_EXEMPT=sklavenitis STRICT_COMPLETENESS=1 ...  # known blocked chains
 
 import 'dotenv/config';
 import dotenv from 'dotenv';
@@ -19,6 +21,10 @@ const { default: prisma } = await import('../lib/prisma.ts');
 const { fetchCatalogCoverage } = await import('../lib/catalog-coverage.ts');
 
 const STRICT = process.env.STRICT === '1';
+const STRICT_COMPLETENESS = process.env.STRICT_COMPLETENESS === '1';
+const COMPLETENESS_EXEMPT = new Set(
+  (process.env.COMPLETENESS_EXEMPT || '').split(',').map((s) => s.trim()).filter(Boolean),
+);
 
 function section(title) {
   console.log(`\n${'='.repeat(78)}\n${title}\n${'='.repeat(78)}`);
@@ -107,6 +113,11 @@ console.table(coverage.chains.map((c) => ({
   gtinProducts: c.sourceProductsWithBarcode,
   mirroredImageRate: `${c.mirroredImageRate}%`,
   baselineProducts: c.normalBaselineProducts,
+  baselineRate: `${c.baselineCoverageRate}%`,
+  baselineStatus: c.baselineCompleteness,
+  pricedProducts: c.currentlyPricedProducts,
+  pricedRate: `${c.currentlyPricedRate}%`,
+  catalogStatus: c.catalogCompleteness,
 })));
 
 const invalidCount =
@@ -118,4 +129,12 @@ await prisma.$disconnect();
 if (STRICT && invalidCount > 0) {
   console.error(`\nCollection contract failed: ${invalidCount} row(s) use unexpected offer/snapshot kinds.`);
   process.exit(1);
+}
+
+if (STRICT_COMPLETENESS) {
+  const incomplete = coverage.chains.filter((c) => !COMPLETENESS_EXEMPT.has(c.chain) && c.catalogCompleteness !== 'complete');
+  if (incomplete.length > 0) {
+    console.error(`\nCatalog completeness failed: ${incomplete.map((c) => `${c.chain}:${c.catalogCompleteness}`).join(', ')}`);
+    process.exit(1);
+  }
 }

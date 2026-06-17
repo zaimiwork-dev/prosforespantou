@@ -476,6 +476,9 @@ export function AdminPanel({ onBack }) {
       if (mode === "full-catalog-baseline") {
         return <span style={{ background: "#e8f7ee", color: "#1b7a43", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>FULL CATALOG</span>;
       }
+      if (mode === "partial-catalog-baseline") {
+        return <span style={{ background: "#fff4e0", color: "#8a5a00", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>PARTIAL CATALOG</span>;
+      }
       if (mode === "offers-only") {
         return <span style={{ background: "#fff4e0", color: "#8a5a00", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>OFFERS ONLY</span>;
       }
@@ -530,6 +533,8 @@ export function AdminPanel({ onBack }) {
                     <th style={{ ...th, textAlign: "right" }}>Source products</th>
                     <th style={{ ...th, textAlign: "right" }}>GTIN products</th>
                     <th style={{ ...th, textAlign: "right" }}>Baseline products</th>
+                    <th style={{ ...th, textAlign: "right" }}>Baseline rate</th>
+                    <th style={{ ...th, textAlign: "right" }}>Priced rate</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -545,6 +550,8 @@ export function AdminPanel({ onBack }) {
                       <td style={{ ...td, textAlign: "right" }}>{fmt(c.sourceProducts)}</td>
                       <td style={{ ...td, textAlign: "right" }}>{fmt(c.sourceProductsWithBarcode)}</td>
                       <td style={{ ...td, textAlign: "right" }}>{fmt(c.normalBaselineProducts)}</td>
+                      <td style={{ ...td, textAlign: "right", color: c.baselineCompleteness === "partial" ? "#8a5a00" : "inherit", fontWeight: c.baselineCompleteness === "partial" ? 800 : 400 }}>{c.baselineCoverageRate ?? 0}%</td>
+                      <td style={{ ...td, textAlign: "right", color: c.catalogCompleteness === "partial" ? "#8a5a00" : "inherit", fontWeight: c.catalogCompleteness === "partial" ? 800 : 400 }}>{c.currentlyPricedRate ?? 0}%</td>
                     </tr>
                   ))}
                 </tbody>

@@ -32,6 +32,11 @@ if (process.env.JSON === '1') {
     gtinProducts: c.sourceProductsWithBarcode,
     mirrored: `${c.sourceProductsMirrored} (${c.mirroredImageRate}%)`,
     baselineProducts: c.normalBaselineProducts,
+    baselineRate: `${c.baselineCoverageRate}%`,
+    baselineStatus: c.baselineCompleteness,
+    pricedProducts: c.currentlyPricedProducts,
+    pricedRate: `${c.currentlyPricedRate}%`,
+    catalogStatus: c.catalogCompleteness,
   })));
 }
 

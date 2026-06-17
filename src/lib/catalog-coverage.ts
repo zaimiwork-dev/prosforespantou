@@ -26,7 +26,17 @@ function pairMap(rows: PairRow[]) {
   return out;
 }
 
-const pct = (part: number, total: number) => total > 0 ? Math.round((part / total) * 100) : 0;
+function pairSetMap(rows: PairRow[]) {
+  const out = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.supermarket || !row.productId) continue;
+    if (!out.has(row.supermarket)) out.set(row.supermarket, new Set());
+    out.get(row.supermarket)!.add(row.productId);
+  }
+  return out;
+}
+
+const pct = (part: number, total: number) => total > 0 ? Math.min(100, Math.round((part / total) * 100)) : 0;
 
 export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
   const activeWhere = { isActive: true, validUntil: { gt: now } };
@@ -108,21 +118,49 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
   const mappingProductMap = pairMap(mappingRows);
   const activeLinkedProductMap = pairMap(activeLinkedProductRows);
   const normalProductMap = pairMap(normalBaselineProducts);
+  const activeLinkedProductSetMap = pairSetMap(activeLinkedProductRows);
+  const normalProductSetMap = pairSetMap(normalBaselineProducts);
 
   const chains = CHAINS.map((chain) => {
     const offerRows = activeOfferMap.get(chain) || 0;
     const linkedRows = linkedOfferMap.get(chain) || 0;
     const baselineProducts = normalProductMap.get(chain) || 0;
-    const mode = baselineProducts > 0
+    const mappedProducts = mappingProductMap.get(chain) || 0;
+    const sourceProductCount = sourceProductMap.get(chain) || 0;
+    const baselineDenominator = Math.max(
+      mappedProducts || sourceProductCount,
+      offerRows,
+      baselineProducts,
+    );
+    const baselineCoverageRate = pct(baselineProducts, baselineDenominator);
+    const baselineCompleteness = baselineProducts === 0
+      ? 'none'
+      : baselineCoverageRate >= 70
+        ? 'complete'
+        : 'partial';
+    const currentlyPricedSet = new Set([
+      ...(normalProductSetMap.get(chain) || []),
+      ...(activeLinkedProductSetMap.get(chain) || []),
+    ]);
+    const currentlyPricedProducts = currentlyPricedSet.size;
+    const currentlyPricedRate = pct(currentlyPricedProducts, baselineDenominator);
+    const catalogCompleteness = baselineProducts === 0
+      ? 'none'
+      : currentlyPricedRate >= 70
+        ? 'complete'
+        : 'partial';
+    const mode = catalogCompleteness === 'complete'
       ? 'full-catalog-baseline'
-      : offerRows > 0
-        ? 'offers-only'
-        : 'missing';
+      : catalogCompleteness === 'partial'
+        ? 'partial-catalog-baseline'
+        : offerRows > 0
+          ? 'offers-only'
+          : 'missing';
 
     return {
       chain,
       mode,
-      sourceProducts: sourceProductMap.get(chain) || 0,
+      sourceProducts: sourceProductCount,
       sourceProductsWithImage: sourceImageMap.get(chain) || 0,
       sourceProductsWithBarcode: sourceBarcodeMap.get(chain) || 0,
       sourceProductsMirrored: mirroredImageMap.get(chain) || 0,
@@ -132,10 +170,16 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
       unlinkedActiveOffers: unlinkedOfferMap.get(chain) || 0,
       linkedOfferRate: pct(linkedRows, offerRows),
       activeLinkedProducts: activeLinkedProductMap.get(chain) || 0,
-      mappedProducts: mappingProductMap.get(chain) || 0,
+      mappedProducts,
       pendingMatches: pendingMap.get(chain) || 0,
       normalBaselineRows: normalRowsMap.get(chain) || 0,
       normalBaselineProducts: baselineProducts,
+      baselineCoverageDenominator: baselineDenominator,
+      baselineCoverageRate,
+      baselineCompleteness,
+      currentlyPricedProducts,
+      currentlyPricedRate,
+      catalogCompleteness,
     };
   });
 

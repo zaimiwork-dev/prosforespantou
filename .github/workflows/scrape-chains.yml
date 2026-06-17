@@ -512,10 +512,11 @@ jobs:
           PACE_MS: '1000'
           JITTER_MS: '500'
           WOLT_BASELINE: '0'
-      - name: My Market full catalog (site listing → Product + shelf-price baseline)
-        # mymarket.gr/offers paginates the WHOLE catalogue (~5.5k) offers-first;
-        # this captures every product (SKU-keyed) so the catalog is complete and
-        # future offers link instantly. Wolt step above still adds GTINs for the
+      - name: My Market full catalog (site listing -> Product + shelf-price baseline)
+        # Walks mymarket.gr's product departments from /sitemap/categories-tree,
+        # not /offers. Normal cards write shelf-price baselines; current offer
+        # cards only create/keep the SKU mapping so promo prices are not stored
+        # as normal shelf prices. Wolt step above still adds GTINs for the
         # subset it covers. See src/scripts/mymarket-catalog.mjs.
         continue-on-error: true
         run: node src/scripts/mymarket-catalog.mjs
