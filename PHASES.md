@@ -279,6 +279,8 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 **Shipped 2026-06-13:** slice 1 = `Discount.offerType`/`PriceSnapshot.kind` (strikethrough vs mono); slice 2 = Κρητικός full-catalog `normal`-price baseline, batched + barcode-matched, live behind `BASELINE=1` (verified 6,038 snapshots / 99.8% match / 9m55s on the full catalog); slice 3 = clear −X%/ΜΟΝΟ badge on the detail view (NO "κανονική τιμή" text — user call); slice 4a = the keyword-alert engine now fires from the scraped pipeline (was admin-only), shared `lib/alert-match.ts`, anti-spam (new/dropped offers only + 6h cooldown), no-op until a Resend key exists. **Left (4b):** add `RESEND_API_KEY` (user) → emails send; then the favorites→email opt-in UI (the product vision) on the now-live engine. Extending the baseline to another chain needs that chain's full catalog + barcode matching.
 
+**2026-06-18 catalog expansion:** official full-catalog collection is now live for AB, Kritikos, Lidl, Masoutis, and MyMarket. MyMarket was corrected to crawl all 15 product departments from its category sitemap instead of treating `/offers` as the catalog (`14,040` products; `99%` currently priced coverage). Wolt is enrichment-only and does not supply official baseline prices. **Remaining catalog gap: Sklavenitis**, which is still offers-only because Akamai blocks GitHub/Vercel direct IPs. Next implementation is a slow chain-direct category crawler run through a residential proxy or the dev PC, with current-offer cards marked `baseline:false`.
+
 
 **Why (user decision, 2026-06-12):** today we only see prices when a chain *promotes* an item, so (a) the price-history "Μέση" is an average of offer prices — biased low, (b) we cannot prove a "-35%" is real (the chain may have raised the base price last week), (c) watch-list alerts can't fire for products that simply aren't on promo anywhere. Ingesting every product's shelf price gives us the baseline that makes the honesty positioning bullet-proof — it's the moat.
 
@@ -288,11 +290,11 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 3. **mono** — "ΜΟΝΟ x€"-style promos where the chain HIDES the reference price (94% of real offers per the 2026-05-12 analysis). With a baseline we can compute the hidden delta ourselves and say honestly "κανονικά ~2.49€, τώρα 1.99€".
 
 **Design sketch (build on what exists — no new architecture):**
-- Adapters already see the full catalog (they currently FILTER to on-offer rows: mymarket keeps only `is-on-offer` cards, etc.). Step 1 is a per-chain `FULL_CATALOG=1` pass that walks all items, *not* writing Discounts for non-offer rows — only PriceSnapshots.
-- `OfferItem.offerType` (`'mono' | 'strikethrough' | null`) already flows from the adapters but ingest-offers DOESN'T persist it — persist it first (new `Discount.offerType` + `PriceSnapshot.kind = 'normal' | 'strikethrough' | 'mono'`; `isDiscounted` stays for back-compat).
+- Full-catalog scripts walk official category/API listings and feed deterministic chain SKUs through `ingestCatalog()`. They do not write Discounts for non-offer rows; ordinary prices live only in `PriceSnapshot(kind='normal')`.
+- `OfferItem.offerType` is persisted as `Discount.offerType`, and snapshots use the normalized `normal | strikethrough | mono` vocabulary; `isDiscounted` remains for back-compat.
 - Snapshot only on change (the ingest already does this for offers) — catalog size is ~10-30k items/chain but steady-state daily writes are the few hundred that moved.
 - Match by `chainItemcode` via ChainProductMapping — no new matching work; unmatched catalog items get NO snapshot (no productless shelf-price rows).
-- Pilot with sklavenitis + mymarket (richest catalogs, adapters already paginate the full listing), watch DB growth + IngestRun duration for two weeks, then expand.
+- MyMarket is complete. Finish Sklavenitis through its official category listing, using residential access and the existing polite HTTP/proxy safety gates.
 - Then alerts: favorites already persist client-side (`favorites` in the zustand store) + Subscriber double-opt-in email exists (Phase 3) → server-side watch list keyed by productId, daily post-ingest check "did any watched product gain an active Discount / drop below its baseline?", email via Phase 3 plumbing, push later via the Capacitor wrap (Phase 4.7).
 
 **Do NOT:**

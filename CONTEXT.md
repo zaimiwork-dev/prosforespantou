@@ -4,6 +4,75 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-18 — official full catalogs complete except Sklavenitis)
+
+**The implementation is committed and pushed to `origin/main`; core implementation commit: `55b93d1`.**
+
+Owner's non-negotiable data requirement: collect **every official chain product**, including ordinary non-offer shelf items. `MONO` and strikethrough deals are additional price states, not the catalog. Wolt is enrichment-only and must not be treated as an official chain shelf-price source.
+
+### Shipped in the latest collection pass
+
+- `c0644cb` — hardened autonomous collection contracts: polite retry/backoff, partial-run safeguards, normalized `mono`/`strikethrough`, catalog/baseline `IngestRun` logging, and `npm run audit:collection`.
+- `a206e0e` — first-party Masoutis full catalog through its official e-shop API; Wolt changed to barcode enrichment only.
+- `55b93d1` — replaced MyMarket's incorrect `/offers` catalog assumption with a full crawl of the 15 official product departments discovered from `/sitemap/categories-tree`.
+
+MyMarket live prod result:
+- `14,040` unique official products collected.
+- `8,489` products have a normal shelf-price baseline.
+- Current-offer cards intentionally skip `kind='normal'` so promo prices never poison the baseline.
+- Latest offers run: `5,448` scraped, `5,447` matched, `1` review item.
+- Audit: `13,313 / 13,471` mapped products currently priced (`99%`) through either a normal baseline or linked active official offer.
+
+Coverage reporting now distinguishes:
+- `baselineCoverageRate`: products with a `normal` shelf-price snapshot.
+- `currentlyPricedRate`: products with either a normal shelf baseline or a linked current official offer price. This is the main comparison-availability metric.
+- `full-catalog-baseline` requires sufficient current priced coverage; a handful of baseline rows can no longer make a chain look complete.
+
+Strict verification for every solved chain:
+
+```powershell
+$env:STRICT='1'
+$env:STRICT_COMPLETENESS='1'
+$env:COMPLETENESS_EXEMPT='sklavenitis'
+npm run audit:collection
+```
+
+This passes for **AB, Kritikos, Lidl, Masoutis, and MyMarket**. Current audit highlights:
+- AB: `100%` currently priced.
+- Kritikos: `100%` currently priced.
+- Lidl: `100%` currently priced.
+- Masoutis: `78%` currently priced, classified complete by the current `>=70%` contract.
+- MyMarket: `99%` currently priced.
+- Sklavenitis: still `offers-only`; `2,831` active offers, `1,907` linked, `924` productless, `0` normal baselines.
+
+### Exact next task: Sklavenitis official full catalog
+
+Sklavenitis is the only major chain still missing ordinary non-offer shelf prices. Build a **chain-direct category catalog crawler**, not a Wolt baseline.
+
+Safe sequence:
+1. Read [src/scripts/adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs), [src/scripts/lib/polite-http.mjs](src/scripts/lib/polite-http.mjs), and [src/scripts/lib/ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs).
+2. Perform only one-page/category discovery requests first from this residential dev machine. GitHub/Vercel direct IPs are still Akamai-blocked (`HTTP 403`); do not retry a 403.
+3. Identify official category roots/pagination, stable chain SKU, current price, image, and a reliable offer marker. Confirm non-offer cards are present before writing a crawler.
+4. Add a dry-run-only smoke path (`MAX_CATEGORIES`, `MAX_PAGES_PER_CATEGORY`, `LIMIT`) with slow pacing and jitter. A partial dry run must never deactivate or mutate existing offers.
+5. Only after a near-full dry run succeeds, ingest through `ingestCatalog()` with `baseline:false` for current-offer cards. Never write promo prices as `kind='normal'`.
+6. Keep autonomous GitHub execution gated by `REQUIRE_PROXY=1`/`PROXY_URL`; otherwise use a scheduled local residential run. Do not probe the blocked CI IP repeatedly.
+7. Re-run the Sklavenitis official offers adapter after mappings fill, then run strict completeness without the Sklavenitis exemption.
+
+Do not:
+- Use Wolt venue prices as official Sklavenitis shelf baselines.
+- Create `Discount` rows for non-offer products.
+- Retry/loop on `401/403`.
+- Turn a partial catalog result into a healthy full-catalog run.
+
+### Verification caveats
+
+- The live DB audit and targeted `node --check` commands pass.
+- Full `npm run lint` is already red on pre-existing `AdminPanel.js` React hook/compiler findings.
+- `npx tsc --noEmit` is already red on pre-existing test typing issues in `offer-similarity.test.ts`, `mirror-images.test.ts`, and `proxy-fetch.test.ts`.
+- Do not broaden the Sklavenitis task into those unrelated cleanup items.
+
+---
+
 ## ⚡ START HERE — full checkpoint for a fresh chat (2026-06-13)
 
 **Project:** Prosfores Pantou — cross-chain Greek supermarket offers (6 chains, ~11k offers). **End goal:** native iOS/Android app; **login OPTIONAL** (email/Google/Apple) → cross-device sync + **push/email watch-list alerts**. Anonymous browsing/list/favorites always work. See [[project_vision]].
