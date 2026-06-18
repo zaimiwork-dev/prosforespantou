@@ -1,4 +1,4 @@
-const CHAINS = ['ab', 'kritikos', 'lidl', 'masoutis', 'mymarket', 'sklavenitis'];
+const CHAINS = ['ab', 'bazaar', 'kritikos', 'lidl', 'masoutis', 'mymarket', 'sklavenitis'];
 
 // Images self-hosted on the Supabase mirror look like publicUrlFor() in
 // src/scripts/lib/mirror-images.mjs — i.e. they contain this path. Everything

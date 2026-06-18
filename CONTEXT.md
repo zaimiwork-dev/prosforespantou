@@ -4,6 +4,21 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-18 — Bazaar added as the 7th fully-integrated chain)
+
+**Bazaar (bazaar-online.gr, OpenCart) is now a first-class chain — offers + full catalog + CI — and passes strict completeness alongside the other six (`STRICT=1 STRICT_COMPLETENESS=1 npm run audit:collection` → exit 0, no exemption).** Code is committed (`83f6fd4`); the catalog-coverage CHAINS list update is the only uncommitted bit at time of writing.
+
+New code:
+- [src/scripts/adapters/bazaar.mjs](src/scripts/adapters/bazaar.mjs) — scrapes `/prosfores` (server-rendered OpenCart grid, `?page=N&limit=N`). **Bazaar embeds the GTIN in the image filename** (`.../5201502119435_1-264x264.jpg`), so most offers barcode-match the canonical catalog directly — cross-chain comparison lights up immediately. Reads `price-new`/`price-old` as offer/original (real strikethrough).
+- [src/scripts/bazaar-catalog.mjs](src/scripts/bazaar-catalog.mjs) — walks the 16 OpenCart departments (megamenu `li.dropdown.level-1` → SEO slug) to completion into barcode/SKU-keyed Products + `kind='normal'` baselines. **Throttle-aware**: Bazaar soft-blocks bursts with a `200`/zero-tiles page, so the crawler cools down + retries and flags (never silently drops) a stuck category; pagination keys off the reported total + raw tile count, NOT the filtered item count (two bugs found in testing: non-offer price lives in `.price_wrapper`; filtered tiles must not trip "short page = last").
+- [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml) — `bazaar-offers` (daily 02:30 UTC), `bazaar-catalog` (weekly Sun 07:30 UTC) + `bazaar-resolver-only`; bazaar step in the combined resolver; [mirror-catalog.mjs](src/scripts/mirror-catalog.mjs) gained a bazaar host entry. [catalog-coverage.ts](src/lib/catalog-coverage.ts) CHAINS now includes bazaar.
+
+Live prod result (run locally 2026-06-18): catalog `6,523` products (`6,327` baseline + `196` on-offer, `94%` with barcode), `2,745` barcode-matched to existing canonical products (cross-chain dedup); offers re-link after mappings filled = **`197/197` matched (100% via mapping), 0 review** (was 62). Audit: `linkedOfferRate 100%`, `baselineRate 97%`, `pricedRate 100%`, `catalogStatus complete`. No native-category-map needed — the `/prosfores` grid exposes no per-product label, so (like Masoutis/Lidl) it relies on barcode-match + keyword fallback.
+
+Follow-up (non-blocking): bazaar `mirroredImageRate 0%` — images serve browsers fine from bazaar-online.gr; the `bazaar-catalog` CI job mirrors them to Supabase on its first run.
+
+---
+
 ## ⚡ Pick up here (2026-06-18 — ALL 6 official full catalogs complete, incl. Sklavenitis)
 
 **Sklavenitis full catalog SHIPPED — it was the last chain still offers-only. All 6 chains now pass strict completeness with NO exemption.** New code (uncommitted at time of writing → commit it): [src/scripts/sklavenitis-catalog.mjs](src/scripts/sklavenitis-catalog.mjs) + a `sklavenitis-catalog` job in [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
