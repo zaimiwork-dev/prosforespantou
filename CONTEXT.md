@@ -657,10 +657,10 @@ beyond the couple-days window; alerts/login still need `RESEND_API_KEY` + `AUTH_
 
 **LAUNCH BLOCKERS (must clear before public launch):**
 - [ ] **Legal/GDPR** — NO privacy policy / terms / cookie-consent pages exist. Mandatory for an EU consumer site. (Good ChatGPT task: draft Greek Πολιτική Απορρήτου + Όροι Χρήσης; we wire the pages + a cookie banner.)
-- [ ] **AB images** (~360 placeholder; host 403s everyone) — mirror at scrape time. #1 visible-polish item.
+- [x] **AB images** — RESOLVED. Smoke 2026-06-18: 100% of active AB offers resolve to the Supabase mirror (0 left on the 403-ing www.ab.gr). Mirrored at scrape time by the ab-offers CI job.
 - [ ] **Email alerts live** — needs `RESEND_API_KEY` (user-provided). Then watch-list → "το Χ έπεσε στα Υ€". This is the retention hook; high marketing value.
 - [ ] **Login decision** — accounts foundation shipped but login NOT active (needs `AUTH_SECRET` + optional Google OAuth). Per vision login is OPTIONAL → can launch WITHOUT it (favorites already work device-local); decide explicitly, don't let it block.
-- [ ] **Production smoke** — confirm prod deploy (Vercel), custom domain, all 6 chains' crons green in Υγεία tab, Sentry receiving.
+- [~] **Production smoke** — PASSED 2026-06-18 (read-only): all 6 chains fresh & healthOk in IngestRun (ab/kritikos/masoutis/mymarket/sklavenitis web within hours; lidl 61h = within weekly cadence; catalogs 9–36h = weekly); 13,569 active discounts across 6 chains; prod pages all 200 over HTTPS (`/`, `/catalog`, `/search`, 3 legal pages) rendering real deals (no error boundary); cron endpoint correctly gated (401 without bearer). STILL ON OWNER to eyeball in dashboards: **Sentry actually receiving events** (DSN configured, can't verify from CLI), Vercel build status. Effective-image health: ab/kritikos/mymarket 100% mirror, lidl 66%+own-CDN, masoutis 17% mirror/83% on rotating promo URLs (works now, weekly catalog mirror tops up), **sklavenitis 100% on s1.sklavenitis.gr — confirmed 200 to browser/residential (images.unoptimized bypasses the Vercel optimizer) so it displays for users; unmirrored = resilience gap only, needs PROXY_URL to mirror from CI**.
 - [ ] **Basic analytics** for the marketing phase (Vercel Analytics or Plausible — privacy-friendly fits the brand).
 
 **NICE-TO-HAVE (post-launch / marketing phase):** Capacitor wrap for app stores (vision = native mobile app); Bazaar Discount + Γαλαξίας chains (more coverage = better than competitor); Lidl OCR cleanup; the 173 sklavenitis mis-mappings audit.
