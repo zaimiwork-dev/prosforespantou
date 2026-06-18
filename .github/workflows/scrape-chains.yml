@@ -56,6 +56,7 @@ on:
     - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market Wolt barcode enrichment
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
     - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
+    - cron: '0 7 * * 0'   # weekly Sun 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL)
   workflow_dispatch:
     inputs:
       chain:
@@ -82,6 +83,7 @@ on:
           - sklavenitis-canonical
           - kritikos-canonical
           - masoutis-catalog
+          - sklavenitis-catalog
 
 permissions:
   contents: read
@@ -615,6 +617,54 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MIRROR_MAX_NEW: '2500'
+          MIRROR_CONCURRENCY: '3'
+          QUERY_LIMIT: '4000'
+
+  sklavenitis-catalog:
+    # Weekly Sun 07:00 UTC + manual. Walks sklavenitis.gr's real category tree
+    # (/katigories/ → ~144 leaf categories, ?pg=N to completion) into SKU-keyed
+    # Products + kind='normal' shelf-price baselines for the FULL official
+    # assortment — the only chain previously offers-only. On-offer cards
+    # (main-price--previous) keep the Product + SKU mapping but skip the baseline
+    # so a promo price is never stored as a normal price. See
+    # src/scripts/sklavenitis-catalog.mjs.
+    #
+    # REQUIRE_PROXY=1: sklavenitis.gr (Akamai) 403s GitHub's datacenter IPs, so
+    # without PROXY_URL this job no-ops (exit 0) rather than hammering a block.
+    # Set the PROXY_URL secret to make it autonomous; until then run it locally
+    # from a residential IP.
+    if: github.event.schedule == '0 7 * * 0' || github.event.inputs.chain == 'sklavenitis-catalog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/sklavenitis-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REQUIRE_PROXY: '1'
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+          PACE_MS: '4000'
+          JITTER_MS: '1500'
+      - name: Self-host Sklavenitis catalog images
+        continue-on-error: true
+        run: node src/scripts/mirror-catalog.mjs
+        env:
+          CHAIN: sklavenitis
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROXY_URL: ${{ secrets.PROXY_URL }}
           MIRROR_MAX_NEW: '2500'
           MIRROR_CONCURRENCY: '3'
           QUERY_LIMIT: '4000'

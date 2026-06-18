@@ -4,72 +4,59 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-18 — official full catalogs complete except Sklavenitis)
+## ⚡ Pick up here (2026-06-18 — ALL 6 official full catalogs complete, incl. Sklavenitis)
 
-**The implementation is committed and pushed to `origin/main`; core implementation commit: `55b93d1`.**
+**Sklavenitis full catalog SHIPPED — it was the last chain still offers-only. All 6 chains now pass strict completeness with NO exemption.** New code (uncommitted at time of writing → commit it): [src/scripts/sklavenitis-catalog.mjs](src/scripts/sklavenitis-catalog.mjs) + a `sklavenitis-catalog` job in [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
 
 Owner's non-negotiable data requirement: collect **every official chain product**, including ordinary non-offer shelf items. `MONO` and strikethrough deals are additional price states, not the catalog. Wolt is enrichment-only and must not be treated as an official chain shelf-price source.
 
-### Shipped in the latest collection pass
+### Sklavenitis catalog — how it works
 
-- `c0644cb` — hardened autonomous collection contracts: polite retry/backoff, partial-run safeguards, normalized `mono`/`strikethrough`, catalog/baseline `IngestRun` logging, and `npm run audit:collection`.
-- `a206e0e` — first-party Masoutis full catalog through its official e-shop API; Wolt changed to barcode enrichment only.
-- `55b93d1` — replaced MyMarket's incorrect `/offers` catalog assumption with a full crawl of the 15 official product departments discovered from `/sitemap/categories-tree`.
+- Discovers ~`144` leaf categories from the server-rendered `/katigories/` index (depth-2 slug pairs; non-product prefixes filtered).
+- Paginates each category via `?pg=N` to completion (header reports "X από τα Y προϊόντα"; stop at total or a short page). Same product-card markup as the offers adapter.
+- **On-offer marker = `main-price--previous`** on the price div (every card on `/sylloges/prosfores/` carries it; plain `main-price` = normal shelf). On-offer cards set `baseline:false` so a promo price is never stored as `kind='normal'`. No GTIN exposed → identity is the chain SKU (`data-productsku`) via ChainProductMapping, the same SKU space the offers pipeline uses.
+- CI job is gated `REQUIRE_PROXY=1`: sklavenitis.gr (Akamai) 403s GitHub IPs, so without `PROXY_URL` it no-ops (exit 0). Run it locally from a residential IP until `PROXY_URL` is set. Weekly Sun 07:00 UTC + manual dispatch `sklavenitis-catalog`.
 
-MyMarket live prod result:
-- `14,040` unique official products collected.
-- `8,489` products have a normal shelf-price baseline.
-- Current-offer cards intentionally skip `kind='normal'` so promo prices never poison the baseline.
-- Latest offers run: `5,448` scraped, `5,447` matched, `1` review item.
-- Audit: `13,313 / 13,471` mapped products currently priced (`99%`) through either a normal baseline or linked active official offer.
+Sklavenitis live prod result (full crawl + offers re-link, run locally 2026-06-18):
+- `7,475` unique official products collected (`4,545` normal shelf + `2,930` on-offer), `5,525` new Products created, `0` errors.
+- Normal baselines: **`0` → `4,532`** distinct products.
+- Offers re-link after mappings filled: `2,991` scraped, **`2,991` matched (100% via mapping)**, `0` review (was `1,133`), `207` deactivated.
+- Audit: `linkedOfferRate 100%` (was 71%), `pricedRate 100%` (was 89%), `catalogStatus: complete`, mode `full-catalog-baseline`.
 
-Coverage reporting now distinguishes:
+Coverage reporting distinguishes:
 - `baselineCoverageRate`: products with a `normal` shelf-price snapshot.
 - `currentlyPricedRate`: products with either a normal shelf baseline or a linked current official offer price. This is the main comparison-availability metric.
 - `full-catalog-baseline` requires sufficient current priced coverage; a handful of baseline rows can no longer make a chain look complete.
 
-Strict verification for every solved chain:
+Strict verification — now passes for **ALL chains with NO exemption**:
 
 ```powershell
 $env:STRICT='1'
 $env:STRICT_COMPLETENESS='1'
-$env:COMPLETENESS_EXEMPT='sklavenitis'
-npm run audit:collection
+npm run audit:collection   # exit 0
 ```
 
-This passes for **AB, Kritikos, Lidl, Masoutis, and MyMarket**. Current audit highlights:
-- AB: `100%` currently priced.
-- Kritikos: `100%` currently priced.
-- Lidl: `100%` currently priced.
-- Masoutis: `78%` currently priced, classified complete by the current `>=70%` contract.
-- MyMarket: `99%` currently priced.
-- Sklavenitis: still `offers-only`; `2,831` active offers, `1,907` linked, `924` productless, `0` normal baselines.
+Current audit highlights (all `catalogStatus: complete`):
+- AB: `100%` priced.
+- Kritikos: `100%` priced.
+- Lidl: `100%` priced.
+- Masoutis: `79%` priced (complete by the `>=70%` contract).
+- MyMarket: `99%` priced.
+- Sklavenitis: `100%` priced, `100%` offers linked.
 
-### Exact next task: Sklavenitis official full catalog
+### Open follow-ups (none blocking — catalog work is done)
 
-Sklavenitis is the only major chain still missing ordinary non-offer shelf prices. Build a **chain-direct category catalog crawler**, not a Wolt baseline.
-
-Safe sequence:
-1. Read [src/scripts/adapters/sklavenitis.mjs](src/scripts/adapters/sklavenitis.mjs), [src/scripts/lib/polite-http.mjs](src/scripts/lib/polite-http.mjs), and [src/scripts/lib/ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs).
-2. Perform only one-page/category discovery requests first from this residential dev machine. GitHub/Vercel direct IPs are still Akamai-blocked (`HTTP 403`); do not retry a 403.
-3. Identify official category roots/pagination, stable chain SKU, current price, image, and a reliable offer marker. Confirm non-offer cards are present before writing a crawler.
-4. Add a dry-run-only smoke path (`MAX_CATEGORIES`, `MAX_PAGES_PER_CATEGORY`, `LIMIT`) with slow pacing and jitter. A partial dry run must never deactivate or mutate existing offers.
-5. Only after a near-full dry run succeeds, ingest through `ingestCatalog()` with `baseline:false` for current-offer cards. Never write promo prices as `kind='normal'`.
-6. Keep autonomous GitHub execution gated by `REQUIRE_PROXY=1`/`PROXY_URL`; otherwise use a scheduled local residential run. Do not probe the blocked CI IP repeatedly.
-7. Re-run the Sklavenitis official offers adapter after mappings fill, then run strict completeness without the Sklavenitis exemption.
-
-Do not:
-- Use Wolt venue prices as official Sklavenitis shelf baselines.
-- Create `Discount` rows for non-offer products.
-- Retry/loop on `401/403`.
-- Turn a partial catalog result into a healthy full-catalog run.
+- **Sklavenitis images not yet self-hosted** (`mirroredImageRate 0%`). The CI catalog job has a `mirror-catalog.mjs` step, but it needs `PROXY_URL` (Akamai blocks GitHub from s1.sklavenitis.gr) + Supabase creds. Until `PROXY_URL` lands, run `CHAIN=sklavenitis node src/scripts/mirror-catalog.mjs` locally with the Supabase env set.
+- **`157` sklavenitis SKUs share a productId** with another chain SKU (winner-takes-row warning on the offers run). Likely stale mis-mappings — audit `ChainProductMapping` for sklavenitis (carry-over from the old `~169` residue).
+- **`2` unmapped native categories** (keyword fallback): `eidi-artozacharoplasteioy/glyka`, `kallyntika-eidi-prosopikis-ygieinis/makigiaz-vernikia-nychion` → add lines to [native-category-maps.ts](src/lib/native-category-maps.ts).
+- `baselineRate 62%` is `partial` (same shape as MyMarket 63%): on-offer items have no normal baseline yet — they get one when they go off-offer. Expected; `pricedRate` is the completeness metric.
 
 ### Verification caveats
 
 - The live DB audit and targeted `node --check` commands pass.
 - Full `npm run lint` is already red on pre-existing `AdminPanel.js` React hook/compiler findings.
 - `npx tsc --noEmit` is already red on pre-existing test typing issues in `offer-similarity.test.ts`, `mirror-images.test.ts`, and `proxy-fetch.test.ts`.
-- Do not broaden the Sklavenitis task into those unrelated cleanup items.
+- Do not broaden into those unrelated cleanup items.
 
 ---
 
