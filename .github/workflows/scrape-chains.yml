@@ -47,6 +47,7 @@ on:
     - cron: '0 0 * * *'   # daily 00:00 UTC — My Market offers
     - cron: '0 1 * * *'   # daily 01:00 UTC — Sklavenitis offers
     - cron: '0 2 * * *'   # daily 02:00 UTC — Kritikos offers
+    - cron: '30 2 * * *'  # daily 02:30 UTC — Bazaar offers
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
     - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
@@ -57,6 +58,7 @@ on:
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
     - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
     - cron: '0 7 * * 0'   # weekly Sun 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL)
+    - cron: '30 7 * * 0'  # weekly Sun 07:30 UTC — Bazaar full catalog (OpenCart category walk)
   workflow_dispatch:
     inputs:
       chain:
@@ -65,6 +67,9 @@ on:
         type: choice
         options:
           - kritikos-offers
+          - bazaar-offers
+          - bazaar-catalog
+          - bazaar-resolver-only
           - ab-offers
           - ab-catalog
           - ab-catalog-probe
@@ -202,6 +207,86 @@ jobs:
           # Intentionally no PROXY_URL: this tests whether GitHub's direct IP is
           # currently served. One dry-run page only; no writes/deactivation.
 
+  bazaar-offers:
+    # Daily 02:30 UTC + manual. Scrapes bazaar-online.gr/prosfores (OpenCart,
+    # server-rendered). Bazaar embeds the GTIN in the image filename, so most
+    # offers barcode-match the canonical catalog directly. Bazaar throttles
+    # bursts → slow pacing.
+    if: github.event.schedule == '30 2 * * *' || github.event.inputs.chain == 'bazaar-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Run Bazaar adapter
+        run: node src/scripts/adapters/bazaar.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PACE_MS: '2000'
+          JITTER_MS: '1000'
+
+  bazaar-catalog:
+    # Weekly Sun 07:30 UTC + manual. Walks bazaar-online.gr's 16 OpenCart
+    # departments (?page=N&limit=100) into barcode/SKU-keyed Products +
+    # kind='normal' shelf-price baselines. On-offer cards skip the baseline.
+    if: github.event.schedule == '30 7 * * 0' || github.event.inputs.chain == 'bazaar-catalog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/bazaar-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '2000'
+          JITTER_MS: '1000'
+      - name: Self-host Bazaar catalog images
+        continue-on-error: true
+        run: node src/scripts/mirror-catalog.mjs
+        env:
+          CHAIN: bazaar
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MIRROR_MAX_NEW: '2500'
+          MIRROR_CONCURRENCY: '3'
+          QUERY_LIMIT: '4000'
+
+  bazaar-resolver-only:
+    if: github.event.inputs.chain == 'bazaar-resolver-only'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: bazaar
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
   mymarket-offers:
     if: github.event.schedule == '0 0 * * *' || github.event.inputs.chain == 'mymarket-offers'
     runs-on: ubuntu-latest
@@ -253,6 +338,15 @@ jobs:
         run: node src/scripts/resolve-pending-matches.mjs
         env:
           CHAIN: sklavenitis
+          SOURCE: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Resolve Bazaar pending
+        continue-on-error: true
+        run: node src/scripts/resolve-pending-matches.mjs
+        env:
+          CHAIN: bazaar
           SOURCE: web
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}

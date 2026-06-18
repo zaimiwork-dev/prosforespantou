@@ -42,6 +42,7 @@ const HOST_MATCH = {
   masoutis: ['blob.core.windows.net'],
   sklavenitis: ['sklavenitis.gr'],
   lidl: ['assets.schwarz', 'lidl-hellas.gr'], // schwarz imgproxy + own /assets/ host
+  bazaar: ['bazaar-online.gr'],
   wolt: ['wolt.com'], // mostly dead links; low yield, kept for completeness
 };
 
