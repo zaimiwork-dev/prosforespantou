@@ -6,7 +6,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ## ⚡ Pick up here (2026-06-18 — Bazaar added as the 7th fully-integrated chain)
 
-**Bazaar (bazaar-online.gr, OpenCart) is now a first-class chain — offers + full catalog + CI — and passes strict completeness alongside the other six (`STRICT=1 STRICT_COMPLETENESS=1 npm run audit:collection` → exit 0, no exemption).** Code is committed (`83f6fd4`); the catalog-coverage CHAINS list update is the only uncommitted bit at time of writing.
+**Bazaar (bazaar-online.gr, OpenCart) is now a first-class chain — offers + full catalog + CI — and passes strict completeness alongside the other six (`STRICT=1 STRICT_COMPLETENESS=1 npm run audit:collection` → exit 0, no exemption).** Committed + pushed to `origin/main`: `83f6fd4` (adapter / catalog / CI) + `66d101d` (catalog-coverage CHAINS + docs).
 
 New code:
 - [src/scripts/adapters/bazaar.mjs](src/scripts/adapters/bazaar.mjs) — scrapes `/prosfores` (server-rendered OpenCart grid, `?page=N&limit=N`). **Bazaar embeds the GTIN in the image filename** (`.../5201502119435_1-264x264.jpg`), so most offers barcode-match the canonical catalog directly — cross-chain comparison lights up immediately. Reads `price-new`/`price-old` as offer/original (real strikethrough).
@@ -21,7 +21,7 @@ Follow-up (non-blocking): bazaar `mirroredImageRate 0%` — images serve browser
 
 ## ⚡ Pick up here (2026-06-18 — ALL 6 official full catalogs complete, incl. Sklavenitis)
 
-**Sklavenitis full catalog SHIPPED — it was the last chain still offers-only. All 6 chains now pass strict completeness with NO exemption.** New code (uncommitted at time of writing → commit it): [src/scripts/sklavenitis-catalog.mjs](src/scripts/sklavenitis-catalog.mjs) + a `sklavenitis-catalog` job in [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
+**Sklavenitis full catalog SHIPPED — it was the last chain still offers-only. All 6 chains now pass strict completeness with NO exemption.** Committed + pushed (`ed57faf`): [src/scripts/sklavenitis-catalog.mjs](src/scripts/sklavenitis-catalog.mjs) + a `sklavenitis-catalog` job in [.github/workflows/scrape-chains.yml](.github/workflows/scrape-chains.yml).
 
 Owner's non-negotiable data requirement: collect **every official chain product**, including ordinary non-offer shelf items. `MONO` and strikethrough deals are additional price states, not the catalog. Wolt is enrichment-only and must not be treated as an official chain shelf-price source.
 
