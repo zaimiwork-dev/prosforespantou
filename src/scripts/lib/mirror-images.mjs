@@ -19,6 +19,7 @@
 // genuinely new artwork.
 
 import { createHash } from 'node:crypto';
+import { resolveR2Config, makeR2Backend } from './r2-storage.mjs';
 
 export const BUCKET = 'chain-images';
 
@@ -30,6 +31,55 @@ export function resolveStorageConfig(env = process.env) {
   const key = (env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url || !key) return null;
   return { url, key };
+}
+
+// True for an imageUrl already living on either mirror (Supabase or R2). Used to
+// skip re-mirroring and to count mirrored coverage. R2 public bases are the
+// configured R2_PUBLIC_URL plus the generic Cloudflare hosts.
+export function isMirroredUrl(url, env = process.env) {
+  if (!url) return false;
+  if (url.includes(`/storage/v1/object/public/${BUCKET}/`)) return true;
+  const r2Public = (env.R2_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (r2Public && url.startsWith(r2Public)) return true;
+  return /(^|\.)r2\.dev\//.test(url) || url.includes('.r2.cloudflarestorage.com/');
+}
+
+// Supabase Storage as a mirror backend (the original; kept as the fallback when
+// R2 isn't configured). Matches the { kind, publicUrlFor, upload, ensure } shape.
+function makeSupabaseBackend(config = resolveStorageConfig()) {
+  if (!config) return null;
+  const { url, key } = config;
+  return {
+    kind: 'supabase',
+    publicUrlFor: (path) => `${url}/storage/v1/object/public/${BUCKET}/${path}`,
+    async ensure() {
+      const res = await fetch(`${url}/storage/v1/bucket`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: BUCKET, name: BUCKET, public: true }),
+      });
+      if (res.ok) return;
+      const body = await res.text();
+      if (/exist|duplicate/i.test(body)) return;
+      throw new Error(`bucket create HTTP ${res.status}: ${body.slice(0, 200)}`);
+    },
+    async upload(path, bytes, contentType) {
+      const up = await fetch(`${url}/storage/v1/object/${BUCKET}/${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': contentType, 'x-upsert': 'true' },
+        body: bytes,
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!up.ok) throw new Error(`upload HTTP ${up.status}: ${(await up.text()).slice(0, 120)}`);
+    },
+  };
+}
+
+// Prefer R2 (10 GB free + free egress) when configured; otherwise Supabase.
+export function resolveMirrorBackend() {
+  const r2 = makeR2Backend(resolveR2Config());
+  if (r2) return r2;
+  return makeSupabaseBackend();
 }
 
 // Deterministic bucket path for a source URL: <chain>/<sha1-prefix><ext>.
@@ -45,18 +95,6 @@ export function mirrorPathFor(chain, srcUrl) {
 
 export function publicUrlFor(storageUrl, path) {
   return `${storageUrl}/storage/v1/object/public/${BUCKET}/${path}`;
-}
-
-async function ensureBucket({ url, key }) {
-  const res = await fetch(`${url}/storage/v1/bucket`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: BUCKET, name: BUCKET, public: true }),
-  });
-  if (res.ok) return;
-  const body = await res.text();
-  if (/exist|duplicate/i.test(body)) return; // already there — the normal case
-  throw new Error(`bucket create HTTP ${res.status}: ${body.slice(0, 200)}`);
 }
 
 // Mirror every item whose imageUrl matches `match` and rewrite it in place.
@@ -83,15 +121,15 @@ export async function mirrorImages({
 }) {
   const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, skipped: 0, warnings: [] };
 
-  const config = resolveStorageConfig();
-  if (!config) {
+  const backend = resolveMirrorBackend();
+  if (!backend) {
     result.warnings.push(
-      'Image mirroring skipped — SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL not set. Original chain image URLs kept.'
+      'Image mirroring skipped — no storage backend configured (set R2_* or SUPABASE_* env). Original chain image URLs kept.'
     );
     return result;
   }
   try {
-    await ensureBucket(config);
+    if (backend.ensure) await backend.ensure();
   } catch (e) {
     result.warnings.push(`Image mirroring skipped — ${e.message}`);
     return result;
@@ -105,7 +143,7 @@ export async function mirrorImages({
     if (rewrite) src = rewrite(src) || src;
     result.attempted++;
     const path = mirrorPathFor(chain, src);
-    candidates.push({ item, src, publicUrl: publicUrlFor(config.url, path), path });
+    candidates.push({ item, src, publicUrl: backend.publicUrlFor(path), path });
   }
 
   let lastError = null;
@@ -139,18 +177,7 @@ export async function mirrorImages({
       const bytes = Buffer.from(await dl.arrayBuffer());
       if (bytes.byteLength < 100) throw new Error(`suspiciously small body (${bytes.byteLength} bytes)`);
 
-      const up = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${path}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${config.key}`,
-          apikey: config.key,
-          'Content-Type': contentType,
-          'x-upsert': 'true',
-        },
-        body: bytes,
-        signal: AbortSignal.timeout(20000),
-      });
-      if (!up.ok) throw new Error(`upload HTTP ${up.status}: ${(await up.text()).slice(0, 120)}`);
+      await backend.upload(path, bytes, contentType);
 
       item.imageUrl = publicUrl;
       result.mirrored++;

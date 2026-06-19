@@ -1,9 +1,14 @@
 const CHAINS = ['ab', 'bazaar', 'kritikos', 'lidl', 'masoutis', 'mymarket', 'sklavenitis'];
 
-// Images self-hosted on the Supabase mirror look like publicUrlFor() in
-// src/scripts/lib/mirror-images.mjs — i.e. they contain this path. Everything
-// else still points at a chain CDN and breaks if that host blocks us.
-const MIRROR_MARKER = '/storage/v1/object/public/chain-images/';
+// Images self-hosted on a mirror (resilience metric) live on either the legacy
+// Supabase bucket path or Cloudflare R2 (R2_PUBLIC_URL / r2.dev). Everything else
+// still points at a chain CDN and breaks if that host blocks us.
+const MIRROR_MARKERS = [
+  '/storage/v1/object/public/chain-images/',
+  ...(process.env.R2_PUBLIC_URL ? [process.env.R2_PUBLIC_URL.trim().replace(/\/+$/, '')] : []),
+  '.r2.dev/',
+];
+const mirroredWhere = { OR: MIRROR_MARKERS.map((m) => ({ imageUrl: { contains: m } })) };
 
 type CountRow = { supermarket: string | null; _count: { _all: number } };
 type PairRow = { supermarket: string | null; productId: string | null };
@@ -101,9 +106,9 @@ export async function fetchCatalogCoverage(prisma: any, now = new Date()) {
       distinct: ['supermarket', 'productId'],
     }),
 
-    // Catalog images self-hosted on the Supabase mirror (resilience metric).
-    prisma.product.count({ where: { imageUrl: { contains: MIRROR_MARKER } } }),
-    prisma.product.groupBy({ by: ['supermarket'], where: { imageUrl: { contains: MIRROR_MARKER } }, _count: { _all: true } }),
+    // Catalog images self-hosted on a mirror (Supabase legacy or R2).
+    prisma.product.count({ where: mirroredWhere }),
+    prisma.product.groupBy({ by: ['supermarket'], where: mirroredWhere, _count: { _all: true } }),
   ]);
 
   const sourceProductMap = countMap(sourceProducts);
