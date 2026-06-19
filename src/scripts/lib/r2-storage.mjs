@@ -57,5 +57,30 @@ export function makeR2Backend(cfg = resolveR2Config()) {
       });
       if (!res.ok) throw new Error(`R2 upload HTTP ${res.status}: ${(await res.text()).slice(0, 120)}`);
     },
+    // Every key currently in the bucket (S3 ListObjectsV2, paginated). Uses the
+    // signed S3 API — NOT the rate-limited public r2.dev host — so it is safe to
+    // call for bulk resume/skip logic.
+    async listKeys(onProgress) {
+      const keys = new Set();
+      let token = null;
+      do {
+        const u = new URL(`${cfg.endpoint}/${cfg.bucket}`);
+        u.searchParams.set('list-type', '2');
+        u.searchParams.set('max-keys', '1000');
+        if (token) u.searchParams.set('continuation-token', token);
+        const res = await client.fetch(u.toString(), { signal: AbortSignal.timeout(30000) });
+        if (!res.ok) throw new Error(`R2 list HTTP ${res.status}: ${(await res.text()).slice(0, 120)}`);
+        const xml = await res.text();
+        for (const m of xml.matchAll(/<Key>([^<]+)<\/Key>/g)) keys.add(decodeXml(m[1]));
+        const t = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
+        token = t ? decodeXml(t[1]) : null;
+        if (onProgress) onProgress(keys.size);
+      } while (token);
+      return keys;
+    },
   };
+}
+
+function decodeXml(s) {
+  return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }

@@ -29,8 +29,15 @@ import { resolveR2Config, makeR2Backend } from './lib/r2-storage.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const REWRITE_DB = process.env.REWRITE_DB === '1';
+const FORCE = process.env.FORCE === '1';
 const MAX = process.env.MAX ? parseInt(process.env.MAX, 10) : Infinity;
-const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY || '8', 10));
+// Supabase free tier rate-limits bursty storage reads (a single fetch is fine,
+// but high concurrency trips a per-IP throttle). Keep concurrency low + pace
+// each worker so the migration stays under the limit.
+const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY || '4', 10));
+const PACE_MS = parseInt(process.env.PACE_MS || '150', 10);
+const DL_TIMEOUT = parseInt(process.env.DL_TIMEOUT_MS || '45000', 10);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const supa = resolveStorageConfig();
 const r2cfg = resolveR2Config();
@@ -76,38 +83,65 @@ async function copyObjects() {
   console.log(`Total objects: ${allKeys.length}${DRY_RUN ? ' (DRY_RUN — no copy)' : ''}`);
   if (DRY_RUN) return;
 
-  let copied = 0, reused = 0, failed = 0, done = 0;
+  // Resume cheaply: list everything already on R2 via the S3 API (NOT the
+  // rate-limited public r2.dev host) and skip those in-memory. One listing
+  // instead of 21k per-object HEADs that throttle r2.dev.
+  process.stdout.write('   listing keys already on R2…');
+  const onR2 = await r2.listKeys((n) => process.stdout.write(`\r   listing keys already on R2… ${n}`));
+  console.log(`\r   already on R2: ${onR2.size}                    `);
+  const todo = allKeys.filter((k) => !onR2.has(k));
+  console.log(`   to copy: ${todo.length} (concurrency ${CONCURRENCY}, pace ${PACE_MS}ms, timeout ${DL_TIMEOUT}ms)`);
+
+  let copied = 0, failed = 0, done = 0;
   let idx = 0;
   async function worker() {
-    while (idx < allKeys.length && copied < MAX) {
-      const key = allKeys[idx++];
+    while (idx < todo.length && copied < MAX) {
+      const key = todo[idx++];
       try {
-        // Resumable: skip if already on R2 (public HEAD, no auth).
-        const head = await fetch(`${r2PublicBase}${encodeURI(key)}`, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
-        if (head.ok) { reused++; }
-        else {
-          const dl = await fetch(`${supaPublicBase}${encodeURI(key)}`, { signal: AbortSignal.timeout(20000) });
-          if (!dl.ok) throw new Error(`supabase GET ${dl.status}`);
-          const ct = dl.headers.get('content-type') || 'image/jpeg';
-          const bytes = Buffer.from(await dl.arrayBuffer());
-          await r2.upload(key, bytes, ct);
-          copied++;
-        }
+        const dl = await fetch(`${supaPublicBase}${encodeURI(key)}`, { signal: AbortSignal.timeout(DL_TIMEOUT) });
+        if (!dl.ok) throw new Error(`supabase GET ${dl.status}`);
+        const ct = dl.headers.get('content-type') || 'image/jpeg';
+        const bytes = Buffer.from(await dl.arrayBuffer());
+        await r2.upload(key, bytes, ct);
+        copied++;
+        await sleep(PACE_MS);
       } catch (e) {
         failed++;
         if (failed <= 10) console.log(`   ⚠️ ${key}: ${e.message}`);
       }
-      if (++done % 500 === 0) process.stdout.write(`\r   copied ${copied}, reused ${reused}, failed ${failed} (${done}/${allKeys.length})   `);
+      if (++done % 250 === 0) process.stdout.write(`\r   copied ${copied}, failed ${failed} (${done}/${todo.length})   `);
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-  console.log(`\nCopy done — copied ${copied}, reused ${reused}, failed ${failed} of ${allKeys.length}`);
+  console.log(`\nCopy done — copied ${copied}, failed ${failed}, skipped ${onR2.size} already-on-R2 (of ${allKeys.length} total)`);
   return { failed };
 }
 
 async function rewriteDb() {
   const { default: prisma } = await import('../lib/prisma.ts');
   console.log(`\nRewriting DB imageUrl base:\n  from ${supaPublicBase}\n  to   ${r2PublicBase}`);
+
+  // Safety guard: a blanket base swap is only safe if (nearly) every Supabase
+  // object is actually on R2 — otherwise a not-yet-copied image would be
+  // repointed to a missing R2 key and break. Compare key coverage first.
+  process.stdout.write('   verifying R2 coverage…');
+  const onR2 = await r2.listKeys((n) => process.stdout.write(`\r   verifying R2 coverage… ${n} keys on R2`));
+  let supaCount = 0;
+  const rootRes = await fetch(`${supa.url}/storage/v1/object/list/${BUCKET}`, {
+    method: 'POST', headers: H, body: JSON.stringify({ prefix: '', limit: 100, sortBy: { column: 'name', order: 'asc' } }),
+  });
+  for (const e of (await rootRes.json())) {
+    if (e.id) continue;
+    supaCount += (await listFolder(`${e.name}/`)).length;
+  }
+  const coverage = supaCount ? onR2.size / supaCount : 1;
+  console.log(`\r   R2 has ${onR2.size} keys vs Supabase ${supaCount} → ${(coverage * 100).toFixed(1)}% coverage   `);
+  if (coverage < 0.999 && !FORCE) {
+    console.error(`❌ Aborting rewrite — ${supaCount - onR2.size} object(s) not yet on R2. Re-run the copy first (or set FORCE=1 to rewrite only covered keys).`);
+    await prisma.$disconnect();
+    process.exit(1);
+  }
+
   if (DRY_RUN) {
     const p = await prisma.product.count({ where: { imageUrl: { startsWith: supaPublicBase } } });
     const d = await prisma.discount.count({ where: { imageUrl: { startsWith: supaPublicBase } } });
