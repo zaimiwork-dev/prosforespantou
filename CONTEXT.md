@@ -4,6 +4,20 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-19 — Supabase storage over quota → migrating images to Cloudflare R2)
+
+**Owner got a Supabase "usage quota exceeded" email.** Diagnosed: the DB is fine (132 MB / 500 MB free), but the **`chain-images` Storage bucket is ~2.0 GB — 2× the 1 GB free tier** (kritikos 1,085 MB / mymarket 739 MB / masoutis 103 MB / ab 57 MB / lidl 18 MB / bazaar 3 MB). Owner wants to KEEP all images for resilience at €0, so we're moving image hosting to **Cloudflare R2 (10 GB free + unlimited free egress)** rather than deleting or paying.
+
+Infra is built + committed (`963e068`), pluggable so it's a no-op until R2 secrets exist:
+- [src/scripts/lib/r2-storage.mjs](src/scripts/lib/r2-storage.mjs) — S3-compatible R2 backend via `aws4fetch` (no AWS SDK).
+- [src/scripts/lib/mirror-images.mjs](src/scripts/lib/mirror-images.mjs) — `resolveMirrorBackend()` prefers R2 when `R2_*` env is set, else Supabase, else no-op; same object keys (`<chain>/<sha>.<ext>`); new `isMirroredUrl()` matches both.
+- [src/scripts/migrate-images-to-r2.mjs](src/scripts/migrate-images-to-r2.mjs) — idempotent copy Supabase→R2, then `REWRITE_DB=1` repoints `Product`/`Discount.imageUrl` (pure base-URL `REPLACE`).
+- [catalog-coverage.ts](src/lib/catalog-coverage.ts) `mirroredImageRate` counts R2 too; `scrape-chains.yml` has `R2_*` at workflow `env` (every mirror step picks up R2 once secrets land).
+
+**BLOCKED ON OWNER:** create a free Cloudflare account → R2 bucket `chain-images` → enable public access (gets a `pub-xxxx.r2.dev` URL) → create an R2 API token → set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL` (+ optional `R2_BUCKET`) in `.env.local`, Vercel, and GH Actions secrets. Then run: `node src/scripts/migrate-images-to-r2.mjs` (copy) → verify on R2 → `REWRITE_DB=1 node …` (flip DB URLs) → verify prod images → delete the Supabase bucket. `next.config` already has `images.unoptimized:true`, so R2 URLs render with no app change.
+
+---
+
 ## ⚡ Pick up here (2026-06-18 — Bazaar added as the 7th fully-integrated chain)
 
 **Bazaar (bazaar-online.gr, OpenCart) is now a first-class chain — offers + full catalog + CI — and passes strict completeness alongside the other six (`STRICT=1 STRICT_COMPLETENESS=1 npm run audit:collection` → exit 0, no exemption).** Committed + pushed to `origin/main`: `83f6fd4` (adapter / catalog / CI) + `66d101d` (catalog-coverage CHAINS + docs).
