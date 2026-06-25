@@ -4,17 +4,20 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-06-19 — Supabase storage over quota → migrating images to Cloudflare R2)
+## ⚡ Pick up here (2026-06-25 — image hosting MIGRATED to Cloudflare R2; Supabase quota cleared)
 
-**Owner got a Supabase "usage quota exceeded" email.** Diagnosed: the DB is fine (132 MB / 500 MB free), but the **`chain-images` Storage bucket is ~2.0 GB — 2× the 1 GB free tier** (kritikos 1,085 MB / mymarket 739 MB / masoutis 103 MB / ab 57 MB / lidl 18 MB / bazaar 3 MB). Owner wants to KEEP all images for resilience at €0, so we're moving image hosting to **Cloudflare R2 (10 GB free + unlimited free egress)** rather than deleting or paying.
+**The Supabase→R2 image migration is DONE.** Owner had a Supabase "usage quota exceeded" email — the `chain-images` Storage bucket was ~2 GB (2× the 1 GB free tier). Images are now hosted on **Cloudflare R2** (10 GB free + free egress, bucket `chain-images`, EEUR region). The infra is pluggable (`963e068`); the migration scripts hardened in `c8a2cee` + `dce0e19`.
 
-Infra is built + committed (`963e068`), pluggable so it's a no-op until R2 secrets exist:
-- [src/scripts/lib/r2-storage.mjs](src/scripts/lib/r2-storage.mjs) — S3-compatible R2 backend via `aws4fetch` (no AWS SDK).
-- [src/scripts/lib/mirror-images.mjs](src/scripts/lib/mirror-images.mjs) — `resolveMirrorBackend()` prefers R2 when `R2_*` env is set, else Supabase, else no-op; same object keys (`<chain>/<sha>.<ext>`); new `isMirroredUrl()` matches both.
-- [src/scripts/migrate-images-to-r2.mjs](src/scripts/migrate-images-to-r2.mjs) — idempotent copy Supabase→R2, then `REWRITE_DB=1` repoints `Product`/`Discount.imageUrl` (pure base-URL `REPLACE`).
-- [catalog-coverage.ts](src/lib/catalog-coverage.ts) `mirroredImageRate` counts R2 too; `scrape-chains.yml` has `R2_*` at workflow `env` (every mirror step picks up R2 once secrets land).
+What happened:
+- R2 creds live in `.env.local` + **GitHub Actions secrets** (`R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_PUBLIC_URL` = `https://pub-8545c51f54284a0cb271d90ff32b0832.r2.dev` / `R2_BUCKET=chain-images`). The nightly scrapers picked up R2 immediately and now mirror there.
+- All ~21.8k images copied Supabase→R2 (gentle: Supabase free tier rate-limits bursty reads, and **r2.dev rate-limits per-object HEADs** — resume now lists R2 keys once via the S3 API, not per-object HEAD; see `migrate-images-to-r2.mjs`).
+- `REWRITE_DB=1` repointed **6,305 products + 1,600 discounts** to R2. Verified: **0 supabase refs remain** in the DB; products/active-discounts with R2 URLs = **0 broken**; prod homepage serves R2 (`r2.dev` refs, 0 supabase). Guard now checks DB-referenced coverage (not orphan bucket objects).
 
-**BLOCKED ON OWNER:** create a free Cloudflare account → R2 bucket `chain-images` → enable public access (gets a `pub-xxxx.r2.dev` URL) → create an R2 API token → set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL` (+ optional `R2_BUCKET`) in `.env.local`, Vercel, and GH Actions secrets. Then run: `node src/scripts/migrate-images-to-r2.mjs` (copy) → verify on R2 → `REWRITE_DB=1 node …` (flip DB URLs) → verify prod images → delete the Supabase bucket. `next.config` already has `images.unoptimized:true`, so R2 URLs render with no app change.
+**STILL ON OWNER (2 things):**
+1. **Delete the Supabase `chain-images` bucket** (Storage → chain-images → delete) — it is now fully orphaned (0 DB refs); deleting reclaims the 2 GB and clears the quota. Safe.
+2. **Production polish — custom domain on the R2 bucket.** `pub-…r2.dev` is Cloudflare's rate-limited *dev* URL (fine now, can throttle under real traffic). Add a custom domain (e.g. `img.prosforespantou.gr` → bucket, ~2 clicks if DNS is on Cloudflare); then just swap `R2_PUBLIC_URL` in `.env.local` + GH secrets + the DB base (`migrate-images-to-r2.mjs REWRITE_DB` with the new base) — object paths are identical, no re-copy.
+
+Note: ~41k Product rows + ~5.4k active discounts still serve images from **chain CDNs** (never mirrored — they work in browsers but aren't on R2). Optional resilience follow-up: run the per-chain catalog mirror (`CHAIN=<x> node src/scripts/mirror-catalog.mjs`) to pull those onto R2 too. Not urgent.
 
 ---
 
