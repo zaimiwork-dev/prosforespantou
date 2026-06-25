@@ -3,8 +3,29 @@ import {
   salientTokens,
   nameSimilarity,
   filterComparable,
+  variantConflict,
   COMPARISON_SIMILARITY_FLOOR,
 } from './offer-similarity';
+
+describe('variantConflict (flavour/fat/type guard)', () => {
+  it('blocks different flavours that otherwise score high', () => {
+    expect(variantConflict('LIPTON ICE TEA GREEN LEMON 500ML', 'Lipton Ice Tea Green Φράουλα 500ml')).toBe(true);
+    expect(variantConflict('Παπαδοπούλου Μπισκότα Σοκολάτα 200g', 'Παπαδοπούλου Μπισκότα Λεμόνι 200g')).toBe(true);
+  });
+  it('blocks fat / sugar / type differences', () => {
+    expect(variantConflict('Adoro Τυρί Κρέμα Light 200gr', 'ADORO ΤΥΡΙ ΚΡΕΜΑ 200ΓΡ')).toBe(true);
+    expect(variantConflict('Γάλα ΝΟΥΝΟΥ Πλήρες 1L', 'Γάλα ΝΟΥΝΟΥ Ελαφρύ 1L')).toBe(true);
+    expect(variantConflict('FANTA Πορτοκαλάδα 6x330ml', 'Fanta Πορτοκαλάδα Zero 6x330ml')).toBe(true);
+  });
+  it('treats latin/greek spellings of the same flavour as equal', () => {
+    expect(variantConflict('FAIRY LEMON 660ML', 'Fairy Λεμόνι 660ml')).toBe(false);
+    expect(variantConflict('Coca Cola Zero 330ml', 'Coca-Cola Zero 330ml')).toBe(false);
+  });
+  it('does not block on the generic word "Χωρίς" or wine colour', () => {
+    expect(variantConflict('Brava Μουστάρδα Απαλή 430gr', 'BRAVA Μουστάρδα Απαλή Χωρίς γλουτένη 430g')).toBe(false);
+    expect(variantConflict('MARTINI Prosecco 750ml', 'MARTINI Prosecco Αφρώδης Λευκός Οίνος 750ml')).toBe(false);
+  });
+});
 
 // Real names from the 2026-06-12 user report: an AB "Στιγμιαίος Καφές Rich
 // Caramel 95g" offer rendered NESCAFE Gold and NESCAFE Organic (different

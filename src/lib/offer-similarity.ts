@@ -117,6 +117,78 @@ export function nameSimilarity(a: string | null | undefined, b: string | null | 
   return union === 0 ? 0 : shared / union;
 }
 
+// Variant guard. Two offers can share every generic word + the same pack size
+// and still be DIFFERENT products because they differ on one flavour / fat-level
+// / type marker — "Lipton Ice Tea Lemon" vs "… Φράουλα", "Adoro Κρέμα Light" vs
+// the regular one, "Γάλα Πλήρες" vs "Ελαφρύ". Jaccard dilutes that single
+// differing token below notice, so we block any pair whose marker FAMILIES
+// differ. Each family lists accent-stripped lowercase prefix roots in BOTH
+// scripts (so latin "lemon" and Greek "λεμόνι" land in the same family and are
+// NOT falsely split). A name "belongs to" a family if any of its word tokens
+// starts with — or is a prefix of — one of the roots.
+const MARKER_FAMILIES: string[][] = [
+  ['lemon', 'λεμον'],
+  ['fraoul', 'φραουλ', 'strawberr'],
+  ['sokolat', 'chocolat', 'cacao', 'κακαο', 'choco'],
+  ['vanil', 'βανιλ'],
+  ['portokal', 'orange', 'πορτοκαλ'],
+  ['rodakin', 'peach', 'ροδακιν'],
+  ['verykok', 'βερυκοκ', 'apricot'],
+  ['banan', 'μπαναν'],
+  ['kerasi', 'κερασ', 'cherry'],
+  ['ananas', 'ανανα', 'pineappl'],
+  ['mango', 'μανγκ', 'μαγκο'],
+  ['karyd', 'καρυδ', 'coconut', 'καρυδα'],
+  ['mela', 'μηλο', 'apple', 'μηλ'],
+  ['menta', 'μεντ', 'mint', 'δυοσμ'],
+  ['kanel', 'cinnamon', 'κανελ'],
+  ['karamel', 'caramel', 'καραμελ'],
+  // fat / sugar / type — "light/ελαφρύ/ημιάπαχο/αποβουτυρωμένο" are one family
+  // (reduced); "πλήρες/full" another; "zero" another.
+  ['light', 'λαιτ', 'elafr', 'ελαφρ', 'imiapax', 'ημιαπαχ', 'apovoutyr', 'αποβουτυρ'],
+  ['plir', 'πληρ', 'full'],
+  ['zero', 'ζερο'],
+  ['decaf', 'ντεκαφ'],
+];
+
+function rawWordTokens(name: string | null | undefined): string[] {
+  if (!name) return [];
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ς/g, 'σ')
+    .split(/[^a-z0-9α-ω]+/)
+    .filter(Boolean);
+}
+
+function markerFamilies(name: string | null | undefined): Set<number> {
+  const tokens = rawWordTokens(name);
+  const fams = new Set<number>();
+  MARKER_FAMILIES.forEach((roots, idx) => {
+    for (const tok of tokens) {
+      // ignore very short tokens to avoid spurious prefix hits ("με", "ro")
+      if (tok.length < 3) continue;
+      // Forward-prefix ONLY (token carries the root as its stem, tolerating Greek
+      // inflection: "λεμονι".startsWith("λεμον")). The reverse direction let a
+      // generic short word like "χωρίς" match a longer root and over-block.
+      if (roots.some((r) => tok.startsWith(r))) { fams.add(idx); return; }
+    }
+  });
+  return fams;
+}
+
+// True when the two names carry a DIFFERENT set of flavour/type markers — one
+// is Lemon and the other Strawberry, or one is Light and the other is regular.
+// Such pairs are different products even if every other word + the size match.
+export function variantConflict(a: string | null | undefined, b: string | null | undefined): boolean {
+  const fa = markerFamilies(a);
+  const fb = markerFamilies(b);
+  if (fa.size !== fb.size) return true;
+  for (const f of fa) if (!fb.has(f)) return true;
+  return false;
+}
+
 // Below this, two offers joined by productId are treated as different products
 // and hidden from comparison. Deliberately strict: a hidden legit comparison
 // costs us a feature; a shown wrong one costs us the user's trust.
@@ -140,11 +212,16 @@ export function filterComparable<T>(
   getName: (c: T) => string | null | undefined,
   getChain: (c: T) => string | null | undefined
 ): T[] {
-  const scored = candidates.map((c) => ({
-    c,
-    chain: getChain(c) ?? '',
-    score: nameSimilarity(sourceName, getName(c)),
-  }));
+  const scored = candidates
+    // Drop anything that differs on a flavour/fat/type marker BEFORE scoring —
+    // a single differing variant token (Lemon vs Φράουλα, Light vs regular)
+    // makes them different products even at a high Jaccard score.
+    .filter((c) => !variantConflict(sourceName, getName(c)))
+    .map((c) => ({
+      c,
+      chain: getChain(c) ?? '',
+      score: nameSimilarity(sourceName, getName(c)),
+    }));
   const chainBest = new Map<string, number>();
   for (const s of scored) {
     if (s.score > (chainBest.get(s.chain) ?? -1)) chainBest.set(s.chain, s.score);
