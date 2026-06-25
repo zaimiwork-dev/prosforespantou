@@ -4,6 +4,21 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-25 — cross-chain comparison variant guard SHIPPED; new-chain recon done)
+
+**Two things this session: (1) finished the R2 image migration [below], (2) hardened cross-chain price-comparison correctness, (3) reconned candidate new chains.**
+
+### Comparison correctness (SHIPPED `e3e719a`)
+Owner asked to make cross-chain price comparison "100% correct". Audited the live data (replicating `getPriceComparison`'s join over all 11,454 active discounts): of 1,248 rendered comparison pairs, a small but real class was WRONG — products that differ only on a **flavour/fat/type** marker but share generic words + pack size (e.g. "Lipton Ice Tea **Lemon**" vs "… **Φράουλα**", "Adoro Κρέμα **Light**" vs regular, "Γάλα **Πλήρες**" vs "**Ελαφρύ**", "Fanta" vs "Fanta **Zero**"). The 0.5 Jaccard floor in [offer-similarity.ts](src/lib/offer-similarity.ts) dilutes a single differing token. Fix: added `variantConflict()` — both names' marker FAMILIES must match (transliteration-aware so latin "lemon" == Greek "λεμόνι"; forward-prefix only so generic "Χωρίς" / wine colours don't over-block), wired into `filterComparable` before scoring. **Removed 62 wrong pairs (1,248→1,186), kept the legit ones; 18 unit tests (4 new) pass.** Audit scripts in `.local-scratch/audit-comparison.mjs` + `blocked-sample.mjs` (re-run to re-measure). FOLLOW-UP if owner wants stricter: ~448 pairs score 0.5–0.65 (no variant flag) — eyeball a sample; consider nudging `COMPARISON_SIMILARITY_FLOOR` up or extending `MARKER_FAMILIES`.
+
+### New-chain recon (owner wants an 8th chain; comparison must stay barcode-correct)
+- **Galaxias — DEAD END.** `galaxias.gr` is a literal "SITE UNDER CONSTRUCTION" placeholder (iphost.net); `www.galaxias.gr` doesn't respond. Brand was absorbed into the My Market group — no standalone e-shop.
+- **Market In** — OpenCart (like Bazaar) but **no barcode** in image filenames and its only "offers" are a flipbook (`/filadio/`, OCR territory). Catalog is scrapable but matching would be fuzzy.
+- **e-fresh — the only viable candidate.** Clean JSON API (`https://www.e-fresh.gr/api/search?q=…` returns rich products: title, price, price_old, is_discount/offer flags, pkg_unit/value, categories, image) BUT **no barcode/GTIN** — identity is internal `kodikos`. So cross-chain matching would go name→LLM→review (guarded by offer-similarity, now incl. the variant guard) — CORRECT but less complete than a barcode chain.
+- **DECISION PENDING (owner):** build e-fresh accepting name-based (guarded) matching, or hold new chains until a barcode source appears. Owner emphasized comparison must be correct — the variant guard now protects that regardless.
+
+---
+
 ## ⚡ Pick up here (2026-06-25 — image hosting MIGRATED to Cloudflare R2; Supabase quota cleared)
 
 **The Supabase→R2 image migration is DONE.** Owner had a Supabase "usage quota exceeded" email — the `chain-images` Storage bucket was ~2 GB (2× the 1 GB free tier). Images are now hosted on **Cloudflare R2** (10 GB free + free egress, bucket `chain-images`, EEUR region). The infra is pluggable (`963e068`); the migration scripts hardened in `c8a2cee` + `dce0e19`.
