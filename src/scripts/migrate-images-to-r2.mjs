@@ -121,23 +121,23 @@ async function rewriteDb() {
   const { default: prisma } = await import('../lib/prisma.ts');
   console.log(`\nRewriting DB imageUrl base:\n  from ${supaPublicBase}\n  to   ${r2PublicBase}`);
 
-  // Safety guard: a blanket base swap is only safe if (nearly) every Supabase
-  // object is actually on R2 — otherwise a not-yet-copied image would be
-  // repointed to a missing R2 key and break. Compare key coverage first.
-  process.stdout.write('   verifying R2 coverage…');
-  const onR2 = await r2.listKeys((n) => process.stdout.write(`\r   verifying R2 coverage… ${n} keys on R2`));
-  let supaCount = 0;
-  const rootRes = await fetch(`${supa.url}/storage/v1/object/list/${BUCKET}`, {
-    method: 'POST', headers: H, body: JSON.stringify({ prefix: '', limit: 100, sortBy: { column: 'name', order: 'asc' } }),
-  });
-  for (const e of (await rootRes.json())) {
-    if (e.id) continue;
-    supaCount += (await listFolder(`${e.name}/`)).length;
-  }
-  const coverage = supaCount ? onR2.size / supaCount : 1;
-  console.log(`\r   R2 has ${onR2.size} keys vs Supabase ${supaCount} → ${(coverage * 100).toFixed(1)}% coverage   `);
-  if (coverage < 0.999 && !FORCE) {
-    console.error(`❌ Aborting rewrite — ${supaCount - onR2.size} object(s) not yet on R2. Re-run the copy first (or set FORCE=1 to rewrite only covered keys).`);
+  // Safety guard: the blanket base swap only touches DB rows whose imageUrl is
+  // on Supabase, so the correct check is whether every Supabase image THE DB
+  // ACTUALLY REFERENCES is on R2 (orphan bucket objects nobody links to are
+  // irrelevant). If any referenced key is missing from R2, repointing it would
+  // break that image — abort.
+  process.stdout.write('   verifying R2 coverage of DB-referenced images…');
+  const onR2 = await r2.listKeys((n) => process.stdout.write(`\r   verifying R2 coverage of DB-referenced images… ${n} keys on R2`));
+  const keyOf = (u) => { const m = u.match(/chain-images\/(.+)$/); return m ? m[1] : null; };
+  const refs = [
+    ...(await prisma.product.findMany({ where: { imageUrl: { contains: 'supabase.co' } }, select: { imageUrl: true } })),
+    ...(await prisma.discount.findMany({ where: { isActive: true, imageUrl: { contains: 'supabase.co' } }, select: { imageUrl: true } })),
+  ];
+  const referencedKeys = new Set(refs.map((r) => keyOf(r.imageUrl)).filter(Boolean));
+  const missing = [...referencedKeys].filter((k) => !onR2.has(k));
+  console.log(`\r   ${referencedKeys.size} distinct DB-referenced Supabase keys; ${missing.length} missing from R2 (R2 total ${onR2.size})   `);
+  if (missing.length > 0 && !FORCE) {
+    console.error(`❌ Aborting rewrite — ${missing.length} DB-referenced image(s) not yet on R2. Copy them first. e.g. missing: ${missing.slice(0, 3).join(', ')}`);
     await prisma.$disconnect();
     process.exit(1);
   }
