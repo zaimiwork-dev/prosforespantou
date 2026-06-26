@@ -87,9 +87,8 @@ function toOfferItem(raw) {
 }
 
 // Programmatic entry — return the ingest report instead of exiting.
-export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit = Infinity, log = console.log } = {}) {
+export async function collectMasoutisOffers({ source = 'web', limit = Infinity, log = console.log } = {}) {
   const itemcodeFilter = source === 'leaflet' ? '0,2' : '0,1';
-  log(`🛒 Masoutis adapter — source=${source}${dryRun ? ' (DRY_RUN)' : ''}`);
   const cred = await getCred();
   log(`   credential ok (usl=${cred.usl})`);
 
@@ -118,6 +117,20 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
   // adapter runs inside the Vercel cron's 300s budget, so cap fresh downloads
   // per run: HEAD-reuses are free, and the backlog drains across a few runs.
   // No-op (originals kept + report warning) without SUPABASE creds in Vercel.
+  // A full final page at MAX_PAGES means the feed may continue beyond our
+  // safety cap. Mark the run partial so stale deactivation is forbidden.
+  // Likewise, any finite LIMIT is an intentional partial run.
+  const partial = Number.isFinite(limit) || !stoppedOnShortPage;
+  return { items, partial };
+}
+
+// Programmatic entry — return the ingest report instead of exiting.
+export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit = Infinity, log = console.log } = {}) {
+  log(`🛒 Masoutis adapter — source=${source}${dryRun ? ' (DRY_RUN)' : ''}`);
+  const { items, partial } = await collectMasoutisOffers({ source, limit, log });
+
+  // Mirror rotating promo images only during a real ingest. The read-only
+  // coverage audit deliberately skips this write-side work.
   let mirrorWarnings = [];
   if (!dryRun) {
     const mirror = await mirrorImages({
@@ -130,10 +143,6 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
     mirrorWarnings = mirror.warnings;
   }
 
-  // A full final page at MAX_PAGES means the feed may continue beyond our
-  // safety cap. Mark the run partial so stale deactivation is forbidden.
-  // Likewise, any finite LIMIT is an intentional partial run.
-  const partial = Number.isFinite(limit) || !stoppedOnShortPage;
   return await ingestOffers({
     chain: 'masoutis',
     source,

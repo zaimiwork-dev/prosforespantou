@@ -102,6 +102,10 @@ Two rules that exist because of real incidents:
   runs and every flip writes a bogus PriceSnapshot. The run report warns with
   the count so mis-mappings can be audited.
 
+  **Current behavior:** keep the official row visible as productless and queue
+  it for mapping review. The unresolved row is excluded from comparisons and
+  price history rather than being hidden from shoppers.
+
 ## Safety rules baked into the shared pipeline
 
 - **Zero items → abort.** An adapter returning `[]` is treated as "scrape broke",

@@ -215,6 +215,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
   useEffect(() => { setVisibleCount(60); }, [activeCategory, searchQuery, sortBy]);
 
   const visibleDeals = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const initialPreviewCount = useMemo(() => dedupeDeals(initialDeals).length, [initialDeals]);
   const searching = searchQuery.trim().length >= 2;
   const showCategoryBrowser = viewMode === "categories" && !searching;
   const groupedView = viewMode === "offers"
@@ -225,6 +226,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
   const biggestDiscount = useMemo(() => {
     return initialDeals.reduce((max, d) => Math.max(max, d.discountPercent ?? 0), 0);
   }, [initialDeals]);
+  const hasMoreActiveOffers = (totalCount ?? initialPreviewCount) > initialPreviewCount;
 
   const switchView = (nextView) => {
     setViewMode(nextView);
@@ -366,7 +368,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
             <span>🏷️</span>
             <span>
               <strong>Προσφορές</strong>
-              <small>{(totalCount ?? initialDeals.length).toLocaleString("el-GR")} ενεργές</small>
+              <small>{initialPreviewCount.toLocaleString("el-GR")} επιλεγμένες</small>
             </span>
           </button>
           <button
@@ -433,7 +435,20 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
           )}
 
           {groupedView ? (
-            <SupermarketAisles deals={filtered} onAdd={addItem} onSelect={setSelectedProduct} />
+            <>
+              <SupermarketAisles deals={filtered} onAdd={addItem} onSelect={setSelectedProduct} />
+              {hasMoreActiveOffers && (
+                <section className="supermarket-all-offers-cta">
+                  <div>
+                    <strong>Όλες οι {totalCount.toLocaleString("el-GR")} ενεργές προσφορές</strong>
+                    <p>Εδώ βλέπεις μια επιλεγμένη ψηφιακή βιτρίνα. Οι Κατηγορίες έχουν όλο το τρέχον φυλλάδιο.</p>
+                  </div>
+                  <button type="button" onClick={() => switchView("categories")}>
+                    Περιήγηση σε όλες
+                  </button>
+                </section>
+              )}
+            </>
           ) : (
             <DealGrid
               deals={visibleDeals}

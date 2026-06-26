@@ -148,6 +148,7 @@ function normalizeOfferType(raw, originalPrice) {
 // productless offer can't be written (no stable identity across runs).
 async function writeOffer(prisma, item, productId, storeId, chain, source, runStart, unmappedLabels) {
   const now = new Date();
+  const matchedProductId = productId;
   const chainItemcode = item.chainItemcode != null ? String(item.chainItemcode) : null;
   if (!productId && !chainItemcode) return { snapshotWritten: false, skipped: true };
   const validFrom = item.validFrom ? new Date(item.validFrom) : now;
@@ -211,11 +212,33 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
   // pack-size variants) used to take turns overwriting the same row — the
   // visible price flip-flopped between runs and every flip wrote a bogus
   // PriceSnapshot. First writer this run owns the row; later SKUs are skipped.
+  // Keep the disputed chain SKU visible but remove its canonical link. This
+  // supersedes the former winner-takes-row behavior described above.
+  let mappingCollision = false;
   if (
     existing && chainItemcode && existing.chainItemcode &&
     existing.chainItemcode !== chainItemcode && existing.updatedAt >= runStart
   ) {
-    return { snapshotWritten: false, skipped: true, sharedRow: true };
+    existing = null;
+    productId = null;
+    data.productId = null;
+    mappingCollision = true;
+  } else if (existing?.chainItemcode === chainItemcode && existing.productId === null && matchedProductId) {
+    const claimedByAnotherSku = await prisma.discount.findFirst({
+      where: {
+        productId: matchedProductId,
+        supermarket: chain,
+        source,
+        isActive: true,
+        chainItemcode: { not: chainItemcode },
+      },
+      select: { id: true },
+    });
+    if (claimedByAnotherSku) {
+      productId = null;
+      data.productId = null;
+      mappingCollision = true;
+    }
   }
   // hotScore at write time uses clicks=0 for new rows or the existing lifetime
   // clickCount on update; the daily recompute cron is the authoritative pass.
@@ -271,7 +294,7 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
       snapshotWritten = true;
     }
   }
-  return { snapshotWritten, alert };
+  return { snapshotWritten, alert, mappingCollision };
 }
 
 // ── Full-catalog price baseline (Phase 9) ────────────────────────────────────
@@ -531,7 +554,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     }
 
     let idx = 0;
-    let sharedRowSkips = 0;
+    let mappingCollisions = 0;
     const unmappedLabels = new Set();
     const alertable = []; // offers that newly appeared / dropped this run
     for (const item of items) {
@@ -565,11 +588,24 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
             if (!skipped) report.unmatchedShown++;
           }
         } else {
-          const { snapshotWritten, sharedRow, alert } = await withDbRetry(`write ${item.name}`, () =>
+          const { snapshotWritten, mappingCollision, alert } = await withDbRetry(`write ${item.name}`, () =>
             writeOffer(prisma, item, productId, store.id, chain, source, runStart, unmappedLabels)
           );
           if (snapshotWritten) report.priceChanges++;
-          if (sharedRow) sharedRowSkips++;
+          if (mappingCollision) {
+            mappingCollisions++;
+            report.reviewQueued++;
+            await prisma.pendingMatch.upsert({
+              where: { rawName_supermarket: { rawName: item.name, supermarket: chain } },
+              create: {
+                rawName: item.name, rawPrice: item.price, supermarket: chain,
+                brand: item.brand || null, imageUrl: item.imageUrl || null,
+              },
+              update: {
+                rawPrice: item.price, brand: item.brand || null, imageUrl: item.imageUrl || null,
+              },
+            });
+          }
           if (alert) alertable.push(alert);
           report.matched++;
           if (via === 'mapping') report.viaMapping++;
@@ -586,9 +622,9 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     }
     if (items.length >= 100) console.log('');
 
-    if (sharedRowSkips > 0) {
+    if (mappingCollisions > 0) {
       report.warnings.push(
-        `${sharedRowSkips} item(s) share a productId with another chain SKU (winner-takes-row this run). ` +
+        `${mappingCollisions} item(s) share a productId with another chain SKU and were shown productless. ` +
         `Likely stale mis-mappings — audit ChainProductMapping for ${chain}.`
       );
     }

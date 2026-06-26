@@ -4,7 +4,34 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-26 PM — leaflet coverage hardened + collision fix SHIPPED & VALIDATED)
+
+**Continuation of the 2026-06-26 UX/data handoff below. This pass made leaflet coverage 100% for the two machine-verifiable chains, fixed a silent offer-hiding bug in ingest, added a reconciliation gate, and validated everything (build + tests + live audit). Committed & pushed to `origin/main`.**
+
+### What shipped this pass
+- **Collision handling rewritten (load-bearing).** [ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs): the old "winner-takes-row" guard **silently hid** legit leaflet offers when two chain SKUs mapped to one `productId` (stale `ChainProductMapping`). New behaviour: keep the official offer **visible but productless** (`productId=null`, keyed by `chainItemcode`) and queue it for mapping review. Productless ⇒ excluded from price comparison ⇒ **zero contamination**. Stable & order-independent across runs (traced both branches). Two new branches: (1) productId-fallback collision this run → drop productId; (2) a prior productless row that now matches but whose product is already claimed by another active SKU → stay productless.
+- **Leaflet reconciliation gate.** New [audit-leaflet-coverage.mjs](src/scripts/audit-leaflet-coverage.mjs) (`npm run audit:leaflets`, `STRICT=1` to exit non-zero on mismatch). Read-only: re-collects each machine-readable leaflet feed and diffs SKU/price against live active rows. Honest by design — only Lidl + Masoutis expose product-level SKUs; the other 5 chains are explicitly reported `unsupported`, never assumed covered. To support this it splits adapters into `collectLidlOffers()` / `collectMasoutisOffers()` (pure fetch) vs the `run*Adapter()` ingest wrappers.
+- **Masoutis partial-run guard moved** into `collectMasoutisOffers` so the audit's read-only collect path shares the same partial detection (full final page at cap, or finite LIMIT ⇒ partial ⇒ no stale deactivation).
+- **MyMarket "selected preview" honesty (UX).** Default `Προσφορές` tab now says `N επιλεγμένες` (selected) not `N ενεργές`, and shows a CTA card ("Όλες οι N ενεργές προσφορές" → routes to `Κατηγορίες`) so the curated ~100-card preview vs the full feed is unmistakable. [SupermarketClient.js](src/components/SupermarketClient.js) + `.supermarket-all-offers-cta` in [globals.css](src/app/globals.css).
+- **Category third-level click fix.** Drinks → Alcohol → Beer now opens the leaf's offers instead of bouncing back to the parent group. [SupermarketCategoryBrowser.js](src/components/SupermarketCategoryBrowser.js). Plus a 360px mobile sort-toolbar overflow fix.
+
+### Validated (this pass)
+- `npm run build` ✓ · targeted tests 11/11 ✓ · syntax-check all 4 scripts ✓.
+- `npm run audit:leaflets` ✓ live: **Lidl 102/102 covered**, **Masoutis 3,029/3,029 covered** (0 missing, 0 extra, 0 price mismatch).
+- DB spot-check: Masoutis leaflet = 3,029 active (was 2,671 visible before — the fix surfaced **357 previously-hidden collision rows**); 2,672 product-linked, **357 productless** (comparison-safe), 1,050 in review queue. Plus 396 web offers ⇒ **3,425 Masoutis offers visible**.
+
+### Caveat / known follow-up
+- The 357 collisions stem from **stale `ChainProductMapping`** entries, so they **re-queue every run** until the mappings are audited/corrected. The fix makes them safe + visible; it does **not** repair the mappings — that's the Groq mapping audit (`LLM=1 node src/scripts/audit-mappings.mjs`), still blocked on Groq billing.
+
+### Exact next work (unchanged from below, minus the now-done leaflet audit)
+1. Post-deploy visual pass on a large chain (Kritikos) phone + desktop — see list below.
+2. Add/repair GitHub Actions `PROXY_URL` so Sklavenitis scheduled runs are healthy.
+3. Unblock Groq billing → run the mapping audit → `APPLY=1` only for explicit `different` verdicts (fixes the collision root cause).
+
+---
+
 ## ⚡ Pick up here (2026-06-26 — current product/data handoff)
+
 
 **Product direction is locked:** Prosfores Pantou is discount-first: the homepage is a mixed digital leaflet across chains; each supermarket opens on its active offers; price comparison is the second value layer. Do **not** turn it into a generic product catalogue. e-fresh is out of scope; no eighth chain until the current seven are autonomous and comparison-safe.
 

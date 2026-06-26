@@ -110,6 +110,10 @@ export function SupermarketCategoryBrowser({ tree, supermarket, onAdd, onSelect 
     setLeafKey(null);
   };
 
+  const selectLeaf = (key) => {
+    setLeafKey(key);
+  };
+
   return (
     <section className="supermarket-category-browser">
       <nav className="supermarket-category-crumbs" aria-label="Διαδρομή κατηγορίας">
@@ -151,7 +155,13 @@ export function SupermarketCategoryBrowser({ tree, supermarket, onAdd, onSelect 
               <CategoryCard
                 key={node.key}
                 node={node}
-                onClick={() => top ? selectGroup(node.key) : selectTop(node.key)}
+                onClick={() => {
+                  // The third level (for example Drinks → Alcohol → Beer)
+                  // must update the leaf, not replace its parent group.
+                  if (group) selectLeaf(node.key);
+                  else if (top) selectGroup(node.key);
+                  else selectTop(node.key);
+                }}
               />
             ))}
           </div>

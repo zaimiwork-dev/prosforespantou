@@ -62,8 +62,7 @@ function toOfferItem(p, cls) {
   };
 }
 
-export async function runLidlAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
-  console.log(`🛒 Lidl adapter (structured e-shop offers)${dryRun ? ' — DRY_RUN' : ''}`);
+export async function collectLidlOffers({ limit = LIMIT } = {}) {
   const now = new Date();
 
   const cats = await discoverCategoryNumbers(CATS_ENV);
@@ -108,6 +107,14 @@ export async function runLidlAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
       console.log(`   ${o.offerType.padEnd(13)} ${String(o.price).padStart(6)} was=${String(o.originalPrice ?? '').padStart(5)}  ${d}  img=${o.imageUrl ? 'Y' : 'N'}  ${o.name}`);
     }
   }
+
+  return { items: finalOffers, partial, warnings: extraWarnings };
+}
+
+export async function runLidlAdapter({ dryRun = DRY_RUN, limit = LIMIT } = {}) {
+  console.log(`🛒 Lidl adapter (structured e-shop offers)${dryRun ? ' — DRY_RUN' : ''}`);
+  const { items: finalOffers, partial, warnings } = await collectLidlOffers({ limit });
+  const extraWarnings = [...warnings];
 
   // Self-host offer images on the Supabase mirror so Lidl photos survive even if
   // schwarz's CDN rotates its (signed) URLs or blocks us. Mutates item.imageUrl
