@@ -2,6 +2,8 @@
 
 Forward-looking roadmap. Each phase has a clear "why", concrete deliverables, and an exit criterion. Don't start phase N+1 until N's exit criterion passes. Pair this with [CONTEXT.md](CONTEXT.md) for the current state.
 
+> **Current-status override (2026-06-26):** Historical counts and some “still to do” notes below are retained for provenance. Before acting, always read the top of [CONTEXT.md](CONTEXT.md): all seven current chains are in scope; Sklavenitis and My Market direct adapters/catalog work are already shipped; the immediate priorities are deployed mobile UX QA, Sklavenitis `PROXY_URL` autonomy, and comparison/mapping cleanup. The new supermarket category browser is a discount-browsing surface, not a change in the app's discount-first strategy.
+
 > **Re-prioritization 2026-05-01.** End form is a native mobile app (iOS + Android Play/App Store) for an elderly + 30–40+ Greek audience. After this discussion, mobile-responsive work (was Phase 7) is bumped ahead of price-history UI (was Phase 6). Email delivery (Phase 3) stays next because newsletter + alerts both depend on it. New phases added below for item-watchlist alerts and a logged-in savings tracker, both flowing from owner's stated end-form. See [CONTEXT.md §0 "Product vision"](CONTEXT.md#0-product-vision-recorded-2026-05-01-directly-from-owner) for the canonical statement of what we're building and why.
 
 Phases 0–4 are **done**; 5 onward is the work ahead.

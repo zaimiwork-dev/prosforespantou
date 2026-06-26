@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
+import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export async function getPriceComparison(discountId: string) {
   return await Sentry.withServerActionInstrumentation(
@@ -43,15 +44,14 @@ export async function getPriceComparison(discountId: string) {
 
         const now = new Date();
         const others = await prisma.discount.findMany({
-          where: {
+          where: withPublicDealVisibility({
             productId: { in: [...matchedProductIds] },
             isActive: true,
             validUntil: { gt: now },
             NOT: { id: discountId },
-          },
+          }),
           include: { store: true, product: true },
           orderBy: { discountedPrice: 'asc' },
-          take: 16,
         });
 
         // Only compare like-for-like pack sizes. A 12-pack offer sharing a

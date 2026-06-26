@@ -14,6 +14,8 @@ import { CATEGORIES } from "@/lib/constants";
 import { track } from '@/lib/track';
 import { searchDeals } from '@/actions/search-deals';
 import { dedupeDeals } from '@/lib/dedupe-deals';
+import { SupermarketAisles } from '@/components/SupermarketAisles';
+import { SupermarketCategoryBrowser } from '@/components/SupermarketCategoryBrowser';
 
 const GREEKLISH_MAP = {
   th: 'θ', ch: 'χ', ps: 'ψ', ou: 'ου', mp: 'μπ',
@@ -137,7 +139,8 @@ function sortDeals(deals, sortBy) {
   return copy;
 }
 
-export default function SupermarketClient({ sm, initialDeals, totalCount, leaflet }) {
+export default function SupermarketClient({ sm, initialDeals, totalCount, catalogCount, categoryTree, leaflet }) {
+  const [viewMode, setViewMode] = useState("offers");
   const [sortBy, setSortBy] = useState("hot");
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -212,13 +215,25 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
   useEffect(() => { setVisibleCount(60); }, [activeCategory, searchQuery, sortBy]);
 
   const visibleDeals = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const searching = searchQuery.trim().length >= 2;
+  const showCategoryBrowser = viewMode === "categories" && !searching;
+  const groupedView = viewMode === "offers"
+    && activeCategory === "all"
+    && searchQuery.trim().length < 2
+    && searchResults === null;
 
   const biggestDiscount = useMemo(() => {
     return initialDeals.reduce((max, d) => Math.max(max, d.discountPercent ?? 0), 0);
   }, [initialDeals]);
 
+  const switchView = (nextView) => {
+    setViewMode(nextView);
+    setActiveCategory("all");
+    if (nextView === "categories") setSearchQuery("");
+  };
+
   return (
-    <div style={{ background: "#f3f5f8", color: "#1c1e24", minHeight: "100vh", fontFamily: "var(--font-outfit), sans-serif" }}>
+    <div style={{ "--brand": sm.color, background: "#f3f5f8", color: "#1c1e24", minHeight: "100vh", fontFamily: "var(--font-outfit), sans-serif" }}>
 
       <SiteHeader cartCount={cart.length} onCartOpen={() => setIsCartOpen(true)} />
 
@@ -276,7 +291,13 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
           </div>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, fontWeight: 700, color: "rgba(28,30,36,0.85)" }}>
-            <span>{totalCount ?? initialDeals.length} ενεργές</span>
+            <span>{(totalCount ?? initialDeals.length).toLocaleString("el-GR")} ενεργές προσφορές</span>
+            {catalogCount > 0 && (
+              <>
+                <span style={{ opacity: 0.35 }}>•</span>
+                <span>{catalogCount.toLocaleString("el-GR")} προϊόντα συνολικά</span>
+              </>
+            )}
             {biggestDiscount > 0 && (
               <>
                 <span style={{ opacity: 0.35 }}>•</span>
@@ -313,7 +334,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Αναζήτηση προσφορών ${sm.name}...`}
+                placeholder={`Αναζήτησε στις προσφορές ${sm.name}...`}
                 style={{
                   width: "100%",
                   padding: "14px 16px 14px 44px",
@@ -336,13 +357,50 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
       </section>
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 80px" }}>
+        <div className="supermarket-view-tabs" aria-label="Τρόπος περιήγησης">
+          <button
+            type="button"
+            className={viewMode === "offers" ? "active" : ""}
+            onClick={() => switchView("offers")}
+          >
+            <span>🏷️</span>
+            <span>
+              <strong>Προσφορές</strong>
+              <small>{(totalCount ?? initialDeals.length).toLocaleString("el-GR")} ενεργές</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === "categories" ? "active" : ""}
+            onClick={() => switchView("categories")}
+          >
+            <span>▦</span>
+            <span>
+              <strong>Κατηγορίες</strong>
+              <small>Βρες αυτό που ψάχνεις</small>
+            </span>
+          </button>
+        </div>
+
+        {showCategoryBrowser ? (
+          <SupermarketCategoryBrowser
+            tree={categoryTree || []}
+            supermarket={sm.id}
+            onAdd={addItem}
+            onSelect={setSelectedProduct}
+          />
+        ) : (
         <section>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 4px" }}>
             <h2 style={{ fontSize: 18, fontWeight: 900, margin: 0, letterSpacing: "-0.4px" }}>
-              {activeCategory === "all" ? "Όλες οι προσφορές" : activeCategory}
+              {searching
+                ? `Αποτελέσματα για «${searchQuery.trim()}»`
+                : groupedView
+                  ? "Προσφορές ανά κατηγορία"
+                  : (activeCategory === "all" ? "Όλες οι προσφορές" : activeCategory)}
             </h2>
             <span style={{ fontSize: 13, color: "var(--ink-3)", fontWeight: 600 }}>
-              {filtered.length.toLocaleString("el-GR")} προσφορές
+              {filtered.length.toLocaleString("el-GR")} {groupedView ? "επιλεγμένες προσφορές" : "προσφορές"}
             </span>
           </div>
 
@@ -374,18 +432,22 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
             </div>
           )}
 
-          <DealGrid
-            deals={visibleDeals}
-            loading={searchLoading && searchResults === null}
-            loadingMore={false}
-            onAdd={addItem}
-            onSelect={setSelectedProduct}
-            emptyTitle={`Δεν βρέθηκαν προσφορές${activeCategory !== "all" ? ` στην κατηγορία "${activeCategory}"` : ""}`}
-            emptyText="Δοκίμασε άλλη κατηγορία ή επίστρεψε αργότερα."
-            onClearFilters={activeCategory !== "all" ? () => setActiveCategory("all") : null}
-          />
-          
-          {visibleCount < filtered.length && (
+          {groupedView ? (
+            <SupermarketAisles deals={filtered} onAdd={addItem} onSelect={setSelectedProduct} />
+          ) : (
+            <DealGrid
+              deals={visibleDeals}
+              loading={searchLoading && searchResults === null}
+              loadingMore={false}
+              onAdd={addItem}
+              onSelect={setSelectedProduct}
+              emptyTitle={`Δεν βρέθηκαν προσφορές${activeCategory !== "all" ? ` στην κατηγορία "${activeCategory}"` : ""}`}
+              emptyText="Δοκίμασε άλλη κατηγορία ή επίστρεψε αργότερα."
+              onClearFilters={activeCategory !== "all" ? () => setActiveCategory("all") : null}
+            />
+          )}
+
+          {!groupedView && visibleCount < filtered.length && (
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <button
                 onClick={() => setVisibleCount(prev => prev + 60)}
@@ -408,6 +470,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, leafle
             </div>
           )}
         </section>
+        )}
       </main>
 
       <Footer />

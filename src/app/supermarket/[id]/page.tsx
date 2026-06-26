@@ -5,6 +5,8 @@ import { SUPERMARKETS } from "@/lib/constants";
 import SupermarketClient from "@/components/SupermarketClient";
 import { pruneExpiredDatelessLeaflets } from "@/actions/admin/leaflet-actions";
 import { activePublicDealWhere } from "@/lib/public-deal-filters";
+import { representativeCatalogCount } from "@/lib/catalog-run-count";
+import { buildSupermarketCategoryTree } from "@/lib/supermarket-category-browser";
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +37,7 @@ export default async function SupermarketPage({ params }) {
   // hotScore so the cap keeps the deals the page defaults to showing first; the
   // full catalog is reachable via the in-page search, which calls a paginated
   // server action (`searchDeals(query, supermarket)`) for queries ≥ 2 chars.
-  const [deals, totalCount, leaflet] = await Promise.all([
+  const [deals, totalCount, leaflet, catalogRuns, taxonomyDeals] = await Promise.all([
     prisma.discount.findMany({
       where: activePublicDealWhere(now, { supermarket: id }),
       include: { store: true, leaflet: true, product: true },
@@ -52,7 +54,30 @@ export default async function SupermarketPage({ params }) {
       },
       orderBy: { validFrom: "desc" },
     }),
+    prisma.ingestRun.findMany({
+      where: {
+        chain: id,
+        source: { in: ["catalog", "baseline"] },
+        healthOk: true,
+        scrapedItems: { gt: 0 },
+      },
+      orderBy: { finishedAt: "desc" },
+      take: 30,
+      select: { scrapedItems: true },
+    }),
+    prisma.discount.findMany({
+      where: activePublicDealWhere(now, { supermarket: id }),
+      orderBy: [{ hotScore: "desc" }, { validUntil: "asc" }],
+      select: {
+        category: true,
+        subcategory: true,
+        productName: true,
+        imageUrl: true,
+      },
+    }),
   ]);
+  const catalogCount = representativeCatalogCount(catalogRuns);
+  const categoryTree = buildSupermarketCategoryTree(taxonomyDeals);
 
   const serializedDeals = deals.map((d) => ({
     ...d,
@@ -72,5 +97,14 @@ export default async function SupermarketPage({ params }) {
       }
     : null;
 
-  return <SupermarketClient sm={sm} initialDeals={serializedDeals} totalCount={totalCount} leaflet={serializedLeaflet} />;
+  return (
+    <SupermarketClient
+      sm={sm}
+      initialDeals={serializedDeals}
+      totalCount={totalCount}
+      catalogCount={catalogCount}
+      categoryTree={categoryTree}
+      leaflet={serializedLeaflet}
+    />
+  );
 }

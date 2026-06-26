@@ -4,6 +4,31 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-06-26 — current product/data handoff)
+
+**Product direction is locked:** Prosfores Pantou is discount-first: the homepage is a mixed digital leaflet across chains; each supermarket opens on its active offers; price comparison is the second value layer. Do **not** turn it into a generic product catalogue. e-fresh is out of scope; no eighth chain until the current seven are autonomous and comparison-safe.
+
+### What just shipped in this revision
+- **Supermarket UX:** the default `Προσφορές` tab groups the selected offer feed into stable aisles instead of a random order. `Κατηγορίες` is a separate visual drill-down: six large entry points (food, drinks, personal care, home/cleaning, baby, pets) → curated subcategories → current offer cards. Drinks go as far as alcohol → beer/wine/spirits and coffee → espresso/Greek/instant/filter. The homepage stays mixed.
+- **Accurate category results without a huge payload:** the page builds a small aggregate tree from the full active offer set. [browse-supermarket-deals.ts](src/actions/browse-supermarket-deals.ts) then filters server-side and returns only a 48-card page for the selected category. Native chain subcategories are used when available; name rules provide a stable cross-chain fallback.
+- **Store count semantics:** homepage supermarket tiles remain offer-only. On a store page, the hero shows active offers plus the healthy official catalog/baseline total. `representativeCatalogCount()` ignores partial probe runs. Current totals displayed: AB 11,828; Bazaar 6,506; Kritikos 5,895; Lidl 177; Masoutis 10,424; MyMarket 14,168; Sklavenitis 7,475.
+- **Feed reliability:** strict freshness now includes Bazaar. Sklavenitis missing `PROXY_URL` records a real failed run instead of a silent healthy skip. Masoutis' 3,008-item feed no longer trips the old 3,000-row cap; an incomplete capped run is marked partial so it cannot deactivate good data.
+- **Comparison correctness:** all shopper-facing comparison/dedupe paths now apply flavour/type **and quantity** guards. It blocks examples such as Fanta vs Fanta Zero, 96 vs 48 Pampers, 270ml vs 250ml sunscreen, and 900ml vs 550ml detergent. Comparison also hides non-public MyMarket rows and does not truncate candidates before validation.
+
+### Validation for this revision
+- `npm run test:run -- src/lib/supermarket-category-browser.test.ts src/lib/supermarket-aisles.test.ts src/lib/catalog-run-count.test.ts` → 11 tests passed.
+- The wider comparison/reliability targeted set passed earlier in the same revision (48 tests).
+- Targeted ESLint and `npm run build` both pass.
+- A local visual screenshot pass was not available because the execution environment hit its process quota; run a real mobile/desktop browser pass after deployment before declaring the new category UX polished.
+
+### Exact next work
+1. After deployment, visually test a large chain such as Kritikos on phone and desktop: default offers, `Κατηγορίες`, Drinks → Alcohol → Beer, a category with no third level, category pagination, search, cart, and comparison sheet.
+2. Add/repair GitHub Actions `PROXY_URL`, then confirm Sklavenitis' scheduled offers and catalog runs are healthy without a local residential connection.
+3. Unblock Groq billing, run `LLM=1 node src/scripts/audit-mappings.mjs`, review its artifact, then use `APPLY=1` **only** for explicit `different` verdicts. `1,326` mappings were still unjudged; no mappings were changed.
+4. Only after those checks, do the broader mobile user-journey audit. New-chain order, if/when authorized: Market In → Discount Markt → Galaxias, and only with an official source that meets the comparison contract.
+
+---
+
 ## ⚡ Pick up here (2026-06-25 — cross-chain comparison variant guard SHIPPED; new-chain recon done)
 
 **Two things this session: (1) finished the R2 image migration [below], (2) hardened cross-chain price-comparison correctness, (3) reconned candidate new chains.**
@@ -1415,6 +1440,8 @@ Reads are tagged by string (match existing names in each action — grep before 
 - [x] **Operationalised ingestion (2026-05-27)** — Vercel Cron (Masoutis) + GitHub Actions (Kritikos, AB+resolver, canonical scrapes). Manual `workflow_dispatch` trigger.
 - [x] **Cross-chain price comparison UI (2026-05-27)** — `getPriceComparison` already existed; surfaced into ProductModal (was only on offer detail page). 67+ cross-chain Products with active comparison.
 - [x] **Supermarket page payload cap (2026-05-27)** — `take: 500` server-side fetch + `searchDeals(query, supermarket)` server action for full-catalog search. Kritikos page dropped 4.4 MB → 1.06 MB (~70% smaller).
+- [x] **Supermarket aisle grouping (2026-06-25)** — chain pages now group their selected offers into stable departments instead of one random-looking feed. Broad source categories are split into useful aisles, including alcohol / soft drinks / water and breakfast / coffee / tea / juices. Homepage deal mixing is unchanged; search and explicit category filters remain flat result views.
+- [x] **Discount-first supermarket category browser (2026-06-25)** — supermarket pages keep `Προσφορές` as the default digital-leaflet view and add a separate `Κατηγορίες` tab inspired by grocery browsing apps. Six visual entry points (food, drinks, personal care, home/cleaning, baby, pets) drill into curated subcategories and, where useful, a third level such as alcohol → beer/wine/spirits or coffee → espresso/Greek/instant/filter. Counts and final results cover the chain's full active offer set through [browse-supermarket-deals.ts](src/actions/browse-supermarket-deals.ts); only the selected result page is sent to the client.
 - [x] **Price history sparkline + "actually cheap?" verdict (2026-06-04)** — uses already-collected PriceSnapshot data (~12,542 rows). Component renders in modal + offer page. Honest verdicts: green when at window-min, red when above average.
 - [x] **Email delivery via Resend (2026-06-04)** — [src/lib/email.ts](src/lib/email.ts) wraps Resend with Greek HTML+text templates for confirmation + price alerts. Wired into `subscribe.ts` and `fireAlertsFor`. Falls back to console.log when `RESEND_API_KEY` is unset (dev-friendly).
 - [x] **Shopping list cross-chain pricing (2026-06-05)** — batched [src/actions/get-cheaper-alternatives.ts](src/actions/get-cheaper-alternatives.ts) (UUID-validated, ≤100 ids/call) joins by `productId` + `Product.barcode`. [src/components/ShoppingList.js](src/components/ShoppingList.js) renders per-item "Πιο φθηνά στο X · −Y€" chip linking to the cheaper offer, per-group savings hint, and a footer total-savings line. Threshold: ignore alternatives below €0.05.
@@ -1429,17 +1456,16 @@ Reads are tagged by string (match existing names in each action — grep before 
 
 ## 7. What's not done yet
 
-### Chain coverage (the biggest visible gap — Kritikos dominates)
-- **Sklavenitis chain-direct adapter** — currently 32 Discounts (Wolt strikethrough only). Their website has the full feed; needs HTML extraction or hidden API discovery. Expected ~500-1,500 Discounts. ~3h.
-- **My Market chain-direct adapter** — same pattern as Sklavenitis. Currently 56. Expected ~500-1,500. ~3h.
+### Chain coverage and autonomy
+- **Sklavenitis automation** — direct offers and full-catalog jobs are built. The remaining blocker is the GitHub Actions residential `PROXY_URL` secret; without it, the jobs now fail visibly and retain last-good data.
+- **My Market and Sklavenitis** — direct adapters are live; do not repeat discovery work. Focus on healthy scheduled refreshes and audit results.
 - **Lidl pipeline rewire** — existing OCR cron at [src/app/api/cron/scrape-lidl/route.ts](src/app/api/cron/scrape-lidl/route.ts) writes Discounts directly without `ingest-offers`. Rewire would give source isolation + MatchCache + PriceSnapshot. ~2h.
-- **Bazaar / Galaxias / Market In / Discount Markt** — Tier 3, no public API. Leaflet OCR via Lidl-style cron is the future path.
+- **Market In / Discount Markt / Galaxias** — only reconsider after current-chain autonomy and comparison correctness are verified. No e-fresh work.
 
 ### Product features
-- **Shopping list cross-chain pricing** — when item is added, show cheapest chain inline (reuse `getPriceComparison`). ~1.5h.
 - **Daily best deals widget on homepage** — top 10 deepest-discount Discounts across all chains. ~1h.
 - **Bulk Review Queue admin actions** — "Approve all / Reject all" per chain to clear the ~1,172 pending rows. ~1h.
-- **Mobile UX audit** — tap targets, card density, scroll perf. Required before native app submission.
+- **Mobile UX audit** — first verify the new supermarket offer/category paths on real mobile widths: tabs, card density, category cards, breadcrumbs, pagination, search, cart and comparison sheet. Required before native app submission.
 - **Capacitor wrap → iOS/Android app** — end form per [§0](#0-product-vision-recorded-2026-05-01-directly-from-owner). After web feels complete + mobile pass.
 - **Mobile leaflet viewer.** Desktop-first right now.
 - **Analytics charts.** Admin Αναλυτικά is a plain table.
@@ -1467,11 +1493,12 @@ Reads are tagged by string (match existing names in each action — grep before 
 | Store colors / categories / Greeklish | [src/lib/constants.js](src/lib/constants.js) |
 | Canonical server action | [src/actions/admin/create-discount.ts](src/actions/admin/create-discount.ts) |
 | Public card | [src/components/DiscountCard.js](src/components/DiscountCard.js) |
+| Supermarket offer/category UX | [src/components/SupermarketClient.js](src/components/SupermarketClient.js), [SupermarketAisles.js](src/components/SupermarketAisles.js), [SupermarketCategoryBrowser.js](src/components/SupermarketCategoryBrowser.js), [supermarket-aisles.ts](src/lib/supermarket-aisles.ts), [supermarket-category-browser.ts](src/lib/supermarket-category-browser.ts), [browse-supermarket-deals.ts](src/actions/browse-supermarket-deals.ts) |
 | Admin cockpit | [src/components/AdminPanel.js](src/components/AdminPanel.js) |
 | Shopping list store | [src/lib/store.js](src/lib/store.js) |
 | Adapter contract | [src/scripts/adapters/CONTRACT.md](src/scripts/adapters/CONTRACT.md) — read before writing/modifying a chain adapter |
 | Shared ingest pipeline | [src/scripts/lib/ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) — only place chain-direct adapters write to DB |
-| Per-chain adapters | [src/scripts/adapters/](src/scripts/adapters/) — `masoutis.mjs` ✅, `ab.mjs` ✅, `kritikos.mjs` ✅ live; Sklavenitis + My Market direct adapters not built yet |
+| Per-chain adapters | [src/scripts/adapters/](src/scripts/adapters/) — `masoutis.mjs`, `ab.mjs`, `kritikos.mjs`, `mymarket.mjs`, `sklavenitis.mjs`, `lidl.mjs`, and `bazaar.mjs` are live; read [CONTRACT.md](src/scripts/adapters/CONTRACT.md) before changing any of them |
 | LLM resolver (chain-agnostic) | [src/scripts/resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) — `CHAIN=ab SOURCE=web node ...`. Brand-aware via `PendingMatch.brand`. |
 | Canonical (Wolt) scraper | [src/scripts/wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs) — `<venue-slug> [chain-slug]` args. Use for any Wolt-listed chain. |
 | Kritikos canonical scraper | [src/scripts/kritikos-canonical-scraper.mjs](src/scripts/kritikos-canonical-scraper.mjs) — walks the full Kritikos category tree, upserts Products by GTIN. |

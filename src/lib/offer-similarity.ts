@@ -189,10 +189,80 @@ export function variantConflict(a: string | null | undefined, b: string | null |
   return false;
 }
 
+type Quantities = {
+  massGrams: Set<number>;
+  volumeMl: Set<number>;
+  count: Set<number>;
+};
+
+function quantities(name: string | null | undefined): Quantities {
+  const out: Quantities = {
+    massGrams: new Set(),
+    volumeMl: new Set(),
+    count: new Set(),
+  };
+  if (!name) return out;
+  const normalized = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ς/g, 'σ')
+    // Diaper/clothing age-weight ranges are not product net quantities.
+    .replace(/\d+(?:[.,]\d+)?\s*[-–]\s*\d+(?:[.,]\d+)?\s*(?:kg|κιλ\w*|gr|g|γρ\w*)/g, ' ');
+
+  const massRe = /(\d+(?:[.,]\d+)?)\s*(kg|κιλ\w*|gr|g(?=[^a-zα-ω]|$)|γρ\w*)/g;
+  const volumeRe = /(\d+(?:[.,]\d+)?)\s*(ml|cl|lt|l(?=[^a-zα-ω]|$)|λτ|λιτρ\w*)/g;
+  const countRe = /(\d{1,3})\s*(?:τεμαχ\w*|τεμ(?=[^a-zα-ω]|$)|τμχ|pcs|μεζ\w*|mez|πλυσ\w*|ρολ\w*)/g;
+
+  let match: RegExpExecArray | null;
+  while ((match = massRe.exec(normalized))) {
+    const value = parseFloat(match[1].replace(',', '.'));
+    out.massGrams.add(match[2] === 'kg' || match[2].startsWith('κιλ') ? value * 1000 : value);
+  }
+  while ((match = volumeRe.exec(normalized))) {
+    const value = parseFloat(match[1].replace(',', '.'));
+    const unit = match[2];
+    const ml = unit === 'ml' ? value
+      : unit === 'cl' ? value * 10
+        : value * 1000;
+    out.volumeMl.add(ml);
+  }
+  while ((match = countRe.exec(normalized))) {
+    out.count.add(parseInt(match[1], 10));
+  }
+  return out;
+}
+
+function disjointWhenBothPresent(a: Set<number>, b: Set<number>): boolean {
+  if (a.size === 0 || b.size === 0) return false;
+  for (const value of a) if (b.has(value)) return false;
+  return true;
+}
+
+// Different declared net quantities are different sellable items. If one name
+// omits quantity entirely we stay permissive because canonical names are often
+// abbreviated; conflict requires both sides to state incompatible values.
+export function quantityConflict(a: string | null | undefined, b: string | null | undefined): boolean {
+  const qa = quantities(a);
+  const qb = quantities(b);
+  return disjointWhenBothPresent(qa.massGrams, qb.massGrams)
+    || disjointWhenBothPresent(qa.volumeMl, qb.volumeMl)
+    || disjointWhenBothPresent(qa.count, qb.count);
+}
+
 // Below this, two offers joined by productId are treated as different products
 // and hidden from comparison. Deliberately strict: a hidden legit comparison
 // costs us a feature; a shown wrong one costs us the user's trust.
 export const COMPARISON_SIMILARITY_FLOOR = 0.5;
+
+export function areComparableNames(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  return !variantConflict(a, b)
+    && !quantityConflict(a, b)
+    && nameSimilarity(a, b) >= COMPARISON_SIMILARITY_FLOOR;
+}
 
 // Candidates within this much of their chain's best score are kept alongside
 // it (same product can legitimately appear twice per chain as web + leaflet
@@ -216,7 +286,8 @@ export function filterComparable<T>(
     // Drop anything that differs on a flavour/fat/type marker BEFORE scoring —
     // a single differing variant token (Lemon vs Φράουλα, Light vs regular)
     // makes them different products even at a high Jaccard score.
-    .filter((c) => !variantConflict(sourceName, getName(c)))
+    .filter((c) => !variantConflict(sourceName, getName(c))
+      && !quantityConflict(sourceName, getName(c)))
     .map((c) => ({
       c,
       chain: getChain(c) ?? '',

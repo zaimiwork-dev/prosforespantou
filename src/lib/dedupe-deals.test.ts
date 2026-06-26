@@ -25,6 +25,12 @@ describe('dedupeDeals', () => {
     expect(dedupeDeals([a, b])).toHaveLength(2);
   });
 
+  it('does not collapse different quantities mis-mapped to one product at one chain', () => {
+    const a = deal({ id: 'a', productId: 'p1', productName: 'Barilla Πένες 500g', supermarket: 'mymarket' });
+    const b = deal({ id: 'b', productId: 'p1', productName: 'Barilla Πένες 400g', supermarket: 'mymarket' });
+    expect(dedupeDeals([a, b])).toHaveLength(2);
+  });
+
   it('crossChain: same product across chains → single card, cheapest chain wins the slot', () => {
     // The Μεβγάλ case: My Market row ranks first (higher hotScore) but
     // Masoutis sells the identical product 0.13€ cheaper.
@@ -41,6 +47,12 @@ describe('dedupeDeals', () => {
     const out = dedupeDeals([a, b], { crossChain: true });
     expect(out).toHaveLength(1);
     expect(out[0].id).toBe('b');
+  });
+
+  it('crossChain: does not collapse different variants sharing a stale productId', () => {
+    const regular = deal({ id: 'regular', productId: 'p1', productName: 'Fanta Πορτοκαλάδα 6x330ml', supermarket: 'kritikos', discountedPrice: 3.98 });
+    const zero = deal({ id: 'zero', productId: 'p1', productName: 'Fanta Πορτοκαλάδα Zero 6x330ml', supermarket: 'mymarket', discountedPrice: 3.6 });
+    expect(dedupeDeals([regular, zero], { crossChain: true })).toHaveLength(2);
   });
 
   it('crossChain: different products at different chains all stay', () => {

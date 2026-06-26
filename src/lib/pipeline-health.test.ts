@@ -59,4 +59,17 @@ describe('EXPECTED_FEEDS', () => {
     const keys = EXPECTED_FEEDS.map((f) => `${f.chain}/${f.source}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
+
+  it('monitors every live chain offer feed', () => {
+    const chains = new Set(EXPECTED_FEEDS.map((f) => f.chain));
+    expect(chains).toEqual(new Set([
+      'ab',
+      'bazaar',
+      'kritikos',
+      'lidl',
+      'masoutis',
+      'mymarket',
+      'sklavenitis',
+    ]));
+  });
 });

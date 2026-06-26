@@ -186,15 +186,29 @@ async function run() {
   const todo = candidates.filter((r) => !cache[keyOf(r)]);
   console.log(`\nLLM pass: ${candidates.length} questionable mappings, ${todo.length} not yet judged`);
 
+  let fatalError = null;
+  let consecutiveErrors = 0;
   for (let i = 0; i < todo.length; i += BATCH) {
     const batch = todo.slice(i, i + BATCH);
     const res = await judgeBatch(apiKey, batch);
     if (res.error) {
       console.log(`  batch ${i / BATCH + 1}: ${res.error}${res.status === 429 ? ' — backing off 60s' : ''}`);
-      if (res.status === 429) { await sleep(60000); i -= BATCH; }
+      if (res.status === 429) {
+        await sleep(60000);
+        i -= BATCH;
+        continue;
+      }
+      consecutiveErrors++;
+      // Billing/auth/request 4xx responses will not heal on the next batch.
+      // Stop instead of burning through the queue and reporting false success.
+      if ((res.status && res.status >= 400 && res.status < 500) || consecutiveErrors >= 3) {
+        fatalError = res.error;
+        break;
+      }
       await sleep(PACE_MS);
       continue;
     }
+    consecutiveErrors = 0;
     batch.forEach((r, j) => { cache[keyOf(r)] = res.verdicts[j]; });
     writeFileSync(VERDICT_CACHE, JSON.stringify(cache, null, 2));
     if ((i / BATCH) % 10 === 0) console.log(`  judged ${Math.min(i + BATCH, todo.length)}/${todo.length}`);
@@ -206,6 +220,14 @@ async function run() {
   const tally = judged.reduce((acc, r) => ((acc[r.verdict] = (acc[r.verdict] ?? 0) + 1), acc), {});
   console.log(`\nVerdicts: ${JSON.stringify(tally)}`);
   writeFileSync('./mapping-audit-report.json', JSON.stringify({ judged }, null, 2));
+
+  const unjudged = judged.filter((r) => r.verdict === 'unjudged').length;
+  if (fatalError || unjudged > 0) {
+    console.error(`LLM audit incomplete: ${unjudged} mapping(s) unjudged${fatalError ? `; last error: ${fatalError}` : ''}.`);
+    await prisma.$disconnect();
+    process.exitCode = 1;
+    return;
+  }
 
   if (!APPLY) {
     console.log(`Dry run — APPLY=1 would fix ${different.length} verdict=different mappings.`);

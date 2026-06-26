@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { samePack } from '@/lib/packaging';
-import { nameSimilarity, COMPARISON_SIMILARITY_FLOOR } from '@/lib/offer-similarity';
+import { filterComparable } from '@/lib/offer-similarity';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export interface CheaperAlternative {
@@ -106,7 +106,7 @@ export async function getCheaperAlternatives(
           const bc = s.product?.barcode;
           if (bc) for (const pid of barcodeToProductIds.get(bc) ?? []) matched.add(pid);
 
-          let best: (typeof candidates)[number] | null = null;
+          const eligible: typeof candidates = [];
           for (const pid of matched) {
             for (const c of byProductId.get(pid) ?? []) {
               if (c.supermarket === s.supermarket) continue;
@@ -115,9 +115,20 @@ export async function getCheaperAlternatives(
               if (!samePack(s.productName, c.productName)) continue;
               // Mis-mapped productIds join different products — never claim a
               // DIFFERENT product is "the same thing, cheaper elsewhere".
-              if (nameSimilarity(s.productName, c.productName) < COMPARISON_SIMILARITY_FLOOR) continue;
-              if (!best || c.discountedPrice < best.discountedPrice) best = c;
+              eligible.push(c);
             }
+          }
+
+          // Apply the exact name + variant guard used by the comparison UI.
+          const comparable = filterComparable(
+            s.productName,
+            eligible,
+            (c) => c.productName,
+            (c) => c.supermarket,
+          );
+          let best: (typeof candidates)[number] | null = null;
+          for (const c of comparable) {
+            if (!best || c.discountedPrice < best.discountedPrice) best = c;
           }
 
           out[s.id] = best

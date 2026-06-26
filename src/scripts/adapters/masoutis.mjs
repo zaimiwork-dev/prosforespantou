@@ -24,7 +24,7 @@ import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const BASE = 'https://www.masoutis.gr/api/eshop';
 const PAGE_SIZE = 50;
-const MAX_PAGES = envInt('MAX_PAGES', 60); // safety cap
+const MAX_PAGES = envInt('MAX_PAGES', 120); // safety cap (6,000 rows)
 const PACE_MS = envInt('PACE_MS', 650);
 const JITTER_MS = envInt('JITTER_MS', 300);
 
@@ -94,13 +94,17 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
   log(`   credential ok (usl=${cred.usl})`);
 
   const byItemcode = new Map();
+  let stoppedOnShortPage = false;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const rows = await fetchPage(cred, page, itemcodeFilter);
     for (const r of rows) {
       if (r.Itemcode != null) byItemcode.set(String(r.Itemcode), r);
     }
     log(`   page ${page} — ${rows.length} rows — unique items: ${byItemcode.size}`);
-    if (rows.length < PAGE_SIZE) break;
+    if (rows.length < PAGE_SIZE) {
+      stoppedOnShortPage = true;
+      break;
+    }
     if (byItemcode.size >= limit) break;
     await pace(PACE_MS, JITTER_MS);
   }
@@ -126,7 +130,18 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
     mirrorWarnings = mirror.warnings;
   }
 
-  return await ingestOffers({ chain: 'masoutis', source, items, dryRun, extraWarnings: mirrorWarnings });
+  // A full final page at MAX_PAGES means the feed may continue beyond our
+  // safety cap. Mark the run partial so stale deactivation is forbidden.
+  // Likewise, any finite LIMIT is an intentional partial run.
+  const partial = Number.isFinite(limit) || !stoppedOnShortPage;
+  return await ingestOffers({
+    chain: 'masoutis',
+    source,
+    items,
+    dryRun,
+    extraWarnings: mirrorWarnings,
+    partial,
+  });
 }
 
 // CLI behavior — only when this file is invoked directly via `node`.

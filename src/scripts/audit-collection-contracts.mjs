@@ -9,6 +9,7 @@
 // Usage:
 //   node src/scripts/audit-collection-contracts.mjs
 //   STRICT=1 node src/scripts/audit-collection-contracts.mjs  # non-zero on invalid kinds
+//   STRICT_FRESHNESS=1 ...  # also fail stale / never-recorded expected feeds
 //   STRICT_COMPLETENESS=1 ...  # also fail partial/missing full-catalog coverage
 //   COMPLETENESS_EXEMPT=sklavenitis STRICT_COMPLETENESS=1 ...  # known blocked chains
 
@@ -19,8 +20,10 @@ dotenv.config();
 
 const { default: prisma } = await import('../lib/prisma.ts');
 const { fetchCatalogCoverage } = await import('../lib/catalog-coverage.ts');
+const { fetchFeedHealth, isAlarming } = await import('../lib/pipeline-health.ts');
 
 const STRICT = process.env.STRICT === '1';
+const STRICT_FRESHNESS = process.env.STRICT_FRESHNESS === '1';
 const STRICT_COMPLETENESS = process.env.STRICT_COMPLETENESS === '1';
 const COMPLETENESS_EXEMPT = new Set(
   (process.env.COMPLETENESS_EXEMPT || '').split(',').map((s) => s.trim()).filter(Boolean),
@@ -101,6 +104,17 @@ console.table(latestRuns.map((r) => ({
   warnings: Array.isArray(r.warnings) ? r.warnings.length : 0,
 })));
 
+section('Expected feed freshness');
+const feedHealth = await fetchFeedHealth(prisma);
+console.table(feedHealth.map((f) => ({
+  chain: f.spec.chain,
+  source: f.spec.source,
+  status: f.status,
+  lastRunAt: f.lastRun?.finishedAt?.toISOString?.() || null,
+  lastOkAt: f.lastOkAt?.toISOString?.() || null,
+  maxAgeHours: f.spec.maxAgeHours,
+})));
+
 section('Catalog / baseline coverage');
 const coverage = await fetchCatalogCoverage(prisma);
 console.table(coverage.chains.map((c) => ({
@@ -129,6 +143,16 @@ await prisma.$disconnect();
 if (STRICT && invalidCount > 0) {
   console.error(`\nCollection contract failed: ${invalidCount} row(s) use unexpected offer/snapshot kinds.`);
   process.exit(1);
+}
+
+if (STRICT_FRESHNESS) {
+  const alarmingFeeds = feedHealth.filter((f) => isAlarming(f.status));
+  if (alarmingFeeds.length > 0) {
+    console.error(
+      `\nFeed freshness failed: ${alarmingFeeds.map((f) => `${f.spec.chain}/${f.spec.source}:${f.status}`).join(', ')}`,
+    );
+    process.exit(1);
+  }
 }
 
 if (STRICT_COMPLETENESS) {

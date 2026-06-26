@@ -31,6 +31,7 @@ export function DealGrid({
   emptyTitle,
   emptyText,
   onClearFilters,
+  showCompletionMessage = true,
 }) {
   const cartItems = useShoppingListStore((s) => s.items);
   const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
@@ -102,7 +103,7 @@ export function DealGrid({
         </div>
       )}
 
-      {!loading && !hasMore && grouped.length > 0 && (
+      {showCompletionMessage && !loading && !hasMore && grouped.length > 0 && (
         <div className="sub" style={{ textAlign: "center", marginTop: 28 }}>
           Εμφανίζονται όλες οι {grouped.length.toLocaleString("el-GR")} προσφορές
         </div>

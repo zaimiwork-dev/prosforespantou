@@ -4,6 +4,7 @@ import {
   nameSimilarity,
   filterComparable,
   variantConflict,
+  quantityConflict,
   COMPARISON_SIMILARITY_FLOOR,
 } from './offer-similarity';
 
@@ -24,6 +25,29 @@ describe('variantConflict (flavour/fat/type guard)', () => {
   it('does not block on the generic word "Χωρίς" or wine colour', () => {
     expect(variantConflict('Brava Μουστάρδα Απαλή 430gr', 'BRAVA Μουστάρδα Απαλή Χωρίς γλουτένη 430g')).toBe(false);
     expect(variantConflict('MARTINI Prosecco 750ml', 'MARTINI Prosecco Αφρώδης Λευκός Οίνος 750ml')).toBe(false);
+  });
+});
+
+describe('quantityConflict (net quantity guard)', () => {
+  it('blocks different weights, volumes, and piece counts', () => {
+    expect(quantityConflict('Barilla Πένες 500g', 'Barilla Πένες 400γρ')).toBe(true);
+    expect(quantityConflict('Ariel Υγρό 70μεζ 3,15lt', 'Ariel Υγρό 30μεζ 1,35L')).toBe(true);
+    expect(quantityConflict('Septona Δίσκοι 120τεμ', 'Septona Δίσκοι 60 τεμάχια')).toBe(true);
+  });
+
+  it('normalizes equivalent units', () => {
+    expect(quantityConflict('Γάλα 1L', 'Γάλα 1000ml')).toBe(false);
+    expect(quantityConflict('Μπίρα 0,33lt', 'Μπίρα 330ml')).toBe(false);
+    expect(quantityConflict('Τυρί 1kg', 'Τυρί 1000gr')).toBe(false);
+  });
+
+  it('stays permissive when one abbreviated name omits quantity', () => {
+    expect(quantityConflict('Cajoline 52 πλύσεις', 'Cajoline Μύρτιλο & Ορχιδέα')).toBe(false);
+  });
+
+  it('ignores body-weight ranges but still reads the item count', () => {
+    expect(quantityConflict('Πάνες No4 9-14kg 46τεμ', 'Πάνες No4 46 τεμάχια')).toBe(false);
+    expect(quantityConflict('Πάνες No4 9-14kg 46τεμ', 'Πάνες No4 9-14kg 52τεμ')).toBe(true);
   });
 });
 
@@ -156,5 +180,15 @@ describe('filterComparable', () => {
     ];
     const kept = filterComparable(AB_RICH_CARAMEL, candidates, getName, getChain);
     expect(kept.map((c) => c.id)).toEqual(['skl-right']);
+  });
+
+  it('drops a differently-sized item even when the rest of the name matches', () => {
+    const kept = filterComparable(
+      'Barilla Πένες Ριγέ 500g',
+      [mk('Barilla Πένες Ριγέ 400g', 'mymarket', 'wrong-size')],
+      getName,
+      getChain,
+    );
+    expect(kept).toEqual([]);
   });
 });

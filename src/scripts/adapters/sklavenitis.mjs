@@ -182,20 +182,20 @@ export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } 
   // residential proxy. No-op locally / without the secret. See lib/proxy-fetch.mjs.
   const proxy = installProxyFromEnv();
   if (REQUIRE_PROXY && !proxy.enabled) {
-    console.log('   skipping: REQUIRE_PROXY=1 but PROXY_URL is not set; avoiding direct CI request to Sklavenitis');
-    return {
+    const warning = 'REQUIRE_PROXY=1 but PROXY_URL is missing; Sklavenitis was not fetched.';
+    console.log(`   ${warning}`);
+    // Run the empty result through the shared pipeline so the failed attempt is
+    // recorded in IngestRun, stale offers stay untouched, and CI exits non-zero.
+    // The old early return reported healthOk=true and silently hid a dead feed.
+    const report = await ingestOffers({
       chain: 'sklavenitis',
       source: 'web',
-      scrapedItems: 0,
-      matched: 0,
-      reviewQueued: 0,
-      unmatchedShown: 0,
-      priceChanges: 0,
-      deactivated: 0,
-      errors: 0,
-      healthOk: true,
-      warnings: ['Skipped because REQUIRE_PROXY=1 and PROXY_URL is missing.'],
-    };
+      items: [],
+      dryRun,
+      extraWarnings: [warning],
+    });
+    printReport(report);
+    return report;
   }
 
   const byCode = new Map();

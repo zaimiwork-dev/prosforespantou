@@ -201,8 +201,17 @@ async function run() {
   // residential proxy in CI; no-op locally / without the secret.
   const proxy = installProxyFromEnv();
   if (REQUIRE_PROXY && !proxy.enabled) {
-    console.log('   skipping: REQUIRE_PROXY=1 but PROXY_URL is not set; avoiding a direct CI request to Sklavenitis');
-    process.exit(0);
+    const warning = 'REQUIRE_PROXY=1 but PROXY_URL is missing; Sklavenitis catalog was not fetched.';
+    console.log(`   ${warning}`);
+    // Record a failed catalog run instead of silently succeeding. No catalog
+    // rows are deleted by ingestCatalog's zero-item safety path.
+    const report = await ingestCatalog({
+      chain: 'sklavenitis',
+      items: [],
+      dryRun: DRY_RUN,
+      extraWarnings: [warning],
+    });
+    process.exit(report.healthOk ? 0 : 1);
   }
 
   const extraWarnings = [];
