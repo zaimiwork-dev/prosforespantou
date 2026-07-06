@@ -39,8 +39,16 @@ name: Scrape supermarket chains
 #   then re-ingested the same rows. Splitting makes adapters cheap-and-fast and
 #   gives the resolver room to chew through backlog independently.
 #
-# Masoutis is NOT here — its adapter fits in Vercel's timeout and runs as a
-# cron route, then its PendingMatch rows are picked up by this resolver job.
+# Masoutis offers moved HERE from Vercel cron (2026-07-06): the leaflet run
+# (~3k items, ~10-12 min) exceeds Vercel's 300s maxDuration and died mid-run
+# every Thursday without ever writing an IngestRun row — the web cron survived
+# only because 500-ish items fit the budget. GH has no such cap. The cron
+# route (/api/cron/scrape-masoutis) still works as a manual refresh endpoint.
+#
+# pipeline-health also fires from here (08:00 UTC) for the same reason: its
+# Vercel cron was part of the same unreliable set, which is how the leaflet
+# feed sat stale for 10 days without an alarm. curl -f makes a failing
+# watchdog itself turn the workflow red (watchdog for the watchdog).
 
 on:
   schedule:
@@ -49,7 +57,10 @@ on:
     - cron: '0 2 * * *'   # daily 02:00 UTC — Kritikos offers
     - cron: '30 2 * * *'  # daily 02:30 UTC — Bazaar offers
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
+    - cron: '30 3 * * *'  # daily 03:30 UTC — Masoutis web offers (site API)
     - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
+    - cron: '0 3 * * 4'   # weekly Thu 03:00 UTC — Masoutis leaflet offers (site API)
+    - cron: '0 8 * * *'   # daily 08:00 UTC — pipeline-health watchdog (staleness alarm)
     - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
     - cron: '30 3 * * 0'  # weekly Sun 03:30 UTC — Lidl catalog (e-shop grid)
     - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
@@ -83,6 +94,9 @@ on:
           - sklavenitis-resolver-only
           - mymarket-resolver-only
           - masoutis-resolver-only
+          - masoutis-offers
+          - masoutis-leaflet
+          - pipeline-health
           - lidl-resolver-only
           - mymarket-canonical
           - sklavenitis-canonical
@@ -533,6 +547,70 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  masoutis-offers:
+    # Daily 03:30 UTC + manual. Moved from the Vercel cron (2026-07-06) so both
+    # masoutis feeds live where every other chain runs. Same site API the weekly
+    # masoutis-catalog job has hit from GH runners for weeks (not IP-blocked).
+    if: github.event.schedule == '30 3 * * *' || github.event.inputs.chain == 'masoutis-offers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/adapters/masoutis.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          # Offer-image mirror (masoutis promo URLs rotate). R2 preferred via
+          # workflow-level env; Supabase fallback. Missing creds → warn, keep chain URLs.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  masoutis-leaflet:
+    # Weekly Thu 03:00 UTC + manual. The leaflet feed (~3k items, ~10-12 min)
+    # NEVER fit Vercel's 300s maxDuration — it died mid-run every Thursday
+    # before writing an IngestRun row, which is why the feed silently went
+    # stale. SOURCE=leaflet is load-bearing: ingest dedupes and deactivates
+    # per (chain, source); mislabeling would wipe the web rows.
+    if: github.event.schedule == '0 3 * * 4' || github.event.inputs.chain == 'masoutis-leaflet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/adapters/masoutis.mjs
+        env:
+          SOURCE: 'leaflet'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  pipeline-health:
+    # Daily 08:00 UTC + manual. Pings the staleness-watchdog route. Lives here
+    # (not Vercel cron) so a dead watchdog is a visibly red workflow run.
+    if: github.event.schedule == '0 8 * * *' || github.event.inputs.chain == 'pipeline-health'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping pipeline-health route
+        run: |
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://prosforespantou.gr/api/cron/pipeline-health
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
   lidl-offers:
     # Weekly Thu 06:00 UTC + manual `lidl-offers`. Reads the current weekly deals

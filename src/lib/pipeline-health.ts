@@ -16,12 +16,15 @@ export type FeedSpec = {
 // Keep in sync with .github/workflows/scrape-chains.yml and vercel.json.
 export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'mymarket', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 00:00 UTC — GitHub Actions' },
-  { chain: 'sklavenitis', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 01:00 UTC — GitHub Actions' },
+  // Sklavenitis runs from the dev PC (Akamai 403s GitHub/Vercel IPs; owner chose
+  // the free local path over a paid proxy, 2026-07-06). 48h window tolerates one
+  // missed night (PC off) without a false alarm; two misses = real 'stale'.
+  { chain: 'sklavenitis', source: 'web', maxAgeHours: 48, schedule: 'καθημερινά 02:30 τοπική ώρα — Windows task (dev PC)' },
   { chain: 'kritikos', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 02:00 UTC — GitHub Actions' },
   { chain: 'bazaar', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 02:30 UTC — GitHub Actions' },
   { chain: 'ab', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 03:00 UTC — GitHub Actions' },
-  { chain: 'masoutis', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 06:00 UTC — Vercel cron' },
-  { chain: 'masoutis', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 06:30 UTC — Vercel cron' },
+  { chain: 'masoutis', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 03:30 UTC — GitHub Actions' },
+  { chain: 'masoutis', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 03:00 UTC — GitHub Actions' },
   { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 06:00 UTC — GitHub Actions' },
 ];
 

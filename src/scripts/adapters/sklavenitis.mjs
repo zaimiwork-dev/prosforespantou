@@ -182,20 +182,16 @@ export async function runSklavenitisAdapter({ dryRun = DRY_RUN, limit = LIMIT } 
   // residential proxy. No-op locally / without the secret. See lib/proxy-fetch.mjs.
   const proxy = installProxyFromEnv();
   if (REQUIRE_PROXY && !proxy.enabled) {
-    const warning = 'REQUIRE_PROXY=1 but PROXY_URL is missing; Sklavenitis was not fetched.';
-    console.log(`   ${warning}`);
-    // Run the empty result through the shared pipeline so the failed attempt is
-    // recorded in IngestRun, stale offers stay untouched, and CI exits non-zero.
-    // The old early return reported healthOk=true and silently hid a dead feed.
-    const report = await ingestOffers({
-      chain: 'sklavenitis',
-      source: 'web',
-      items: [],
-      dryRun,
-      extraWarnings: [warning],
-    });
-    printReport(report);
-    return report;
+    // QUIET SKIP (2026-07-06). The official Sklavenitis path is the Windows
+    // scheduled task on the dev PC (owner decision — no paid proxy). CI keeps
+    // this job only as a free retry lane if a PROXY_URL secret ever appears.
+    // Do NOT record a failed IngestRun here: that kept the admin Υγεία tab
+    // permanently 'warn' (last run unhealthy) even when the local task was
+    // producing healthy runs. Dead-feed detection is pipeline-health's
+    // EXPECTED_FEEDS staleness window (48h), which alarms if the local task
+    // stops delivering — the concern the old failed-run record addressed.
+    console.log('   REQUIRE_PROXY=1 but PROXY_URL is missing — quiet skip (official path: local Windows task).');
+    return { healthOk: true, skipped: true, scrapedItems: 0, matched: 0, errors: 0, warnings: [] };
   }
 
   const byCode = new Map();

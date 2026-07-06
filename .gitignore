@@ -91,3 +91,6 @@ devserver.log
 # later (drop these lines) if you want reproducible CI builds.
 /android
 /ios
+
+# Sklavenitis local scheduled-task logs (scripts/windows/run-sklavenitis.ps1)
+/logs/
