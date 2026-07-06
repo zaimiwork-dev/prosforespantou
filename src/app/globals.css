@@ -2018,6 +2018,15 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .pc-current { color: var(--ink-3); font-size: 10px; font-weight: 700; }
 .pc-diff { color: var(--accent); font-size: 10px; font-weight: 700; }
 .pc-price { font-size: 15px; font-weight: 900; color: var(--ink); letter-spacing: -0.01em; }
+/* Shelf-price rows: chains with no active offer — latest recorded normal
+   shelf price, visually quieter than offer rows and not clickable. */
+.pc-row.is-shelf { background: var(--surface-2); cursor: default; }
+.pc-row.is-shelf .pc-price { color: var(--ink-2); font-weight: 800; }
+.pc-normal {
+  color: var(--ink-3); font-size: 10px; font-weight: 700;
+  background: var(--bg-soft); padding: 2px 7px; border-radius: 5px;
+  white-space: nowrap;
+}
 
 /* =========================================================
    Bottom navigation (phones)

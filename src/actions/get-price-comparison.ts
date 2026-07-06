@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
+import { pickShelfRows, SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
 
 export async function getPriceComparison(discountId: string) {
   return await Sentry.withServerActionInstrumentation(
@@ -18,6 +19,7 @@ export async function getPriceComparison(discountId: string) {
             id: true,
             productId: true,
             productName: true,
+            supermarket: true,
             product: { select: { barcode: true } },
           },
         });
@@ -68,13 +70,42 @@ export async function getPriceComparison(discountId: string) {
           (d) => d.supermarket
         ).slice(0, 8);
 
-        return comparable.map((d) => ({
+        const offerRows = comparable.map((d) => ({
           ...d,
+          rowType: 'offer' as const,
           validFrom: d.validFrom.toISOString(),
           validUntil: d.validUntil.toISOString(),
           createdAt: d.createdAt.toISOString(),
           updatedAt: d.updatedAt.toISOString(),
         }));
+
+        // Shelf-price rows («Κανονική τιμή») for chains with NO active offer on
+        // this product. Barcode-gated: snapshots carry no chain-side name, so
+        // the variant/pack guards can't vet them — only the GTIN-verified
+        // cluster is safe (mapping-only clusters are exactly where the stale
+        // mis-mappings live; the Groq mapping audit is still deferred).
+        // Chains that appeared in `others` are excluded even if their offer was
+        // dropped by a guard above — the snapshot shares the same mapping risk.
+        if (!barcode) return offerRows;
+
+        const excludedChains = new Set<string>();
+        if (source.supermarket) excludedChains.add(source.supermarket);
+        for (const d of others) if (d.supermarket) excludedChains.add(d.supermarket);
+
+        const snapshots = await prisma.priceSnapshot.findMany({
+          where: {
+            productId: { in: [...matchedProductIds] },
+            kind: 'normal',
+            recordedAt: { gte: new Date(now.getTime() - SHELF_PRICE_MAX_AGE_DAYS * 86400000) },
+            supermarket: { notIn: [...excludedChains] },
+          },
+          orderBy: { recordedAt: 'desc' },
+          take: 100,
+          select: { supermarket: true, price: true, recordedAt: true },
+        });
+
+        const shelfRows = pickShelfRows({ snapshots, excludedChains, now });
+        return [...offerRows, ...shelfRows];
       } catch (error) {
         Sentry.captureException(error);
         console.error('Error fetching price comparison:', error);
