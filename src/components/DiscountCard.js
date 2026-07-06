@@ -8,23 +8,11 @@ import { SUPERMARKETS } from '@/lib/constants';
 import { track } from '@/lib/track';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { displayCategoryForProduct } from '@/lib/display-category';
+import { expiryInfo } from '@/lib/expiry-label';
 
 // Honest "good deal" labels — only positive verdicts ever reach the card
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
 const VERDICT_LABEL = { lowest: '🔥 Χαμηλότερη τιμή', good: '✅ Καλή τιμή' };
-
-function daysLeft(dateStr, nowMs) {
-  if (!dateStr) return null;
-  const today = new Date(nowMs); today.setHours(0, 0, 0, 0);
-  const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0);
-  return Math.round((exp - today) / 86400000);
-}
-
-function formatShortDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -73,15 +61,15 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
     displayImage = `/wolt_images/${displayImage.split('/').pop()}`;
   }
 
-  const dLeft = daysLeft(validUntil, nowMs);
-  const urgent = dLeft !== null && dLeft >= 0 && dLeft <= 2;
-  const expiryLabel = urgent
-    ? (dLeft === 0 ? "Λήγει σήμερα" : dLeft === 1 ? "Λήγει αύριο" : `Λήγει σε ${dLeft} μέρες`)
-    : validUntil ? `Έως ${formatShortDate(validUntil)}` : null;
-
-  const startsLabel = validFrom && new Date(validFrom).getTime() > nowMs
-    ? `Ξεκινά ${formatShortDate(validFrom)}`
-    : null;
+  // Honest dates: "Έως/Λήγει" vocabulary only when the chain published the
+  // window (datesFromSource); otherwise "Ελέγχθηκε DD/MM" from updatedAt
+  // (bumped by every scrape run that still sees the offer live).
+  const exp = expiryInfo({
+    validFrom,
+    validUntil,
+    updatedAt: d.updatedAt ?? d.updated_at,
+    datesFromSource: d.datesFromSource ?? d.dates_from_source,
+  }, nowMs);
 
   const showVerdict = isPositiveVerdict(d.priceVerdict);
 
@@ -159,15 +147,10 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
           </div>
         )}
 
-        {startsLabel ? (
-          <div className="expiry-chip">
+        {exp.chip ? (
+          <div className={`expiry-chip${exp.urgent ? " soon" : ""}`}>
             <Icon.Clock size={11} />
-            <span>{startsLabel}</span>
-          </div>
-        ) : expiryLabel ? (
-          <div className={`expiry-chip${urgent ? " soon" : ""}`}>
-            <Icon.Clock size={11} />
-            <span>{expiryLabel}</span>
+            <span>{exp.chip}</span>
           </div>
         ) : null}
       </div>

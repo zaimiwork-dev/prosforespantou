@@ -44,6 +44,8 @@ export type CatalogProduct = {
     imageUrl: string | null;
     validFrom: Date | string | null;
     validUntil: Date | string | null;
+    datesFromSource?: boolean;
+    updatedAt?: Date | string | null;
     discountPercent: number | null;
     hotScore?: number | null;
     productId: string | null;
@@ -113,6 +115,11 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
             imageUrl: true,
             validFrom: true,
             validUntil: true,
+            // The catalog's ProductSheet feeds this trimmed object straight
+            // into OfferDetails — without these two the honest-dates UI would
+            // treat every catalog-opened offer as fabricated-date.
+            datesFromSource: true,
+            updatedAt: true,
             hotScore: true,
             productId: true,
           },

@@ -109,6 +109,12 @@ model Discount {
   offerType       String?  @map("offer_type")
   validFrom       DateTime @map("valid_from")
   validUntil      DateTime @map("valid_until")
+  // TRUE only when the chain itself published this offer's validity window
+  // (AB promo endDate, Lidl badge dates, admin-entered). FALSE = validUntil is
+  // the ingest +14d bookkeeping default — the UI must show "Σε ισχύ • ελέγχθηκε
+  // <updatedAt>" instead of presenting a fabricated date as real. Written by
+  // ingest-offers writeOffer on every create/update (self-correcting).
+  datesFromSource Boolean  @default(false) @map("dates_from_source")
   imageUrl        String?  @map("image_url")
   description     String?
   createdAt       DateTime @default(now()) @map("created_at")

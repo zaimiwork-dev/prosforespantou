@@ -42,7 +42,9 @@ export async function generateMetadata({ params }) {
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   };
 
-  const expiryStr = offer.validUntil ? ` έως ${formatDate(offer.validUntil)}` : "";
+  // SEO honesty: only chain-published end dates reach metadata — a fabricated
+  // +14d default in Google results would be a public false promise.
+  const expiryStr = offer.datesFromSource && offer.validUntil ? ` έως ${formatDate(offer.validUntil)}` : "";
   const description = `${offer.productName} στα ${storeName}. Τιμή: ${offer.discountedPrice}€ (${offer.discountPercent}% έκπτωση)${expiryStr}.`;
 
   return {
@@ -105,7 +107,8 @@ export default async function OfferPage({ params }) {
       "price": offer.discountedPrice,
       "priceCurrency": "EUR",
       "availability": "https://schema.org/InStock",
-      "priceValidUntil": toIso(offer.validUntil),
+      // Same honesty rule as the metadata: no fabricated validity in JSON-LD.
+      "priceValidUntil": offer.datesFromSource ? toIso(offer.validUntil) : undefined,
       "seller": { "@type": "Organization", "name": offer.store?.name || supermarketName },
       "url": `${baseUrl}/offer/${offer.id}`
     }

@@ -13,19 +13,7 @@ import { parsePack, perUnitPrice, unitPrice } from '@/lib/pack-info';
 import { useShoppingListStore, favoriteKeyFor } from '@/lib/store';
 import { recordInterest, WEIGHT } from '@/lib/interest-profile';
 import { displayCategoryForProduct } from '@/lib/display-category';
-
-function formatDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-}
-
-function daysLeft(dateStr, nowMs) {
-  if (!dateStr) return null;
-  const today = new Date(nowMs); today.setHours(0, 0, 0, 0);
-  const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0);
-  return Math.round((exp - today) / 86400000);
-}
+import { expiryInfo } from '@/lib/expiry-label';
 
 // A small linked tile in the "Παρόμοιες προσφορές" strip. Plain <img> on
 // purpose: these are tiny, and skipping the optimizer avoids the
@@ -93,17 +81,14 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
     ? Math.round((1 - discountedPrice / originalPrice) * 100)
     : null);
 
-  const dLeft = daysLeft(offer.validUntil, nowMs);
-  const expiryUrgent = dLeft !== null && dLeft >= 0 && dLeft <= 2;
-  const expiryLabel = dLeft === null ? '—'
-    : dLeft < 0 ? 'Έχει λήξει'
-    : dLeft === 0 ? 'Τελειώνει σήμερα'
-    : dLeft === 1 ? 'Τελειώνει αύριο'
-    : dLeft <= 2 ? `Τελειώνει σε ${dLeft} μέρες`
-    : `Σε ${dLeft} ημέρες`;
-  const validFromFull = formatDate(offer.validFrom ?? offer.valid_from);
-  const validUntilFull = formatDate(offer.validUntil ?? offer.valid_until);
-  const notStartedYet = offer.validFrom ? new Date(offer.validFrom).getTime() > nowMs : false;
+  // Honest dates: countdown/date vocabulary only when the chain published the
+  // window (datesFromSource); otherwise "Σε ισχύ / ελέγχθηκε <last-verified>".
+  const exp = expiryInfo({
+    validFrom: offer.validFrom ?? offer.valid_from,
+    validUntil: offer.validUntil ?? offer.valid_until,
+    updatedAt: offer.updatedAt ?? offer.updated_at,
+    datesFromSource: offer.datesFromSource ?? offer.dates_from_source,
+  }, nowMs);
 
   const handleAdd = () => {
     track({
@@ -185,19 +170,19 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
           return <div className="od-pack">📦 {parts.join(' · ')}</div>;
         })()}
 
-        {notStartedYet && validFromFull && (
-          <div className="od-upcoming">Η προσφορά ξεκινά στις {validFromFull}</div>
+        {exp.upcoming && exp.startFull && (
+          <div className="od-upcoming">Η προσφορά ξεκινά στις {exp.startFull}</div>
         )}
 
         <div className="od-dates">
           <div className="od-date-box">
             <div className="od-date-label">Έναρξη</div>
-            <div className="od-date-val">{validFromFull || '—'}</div>
+            <div className="od-date-val">{exp.startFull || '—'}</div>
           </div>
           <div className="od-date-box">
             <div className="od-date-label">Λήξη</div>
-            <div className={`od-date-val${expiryUrgent ? ' urgent' : ''}`}>{expiryLabel}</div>
-            {validUntilFull && <div className="od-date-sub">έως {validUntilFull}</div>}
+            <div className={`od-date-val${exp.urgent ? ' urgent' : ''}`}>{exp.status}</div>
+            {exp.statusSub && <div className="od-date-sub">{exp.statusSub}</div>}
           </div>
         </div>
 

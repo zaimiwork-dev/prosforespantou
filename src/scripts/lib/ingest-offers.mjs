@@ -181,6 +181,12 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
     offerType,
     validFrom,
     validUntil,
+    // Honest-dates flag: TRUE only when the CHAIN supplied the end date (AB
+    // promo endDate, Lidl badge dates). FALSE = validUntil above is our +14d
+    // bookkeeping default and the UI must not present it as a real expiry.
+    // Recomputed on every update, so a chain that starts/stops publishing
+    // dates self-corrects on the next run.
+    datesFromSource: Boolean(item.validUntil),
     imageUrl: item.imageUrl || null,
     // Adapters use `description` for chain-printed sticker text ("-25%",
     // "1+1", "ΧΑΜΗΛΗ ΤΙΜΗ", weight/pack size, etc). The UI surfaces this as

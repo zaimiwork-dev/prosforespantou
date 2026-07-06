@@ -126,6 +126,9 @@ export async function createDiscount(input: unknown) {
           description: data.description,
           validFrom,
           validUntil,
+          // Real dates: the admin typed them, or an active leaflet's window was
+          // adopted. Only the pure schema-default fallback counts as fabricated.
+          datesFromSource: !datesMissing || leafletId != null,
           leafletId,
           imageUrl: data.imageUrl,
           isActive: data.isActive,
