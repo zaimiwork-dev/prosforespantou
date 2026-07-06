@@ -50,6 +50,12 @@ export type CatalogProduct = {
     hotScore?: number | null;
     productId: string | null;
   };
+  // Last-known normal shelf price for products with NO current offer (owner
+  // decision 2026-07-06: catalog tiles show a real price + the date we saw it,
+  // not a bare "Κατάλογος" label). No freshness cutoff here — the printed
+  // date carries the honesty; comparison rows (shelf-comparison.ts) are the
+  // strict-freshness surface.
+  shelf: null | { price: number; recordedAt: string; supermarket: string };
 };
 
 function compactWhere(parts: any[]) {
@@ -65,7 +71,46 @@ function mapRows(rows: any[]): CatalogProduct[] {
     imageUrl: p.imageUrl,
     supermarket: p.supermarket,
     offer: p.discounts[0] ?? null,
+    shelf: null,
   }));
+}
+
+// Fill `shelf` for the page's offer-less products: latest normal-shelf
+// snapshot, preferring the product's own chain, else the newest overall.
+// One indexed query per page (≤ page-size ids), latest row per (product,
+// chain) via orderBy+distinct — same pattern ingestBaseline uses.
+async function attachShelfPrices(products: CatalogProduct[]): Promise<CatalogProduct[]> {
+  const ids = products.filter((p) => !p.offer).map((p) => p.id);
+  if (ids.length === 0) return products;
+
+  const snapshots = await prisma.priceSnapshot.findMany({
+    where: { productId: { in: ids }, kind: 'normal' },
+    orderBy: { recordedAt: 'desc' },
+    distinct: ['productId', 'supermarket'],
+    select: { productId: true, supermarket: true, price: true, recordedAt: true },
+  });
+
+  const byProduct = new Map<string, { price: number; recordedAt: Date; supermarket: string }[]>();
+  for (const s of snapshots) {
+    if (!s.supermarket || !Number.isFinite(s.price) || s.price <= 0) continue;
+    const list = byProduct.get(s.productId) ?? [];
+    list.push({ price: s.price, recordedAt: s.recordedAt, supermarket: s.supermarket });
+    byProduct.set(s.productId, list);
+  }
+
+  for (const p of products) {
+    if (p.offer) continue;
+    const list = byProduct.get(p.id);
+    if (!list || list.length === 0) continue;
+    const own = p.supermarket ? list.find((s) => s.supermarket === p.supermarket) : null;
+    const pick = own ?? list.reduce((a, b) => (a.recordedAt >= b.recordedAt ? a : b));
+    p.shelf = {
+      price: pick.price,
+      recordedAt: pick.recordedAt.toISOString(),
+      supermarket: pick.supermarket,
+    };
+  }
+  return products;
 }
 
 export async function getCatalogProducts(rawInput: unknown): Promise<{ products: CatalogProduct[]; total: number }> {
@@ -189,7 +234,7 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
           });
 
         const page = scored.slice(offset, offset + limit).map((x) => x.p);
-        return { products: mapRows(page), total: scored.length };
+        return { products: await attachShelfPrices(mapRows(page)), total: scored.length };
       }
 
       const baseWhere = compactWhere(baseParts);
@@ -204,7 +249,7 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
           }),
           prisma.product.count({ where: baseWhere }),
         ]);
-        return { products: mapRows(rows), total };
+        return { products: await attachShelfPrices(mapRows(rows)), total };
       }
 
       const withOfferWhere = compactWhere([...baseParts, { discounts: { some: currentOfferWhere } }]);
@@ -226,7 +271,8 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
         });
         rows.push(...offerRows.slice(offset, offset + limit));
       }
-      return { products: mapRows(rows), total: offerTotal };
+      // offers-mode rows all carry an offer; attachShelfPrices no-ops cheaply.
+      return { products: await attachShelfPrices(mapRows(rows)), total: offerTotal };
     } catch (error) {
       Sentry.captureException(error);
       console.error('Error fetching catalog products:', error);

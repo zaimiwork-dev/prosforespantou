@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useShoppingListStore } from "@/lib/store";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
+import { ProductCard } from "@/components/ProductCard";
 import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { Footer } from "@/components/Footer";
 
-export function SearchPage({ query, deals }) {
+export function SearchPage({ query, deals, catalogProducts = [] }) {
   const router = useRouter();
   const [inputValue, setInputValue] = useState(query);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -79,21 +80,42 @@ export function SearchPage({ query, deals }) {
           </h1>
           {query && (
             <p style={{ fontSize: 13, color: "#8b929c", margin: 0, fontWeight: 500 }}>
-              {deals.length === 0 ? "Δεν βρέθηκαν αποτελέσματα" : `${deals.length} προσφορές`}
+              {deals.length === 0 ? "Δεν βρέθηκαν προσφορές" : `${deals.length} προσφορές`}
+              {catalogProducts.length > 0 && ` · ${catalogProducts.length} από τους καταλόγους`}
             </p>
           )}
         </div>
 
-        <DealGrid
-          deals={deals}
-          loading={false}
-          loadingMore={false}
-          onAdd={addItem}
-          onSelect={setSelectedProduct}
-          emptyTitle={`Δεν βρέθηκαν προϊόντα για "${query}"`}
-          emptyText="Δοκίμασε άλλη λέξη ή greeklish (π.χ. gala, tyri, kafes)."
-          onClearFilters={null}
-        />
+        {(deals.length > 0 || catalogProducts.length === 0) && (
+          <DealGrid
+            deals={deals}
+            loading={false}
+            loadingMore={false}
+            onAdd={addItem}
+            onSelect={setSelectedProduct}
+            emptyTitle={`Δεν βρέθηκαν προϊόντα για "${query}"`}
+            emptyText="Δοκίμασε άλλη λέξη ή greeklish (π.χ. gala, tyri, kafes)."
+            onClearFilters={null}
+          />
+        )}
+
+        {catalogProducts.length > 0 && (
+          <section style={{ marginTop: deals.length > 0 ? 28 : 0 }}>
+            <div style={{ marginBottom: 12, padding: "0 4px" }}>
+              <h2 style={{ fontSize: 16, fontWeight: 900, margin: "0 0 2px", letterSpacing: "-0.3px" }}>
+                Από τους καταλόγους
+              </h2>
+              <p style={{ fontSize: 12, color: "#8b929c", margin: 0, fontWeight: 500 }}>
+                Δεν είναι σε προσφορά τώρα — τελευταία γνωστή τιμή ραφιού.
+              </p>
+            </div>
+            <div className="products-grid">
+              {catalogProducts.map((p) => (
+                <ProductCard key={p.id} p={p} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

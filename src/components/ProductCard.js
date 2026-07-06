@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { SUPERMARKETS } from '@/lib/constants';
+import { formatShortDate } from '@/lib/expiry-label';
 
 function normalize(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
@@ -37,7 +38,9 @@ export function ProductCard({ p, onSelect }) {
   const [imgIndex, setImgIndex] = useState(0);
   const offer = p.offer;
   const displayName = offer?.productName || p.name;
-  const supermarketId = offer?.supermarket || p.supermarket;
+  // Chain pill follows the price being shown: the offer's chain, else the
+  // chain whose shelf price we display, else the product's first-seen chain.
+  const supermarketId = offer?.supermarket || p.shelf?.supermarket || p.supermarket;
   const sm = supermarketId ? (SUPERMARKETS.find((s) => s.id === supermarketId) || { name: supermarketId, color: 'var(--ink-2)' }) : null;
   const brand = cleanMeta(p.brand);
   const unitInfo = cleanMeta(p.unitInfo);
@@ -108,6 +111,13 @@ export function ProductCard({ p, onSelect }) {
             <div className={offer.originalPrice ? 'has-discount' : undefined}>
               <div className="price">{offer.discountedPrice?.toFixed(2)}€</div>
               {offer.originalPrice && <div className="price-old">{offer.originalPrice.toFixed(2)}€</div>}
+            </div>
+          ) : p.shelf ? (
+            // Not on offer — show the last-known shelf price with the date we
+            // recorded it, instead of a priceless "Κατάλογος" label.
+            <div>
+              <div className="price catalog-shelf-price">{Number(p.shelf.price).toFixed(2)}€</div>
+              <div className="catalog-shelf-date">τιμή ραφιού {formatShortDate(p.shelf.recordedAt)}</div>
             </div>
           ) : (
             <div className="catalog-card-muted">Κατάλογος</div>
