@@ -235,74 +235,36 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
   };
 
   return (
-    <div style={{ "--brand": sm.color, background: "#f3f5f8", color: "#1c1e24", minHeight: "100vh", fontFamily: "var(--font-outfit), sans-serif" }}>
+    <div className="sm-page" style={{ "--brand": sm.color }}>
 
       <SiteHeader cartCount={cart.length} onCartOpen={() => setIsCartOpen(true)} />
 
-      <section
-        style={{
-          background: `linear-gradient(135deg, color-mix(in srgb, ${sm.color} 22%, #ffffff) 0%, color-mix(in srgb, ${sm.color} 45%, #ffffff) 100%)`,
-          color: "#1c1e24",
-          padding: "44px 20px 56px",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ position: "absolute", top: -60, right: -40, width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,0.35)" }} />
-        <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <Link
-            href="/"
-            style={{
-              color: "rgba(28,30,36,0.75)",
-              textDecoration: "none",
-              fontSize: 13,
-              fontWeight: 700,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              marginBottom: 16,
-            }}
-          >
+      <section className="sm-hero">
+        <div className="sm-hero-ornament" />
+        <div className="sm-hero-inner">
+          <Link href="/" className="sm-back-link">
             ← Πίσω στην αρχική
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 10, flexWrap: "wrap" }}>
-            <div
-              style={{
-                width: 96,
-                height: 96,
-                background: "#fff",
-                borderRadius: 18,
-                display: "grid",
-                placeItems: "center",
-                overflow: "hidden",
-                flex: "none",
-                boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
-              }}
-            >
+          <div className="sm-hero-brand-row">
+            <div className="sm-logo-box">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/logos/${sm.logo || `${sm.id}.png`}`}
-                alt={sm.name}
-                style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
-              />
+              <img src={`/logos/${sm.logo || `${sm.id}.png`}`} alt={sm.name} />
             </div>
-            <h1 style={{ fontSize: "clamp(28px, 6vw, 42px)", fontWeight: 900, margin: 0, letterSpacing: "-1px", lineHeight: 1.05 }}>
-              Προσφορές {sm.name}
-            </h1>
+            <h1 className="sm-hero-title">Προσφορές {sm.name}</h1>
           </div>
 
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, fontWeight: 700, color: "rgba(28,30,36,0.85)" }}>
+          <div className="sm-hero-stats">
             <span>{(totalCount ?? initialDeals.length).toLocaleString("el-GR")} ενεργές προσφορές</span>
             {catalogCount > 0 && (
               <>
-                <span style={{ opacity: 0.35 }}>•</span>
+                <span className="dot">•</span>
                 <span>{catalogCount.toLocaleString("el-GR")} προϊόντα συνολικά</span>
               </>
             )}
             {biggestDiscount > 0 && (
               <>
-                <span style={{ opacity: 0.35 }}>•</span>
+                <span className="dot">•</span>
                 <span>έως -{biggestDiscount}%</span>
               </>
             )}
@@ -311,11 +273,12 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
                 the admin Leaflet rows went stale and the link vanished. */}
             {(leaflet?.pdfUrl || sm.leafletUrl) && (
               <>
-                <span style={{ opacity: 0.35 }}>•</span>
+                <span className="dot">•</span>
                 <a
                   href={leaflet?.pdfUrl || sm.leafletUrl}
                   target="_blank"
                   rel="noreferrer"
+                  className="sm-hero-leaflet"
                   onClick={() => {
                     track({
                       eventType: 'leaflet_click',
@@ -323,7 +286,6 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
                       leafletId: leaflet?.id,
                     });
                   }}
-                  style={{ color: sm.color, textDecoration: "underline", textUnderlineOffset: 3 }}
                 >
                   📖 Δες το φυλλάδιο
                 </a>
@@ -331,29 +293,15 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
             )}
           </div>
 
-          <div style={{ marginTop: 24, maxWidth: 600 }}>
-            <div style={{ position: "relative", width: "100%" }}>
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Αναζήτησε στις προσφορές ${sm.name}...`}
-                style={{
-                  width: "100%",
-                  padding: "14px 16px 14px 44px",
-                  borderRadius: 14,
-                  border: "none",
-                  background: "#fff",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-                  fontSize: 15,
-                  outline: "none",
-                  fontWeight: 500,
-                  color: "#1c1e24",
-                }}
-              />
-              <svg style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, color: "#8b929c" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
+          <div className="sm-hero-search">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Αναζήτησε στις προσφορές ${sm.name}...`}
+            />
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
       </section>
@@ -393,15 +341,15 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
           />
         ) : (
         <section>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 4px" }}>
-            <h2 style={{ fontSize: 18, fontWeight: 900, margin: 0, letterSpacing: "-0.4px" }}>
+          <div className="listing-head">
+            <h2>
               {searching
                 ? `Αποτελέσματα για «${searchQuery.trim()}»`
                 : groupedView
                   ? "Προσφορές ανά κατηγορία"
                   : (activeCategory === "all" ? "Όλες οι προσφορές" : activeCategory)}
             </h2>
-            <span style={{ fontSize: 13, color: "var(--ink-3)", fontWeight: 600 }}>
+            <span className="count">
               {filtered.length.toLocaleString("el-GR")} {groupedView ? "επιλεγμένες προσφορές" : "προσφορές"}
             </span>
           </div>
@@ -463,23 +411,8 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
           )}
 
           {!groupedView && visibleCount < filtered.length && (
-            <div style={{ textAlign: "center", marginTop: 40 }}>
-              <button
-                onClick={() => setVisibleCount(prev => prev + 60)}
-                style={{
-                  padding: "14px 32px",
-                  fontSize: 15,
-                  fontWeight: 800,
-                  background: "#fff",
-                  color: sm.color,
-                  border: `2px solid ${sm.color}`,
-                  borderRadius: 14,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-                onMouseOver={(e) => { e.currentTarget.style.background = sm.color; e.currentTarget.style.color = "#fff"; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = sm.color; }}
-              >
+            <div className="load-more-wrap">
+              <button className="load-more-btn" onClick={() => setVisibleCount(prev => prev + 60)}>
                 Φόρτωση περισσότερων ({filtered.length - visibleCount} υπολείπονται)
               </button>
             </div>
