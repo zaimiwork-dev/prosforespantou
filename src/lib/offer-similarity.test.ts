@@ -26,6 +26,15 @@ describe('variantConflict (flavour/fat/type guard)', () => {
     expect(variantConflict('Brava Μουστάρδα Απαλή 430gr', 'BRAVA Μουστάρδα Απαλή Χωρίς γλουτένη 430g')).toBe(false);
     expect(variantConflict('MARTINI Prosecco 750ml', 'MARTINI Prosecco Αφρώδης Λευκός Οίνος 750ml')).toBe(false);
   });
+  it('blocks cosmetic/cleaning scent variants (live miss 2026-07-07)', () => {
+    expect(variantConflict(
+      'PALMOLIVE Naturals Κρεμοσάπουνο Αμύγδαλο & Γάλα Ανταλλακτικό Σακουλάκι Vegan 900ml',
+      'Palmolive Κρεμοσάπουνο Μέλι & Γάλα Ανταλλακτικό 900ml'
+    )).toBe(true);
+    expect(variantConflict('Dettol Κρεμοσάπουνο Chamomile 250ml', 'Dettol Κρεμοσάπουνο Aloe 250ml')).toBe(true);
+    // same scent in two alphabets stays comparable
+    expect(variantConflict('Palmolive Honey & Milk 900ml', 'Palmolive Μέλι & Γάλα 900ml')).toBe(false);
+  });
 });
 
 describe('quantityConflict (net quantity guard)', () => {

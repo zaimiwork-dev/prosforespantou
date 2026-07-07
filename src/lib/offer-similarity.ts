@@ -143,6 +143,17 @@ const MARKER_FAMILIES: string[][] = [
   ['menta', 'μεντ', 'mint', 'δυοσμ'],
   ['kanel', 'cinnamon', 'κανελ'],
   ['karamel', 'caramel', 'καραμελ'],
+  // Cosmetic / cleaning scent families — caught live 2026-07-07: Palmolive
+  // κρεμοσάπουνο «Αμύγδαλο & Γάλα» rendered as comparable with «Μέλι & Γάλα».
+  // Same trade-off as the flavour families above: a chain that omits the scent
+  // word loses the pair (under-compare), never lies (mis-compare).
+  ['meli', 'μελι', 'honey'],
+  ['amygdal', 'αμυγδαλ', 'almond'],
+  ['lavand', 'λεβαντ', 'lavender'],
+  ['aloe', 'αλοη'],
+  ['chamomil', 'χαμομηλ', 'χαμομιλ'],
+  ['karpouz', 'καρπουζ', 'watermelon'],
+  ['vatomour', 'βατομουρ', 'raspberr'],
   // fat / sugar / type — "light/ελαφρύ/ημιάπαχο/αποβουτυρωμένο" are one family
   // (reduced); "πλήρες/full" another; "zero" another.
   ['light', 'λαιτ', 'elafr', 'ελαφρ', 'imiapax', 'ημιαπαχ', 'apovoutyr', 'αποβουτυρ'],
