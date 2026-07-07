@@ -11,6 +11,7 @@ import { PreferredStoresSheet } from "@/components/PreferredStoresSheet";
 import { SiteHeader } from "@/components/SiteHeader";
 import { DealGrid } from "@/components/DealGrid";
 import { dedupeDeals } from "@/lib/dedupe-deals";
+import { interleaveByCategory } from "@/lib/interleave-deals";
 import { Sheet } from "@/components/Sheet";
 import { Icon } from "@/components/Icons";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
@@ -220,7 +221,12 @@ export default function DealsClient({ initial }) {
           )}
 
           <DealGrid
-            deals={dedupeDeals(discounts)}
+            // Default (hot, no category filter) view rotates across categories
+            // so no single department floods the first screenful; explicit
+            // sorts/filters render exactly what the user asked for.
+            deals={sortBy === "hot" && activeCategory === "all"
+              ? interleaveByCategory(dedupeDeals(discounts))
+              : dedupeDeals(discounts)}
             loading={loading}
             loadingMore={loadingMore}
             hasMore={hasMore}

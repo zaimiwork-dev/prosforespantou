@@ -20,10 +20,13 @@ export async function searchDeals(query: string, supermarket?: string) {
       // After running src/scripts/enable-pg-trgm.mjs, swap unaccent → f_unaccent
       // below so Postgres can use the GIN trigram index. Until then, queries
       // work but do a sequential scan (~10k rows, fine).
+      // translate(…,'ς','σ') folds the Greek final sigma so SQL agrees with
+      // normalizeSearchText — Postgres lower('Σ')='σ' but user-typed «καφές»
+      // keeps «ς», and JS-expanded terms are always «σ».
       const conditions = expandedTerms.map(term => Prisma.sql`
-        (unaccent(lower(product_name)) LIKE unaccent(lower(${'%' + term + '%'}))
-        OR unaccent(lower(COALESCE(description, ''))) LIKE unaccent(lower(${'%' + term + '%'}))
-        OR unaccent(lower(COALESCE(category, ''))) LIKE unaccent(lower(${'%' + term + '%'})))
+        (translate(unaccent(lower(product_name)), 'ς', 'σ') LIKE unaccent(lower(${'%' + term + '%'}))
+        OR translate(unaccent(lower(COALESCE(description, ''))), 'ς', 'σ') LIKE unaccent(lower(${'%' + term + '%'}))
+        OR translate(unaccent(lower(COALESCE(category, ''))), 'ς', 'σ') LIKE unaccent(lower(${'%' + term + '%'})))
       `);
 
       const joinedConditions = Prisma.join(conditions, ' OR ');

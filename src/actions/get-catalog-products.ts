@@ -173,9 +173,10 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
 
       if (q) {
         const terms = expandSearch(q).slice(0, 12);
+        // Final-sigma folding — see search-deals.ts / normalizeSearchText.
         const conditions = terms.map((term) => Prisma.sql`
-          (unaccent(lower(p.name)) LIKE unaccent(lower(${'%' + term + '%'}))
-          OR unaccent(lower(COALESCE(p.brand, ''))) LIKE unaccent(lower(${'%' + term + '%'}))
+          (translate(unaccent(lower(p.name)), 'ς', 'σ') LIKE unaccent(lower(${'%' + term + '%'}))
+          OR translate(unaccent(lower(COALESCE(p.brand, ''))), 'ς', 'σ') LIKE unaccent(lower(${'%' + term + '%'}))
           OR COALESCE(p.barcode, '') LIKE ${'%' + term + '%'})
         `);
         if (conditions.length === 0) return { products: [], total: 0 };

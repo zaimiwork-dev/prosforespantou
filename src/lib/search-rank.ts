@@ -37,7 +37,13 @@ const SYNONYMS = [
 ];
 
 export function normalizeSearchText(s: string | null | undefined): string {
-  return (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // Final-sigma folding is load-bearing: JS lowercases a trailing Σ to «ς»
+  // (context-sensitive) while Postgres lower() always yields «σ» — without
+  // folding both to «σ», "kafes"→"καφεσ" never matches "Καφές" in SQL and the
+  // JS ranking disagrees with recall (tour bug 2026-07-07: zero offers for
+  // the greeklish example our own empty-state suggests). Keep in sync with
+  // the translate(…, 'ς', 'σ') wrappers in search-deals + get-catalog-products.
+  return (s ?? '').toLowerCase().replace(/ς/g, 'σ').normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 function greeklishToGreek(text: string): string {

@@ -98,7 +98,7 @@ export function PriceHistory({ history, compact = false }) {
   const tipIsMin = tipIdx === minIdx;
   const tipX = x(tipIdx);
   const tipPrice = prices[tipIdx];
-  const tipLabel = `${tipPrice.toFixed(2)}€ · ${formatShortDate(points[tipIdx].recordedAt)}`;
+  const tipLabel = `${tipPrice.toFixed(2)}€ · ${formatShortDate(points[tipIdx].recordedAt)}${tipIsMin ? ' · χαμηλότερη' : ''}`;
   const tipW = tipLabel.length * 6.4 + 14;
   const tipBoxX = Math.max(2, Math.min(W - tipW - 2, tipX - tipW / 2));
 
@@ -153,7 +153,7 @@ export function PriceHistory({ history, compact = false }) {
           <g>
             <rect x={tipBoxX} y={0} width={tipW} height={17} rx="5" fill="#1c1e24" fillOpacity="0.88" />
             <text x={tipBoxX + tipW / 2} y={12} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#fff">
-              {tipLabel}{tipIsMin ? ' · χαμηλότερη' : ''}
+              {tipLabel}
             </text>
           </g>
 

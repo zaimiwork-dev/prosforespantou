@@ -148,6 +148,10 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
   // Default to biggest-discount-first: hotScore carries ranking jitter that
   // reads as "random order" to shoppers (owner complaint 2026-07-06).
   const [sortBy, setSortBy] = useState("discount");
+  // While searching, results keep the SERVER's relevance order unless the
+  // user explicitly picks a sort — re-sorting by discount put -51% face
+  // serums above actual milk for «γάλα» (tour bug 2026-07-07).
+  const [sortTouched, setSortTouched] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -214,8 +218,9 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
     const byCategory = activeCategory === "all"
       ? base
       : base.filter((d) => d.category === activeCategory);
-    return dedupeDeals(sortDeals(byCategory, sortBy));
-  }, [initialDeals, searchResults, activeCategory, sortBy]);
+    const keepRelevance = searchResults !== null && !sortTouched;
+    return dedupeDeals(keepRelevance ? byCategory : sortDeals(byCategory, sortBy));
+  }, [initialDeals, searchResults, activeCategory, sortBy, sortTouched]);
 
   // Reset visible count when filters change
   useEffect(() => { setVisibleCount(60); }, [activeCategory, searchQuery, sortBy]);
@@ -372,7 +377,16 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
             </button>
             <label className="sort-select">
               <span>Ταξινόμηση:</span>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Ταξινόμηση">
+              <select
+                value={searching && !sortTouched ? "relevance" : sortBy}
+                onChange={(e) => {
+                  if (e.target.value === "relevance") { setSortTouched(false); return; }
+                  setSortBy(e.target.value);
+                  setSortTouched(true);
+                }}
+                aria-label="Ταξινόμηση"
+              >
+                {searching && <option value="relevance">Σχετικότητα</option>}
                 {SORTS.map((s) => (
                   <option key={s.id} value={s.id}>{s.label}</option>
                 ))}

@@ -10,23 +10,43 @@
 //                   updatedAt, which ingest bumps every run the chain's feed
 //                   still lists the offer — i.e. "last verified live".
 
+// All calendar math is anchored to Europe/Athens, NOT the runtime timezone.
+// The server renders in UTC and the browser in local time; near a date
+// boundary the two produced different "Έως DD/MM" strings and React threw
+// hydration error #418 (seen live 2026-07-07). Users are Greek shoppers —
+// Athens dates are also simply the correct ones.
+const ATHENS_DMY = new Intl.DateTimeFormat('el-GR', {
+  timeZone: 'Europe/Athens', day: '2-digit', month: '2-digit', year: 'numeric',
+});
+
+function athensParts(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = ATHENS_DMY.formatToParts(d);
+  const get = (t) => parts.find((p) => p.type === t)?.value;
+  return { day: get('day'), month: get('month'), year: get('year') };
+}
+
 export function daysLeft(dateStr, nowMs) {
   if (!dateStr) return null;
-  const today = new Date(nowMs); today.setHours(0, 0, 0, 0);
-  const exp = new Date(dateStr); exp.setHours(0, 0, 0, 0);
-  return Math.round((exp - today) / 86400000);
+  const a = athensParts(nowMs);
+  const b = athensParts(dateStr);
+  if (!a || !b) return null;
+  return Math.round(
+    (Date.UTC(+b.year, +b.month - 1, +b.day) - Date.UTC(+a.year, +a.month - 1, +a.day)) / 86400000
+  );
 }
 
 export function formatShortDate(dateStr) {
   if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const p = athensParts(dateStr);
+  return p ? `${p.day}/${p.month}` : null;
 }
 
 export function formatFullDate(dateStr) {
   if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const p = athensParts(dateStr);
+  return p ? `${p.day}/${p.month}/${p.year}` : null;
 }
 
 // offer: normalized fields { validFrom, validUntil, updatedAt, datesFromSource }
