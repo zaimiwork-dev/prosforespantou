@@ -126,7 +126,11 @@ function sortDeals(deals, sortBy) {
   if (sortBy === "hot") {
     copy.sort((a, b) => (b.hotScore ?? 0) - (a.hotScore ?? 0));
   } else if (sortBy === "discount") {
-    copy.sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0));
+    // Biggest provable deal first; among equal (incl. the ΜΟΝΟ rows with no
+    // published %), cheapest first — a graspable order, never random.
+    copy.sort((a, b) =>
+      ((b.discountPercent ?? 0) - (a.discountPercent ?? 0))
+      || ((a.discountedPrice ?? 0) - (b.discountedPrice ?? 0)));
   } else if (sortBy === "price_asc") {
     copy.sort((a, b) => (a.discountedPrice ?? 0) - (b.discountedPrice ?? 0));
   } else if (sortBy === "price_desc") {
@@ -141,7 +145,9 @@ function sortDeals(deals, sortBy) {
 
 export default function SupermarketClient({ sm, initialDeals, totalCount, catalogCount, categoryTree, leaflet }) {
   const [viewMode, setViewMode] = useState("offers");
-  const [sortBy, setSortBy] = useState("hot");
+  // Default to biggest-discount-first: hotScore carries ranking jitter that
+  // reads as "random order" to shoppers (owner complaint 2026-07-06).
+  const [sortBy, setSortBy] = useState("discount");
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -416,6 +422,23 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
                 Φόρτωση περισσότερων ({filtered.length - visibleCount} υπολείπονται)
               </button>
             </div>
+          )}
+
+          {/* Bottom of the offers journey: the full-catalog door (owner ask
+              2026-07-06 — after the offers, let people browse everything). */}
+          {catalogCount > 0 && (
+            <section className="supermarket-all-offers-cta">
+              <div>
+                <strong>Ολόκληρος ο κατάλογος {sm.name}</strong>
+                <p>
+                  Δες και τα {catalogCount.toLocaleString("el-GR")} προϊόντα που δεν είναι σε
+                  προσφορά — με την τελευταία γνωστή τιμή ραφιού.
+                </p>
+              </div>
+              <Link href={`/catalog?supermarket=${sm.id}`} className="cta-link">
+                Άνοιγμα καταλόγου
+              </Link>
+            </section>
           )}
         </section>
         )}

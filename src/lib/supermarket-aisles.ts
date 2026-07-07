@@ -1,6 +1,8 @@
 type AisleDeal = {
   category?: string | null;
   productName?: string | null;
+  discountPercent?: number | null;
+  discountedPrice?: number | null;
 };
 
 export type SupermarketAisle<T> = {
@@ -110,6 +112,11 @@ export function groupSupermarketDealsByAisle<T extends AisleDeal>(deals: T[]): S
       key,
       label: META[key]?.label || key,
       emoji: META[key]?.emoji || '📦',
-      deals: aisleDeals,
+      // Graspable order inside each aisle: biggest provable discount first,
+      // cheapest first among equals — the incoming hotScore order carries
+      // ranking jitter that reads as random on a shelf.
+      deals: [...aisleDeals].sort((a, b) =>
+        ((b.discountPercent ?? 0) - (a.discountPercent ?? 0))
+        || ((a.discountedPrice ?? 0) - (b.discountedPrice ?? 0))),
     }));
 }

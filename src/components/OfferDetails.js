@@ -174,17 +174,21 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
           <div className="od-upcoming">Η προσφορά ξεκινά στις {exp.startFull}</div>
         )}
 
-        <div className="od-dates">
-          <div className="od-date-box">
-            <div className="od-date-label">Έναρξη</div>
-            <div className="od-date-val">{exp.startFull || '—'}</div>
+        {/* Λήξη box only for chain-published end dates; for the rest the
+            verification date lives as a footnote at the very bottom. No
+            Έναρξη box at all: most chains publish only the END date, so
+            validFrom is usually our ingest timestamp — showing it as a promo
+            start would be fabricated. (Lidl's real validFrom still powers the
+            «ξεκινά» notice above.) */}
+        {exp.real && (
+          <div className="od-dates">
+            <div className="od-date-box">
+              <div className="od-date-label">Λήξη προσφοράς</div>
+              <div className={`od-date-val${exp.urgent ? ' urgent' : ''}`}>{exp.status}</div>
+              {exp.statusSub && <div className="od-date-sub">{exp.statusSub}</div>}
+            </div>
           </div>
-          <div className="od-date-box">
-            <div className="od-date-label">Λήξη</div>
-            <div className={`od-date-val${exp.urgent ? ' urgent' : ''}`}>{exp.status}</div>
-            {exp.statusSub && <div className="od-date-sub">{exp.statusSub}</div>}
-          </div>
-        </div>
+        )}
 
         <div className="od-cta-row">
           <button
@@ -229,6 +233,10 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
               {similar.map((d) => <SimilarCard key={d.id} d={d} />)}
             </div>
           </section>
+        )}
+
+        {!exp.real && exp.statusSub && (
+          <div className="od-checked-note">Η προσφορά είναι σε ισχύ · {exp.statusSub}</div>
         )}
       </div>
     </div>

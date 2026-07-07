@@ -15,7 +15,10 @@ const PAGE = 24;
 // Full-catalog browse: active offers first, then the wider Product catalog for
 // search/deeper browsing. Offer products open the same sheet as the rest of the
 // app so the catalog does not feel like a separate, colder surface.
-export default function CatalogClient({ initial }) {
+// initialStore preselects the chain filter (deep link from the supermarket
+// pages: /catalog?supermarket=ab). The server initial fetch must have used the
+// same value or the first paint shows the wrong list.
+export default function CatalogClient({ initial, initialStore = 'all' }) {
   const [products, setProducts] = useState(initial.products);
   const [total, setTotal] = useState(initial.total);
   const [offset, setOffset] = useState(initial.products.length);
@@ -23,7 +26,7 @@ export default function CatalogClient({ initial }) {
   const [search, setSearch] = useState('');
   const [mode, setMode] = useState('catalog');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeStore, setActiveStore] = useState('all');
+  const [activeStore, setActiveStore] = useState(initialStore);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);

@@ -43,14 +43,16 @@ export function expiryInfo(offer, nowMs = Date.now()) {
   const real = Boolean(offer.datesFromSource);
 
   if (!real) {
-    const checkedShort = formatShortDate(offer.updatedAt);
+    // Owner call (2026-07-06): verification bookkeeping must NOT be shopper-
+    // facing on cards — no chip at all. The detail view shows it as a small
+    // footnote (statusSub) at the bottom, nothing in the date boxes.
     const checkedFull = formatFullDate(offer.updatedAt);
     return {
       real,
       upcoming: false,
       urgent: false,
       daysLeft: null,
-      chip: checkedShort ? `Ελέγχθηκε ${checkedShort}` : null,
+      chip: null,
       status: 'Σε ισχύ',
       statusSub: checkedFull ? `ελέγχθηκε ${checkedFull}` : null,
       startFull: null,

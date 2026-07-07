@@ -537,6 +537,15 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   cursor: pointer; transition: background 0.2s, color 0.2s;
 }
 .load-more-btn:hover { background: var(--brand); color: var(--brand-ink, #fff); }
+/* Verification footnote at the very bottom of the offer sheet — the honesty
+   metadata lives here in small print, never as a chip on cards. */
+.od-checked-note {
+  margin-top: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  text-align: center;
+}
 
 .supermarket-all-offers-cta {
   display: flex;
@@ -563,17 +572,20 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   font-weight: 600;
   line-height: 1.45;
 }
-.supermarket-all-offers-cta button {
+.supermarket-all-offers-cta button,
+.supermarket-all-offers-cta .cta-link {
   flex: none;
   padding: 11px 16px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--brand);
   color: var(--brand-ink);
   font: inherit;
   font-size: 13px;
   font-weight: 850;
   cursor: pointer;
+  text-decoration: none;
+  text-align: center;
 }
 @media (max-width: 560px) {
   .supermarket-aisles { gap: 34px; }

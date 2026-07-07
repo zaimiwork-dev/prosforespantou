@@ -13,10 +13,10 @@ describe('expiryInfo — fabricated dates (datesFromSource=false)', () => {
     datesFromSource: false,
   };
 
-  it('never shows the +14d default as a real expiry', () => {
+  it('never shows the +14d default as a real expiry — and no card chip at all', () => {
     const e = expiryInfo(base, NOW);
     expect(e.real).toBe(false);
-    expect(e.chip).toBe('Ελέγχθηκε 06/07');
+    expect(e.chip).toBeNull();
     expect(e.status).toBe('Σε ισχύ');
     expect(e.statusSub).toBe('ελέγχθηκε 06/07/2026');
     expect(e.startFull).toBeNull();
@@ -28,7 +28,7 @@ describe('expiryInfo — fabricated dates (datesFromSource=false)', () => {
     expect(e.upcoming).toBe(false);
   });
 
-  it('survives a missing updatedAt (no chip, plain status)', () => {
+  it('survives a missing updatedAt (no footnote text, plain status)', () => {
     const e = expiryInfo({ ...base, updatedAt: null }, NOW);
     expect(e.chip).toBeNull();
     expect(e.status).toBe('Σε ισχύ');

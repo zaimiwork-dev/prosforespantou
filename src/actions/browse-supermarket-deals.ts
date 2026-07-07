@@ -39,7 +39,12 @@ export async function browseSupermarketDeals(rawInput: unknown) {
       // across the whole chain without shipping thousands of offers to mobile.
       const candidates = await prisma.discount.findMany({
         where,
-        orderBy: [{ hotScore: 'desc' }, { validUntil: 'asc' }],
+        // Biggest provable discount first, cheapest among equals — category
+        // browsing must read as an ordered shelf, not hotScore jitter.
+        orderBy: [
+          { discountPercent: { sort: 'desc', nulls: 'last' } },
+          { discountedPrice: 'asc' },
+        ],
         select: {
           id: true,
           category: true,
