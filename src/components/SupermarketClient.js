@@ -390,6 +390,18 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
 
           {groupedView ? (
             <>
+              {filtered.length === 0 && (
+                // A chain outage (scraper blocked / feed empty) must never be a
+                // silent blank page — say what's happening and offer the
+                // catalog + leaflet as the fallback journey.
+                <div className="sm-empty-notice">
+                  <strong>Δεν έχουμε ενεργές προσφορές από {sm.name} αυτή τη στιγμή.</strong>
+                  <p>
+                    Οι προσφορές ανανεώνονται συνεχώς — δοκίμασε ξανά σε λίγο.
+                    Στο μεταξύ, δες τον πλήρη κατάλογο παρακάτω{(leaflet?.pdfUrl || sm.leafletUrl) ? ' ή το φυλλάδιο της αλυσίδας από τον σύνδεσμο πάνω' : ''}.
+                  </p>
+                </div>
+              )}
               <SupermarketAisles deals={filtered} onAdd={addItem} onSelect={setSelectedProduct} />
               {hasMoreActiveOffers && (
                 <section className="supermarket-all-offers-cta">

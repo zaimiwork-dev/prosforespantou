@@ -15,6 +15,18 @@ export const SUPERMARKETS = [
   { id: "masoutis", name: "Μασούτης", short: "ΜΑ", color: "#2d6a4f", bg: "#f0fff4", heroLabel: "Μασού-", heroSub: "της", logo: "masoutis.png", leafletUrl: "https://www.masoutis.gr/promotion" },
   { id: "bazaar", name: "Bazaar", short: "BZ", color: "#7b2d8b", bg: "#fdf0ff", heroLabel: "Bazaar", heroSub: "", logo: "bazaar.svg", leafletUrl: "https://www.bazaar-online.gr/prosfores" },
   { id: "kritikos", name: "Κρητικός", short: "ΚΡ", color: "#e85d04", bg: "#fff4ed", heroLabel: "Κρητι-", heroSub: "κός", logo: "kritikos.avif", leafletUrl: "https://kritikos-sm.gr/fulladia/fulladio/" },
+];
+
+// Parked chains (removed from the user-facing list 2026-07-07 — selecting a
+// store with ZERO offers dead-ended users on empty pages). Recon verdicts:
+//   marketin      — no scrapable offers source (ASP.NET, flipbook-only leaflet)
+//   discountmarkt — WordPress brochure site; PDF leaflet viewer, no product data
+//   galaxias      — site is an under-construction shell (brand folded into the
+//                   My Market group)
+// Move an entry back into SUPERMARKETS only once a real adapter feeds it data.
+// e-fresh is the next viable NEW chain (clean JSON API, but barcode-less →
+// needs guarded name-matching; hold until the Groq mapping audit is unblocked).
+export const PARKED_SUPERMARKETS = [
   { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/filadio/" },
   { id: "discountmarkt", name: "Discount Markt", short: "DM", color: "#d62828", bg: "#fff0f0", heroLabel: "Discount", heroSub: "Markt", logo: "discount_markt.png" },
   { id: "galaxias", name: "Γαλαξίας", short: "ΓΑ", color: "#003f88", bg: "#eef3ff", heroLabel: "Γαλα-", heroSub: "ξίας", logo: "galaxias.jpg" },
