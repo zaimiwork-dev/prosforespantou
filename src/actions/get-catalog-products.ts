@@ -167,6 +167,7 @@ export async function getCatalogProducts(rawInput: unknown): Promise<{ products:
             updatedAt: true,
             hotScore: true,
             productId: true,
+            comparisonCount: true,
           },
         },
       };

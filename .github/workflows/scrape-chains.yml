@@ -430,6 +430,15 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Recompute comparison counts (card «Τιμές σε N καταστήματα» chips)
+        # After the resolvers so counts reflect the productIds they just
+        # linked. Precompute twin of get-price-comparison — see
+        # src/lib/comparison-count.ts.
+        continue-on-error: true
+        run: node src/scripts/recompute-comparison-counts.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
   ab-catalog:
     # Weekly Sun 04:30 UTC + manual. Walks AB's ~14 root categories via the

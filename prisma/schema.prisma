@@ -141,6 +141,12 @@ model Discount {
   // recompute-price-verdicts.mjs (daily) so card lists need no per-row query;
   // null until the next recompute pass. Detail/modal compute it live instead.
   priceVerdict    String?  @map("price_verdict")
+  // How many OTHER chains this offer's price-comparison sheet renders rows
+  // for (cross-chain offers passing the pack/variant guards + barcode-gated
+  // shelf prices). Precomputed by recompute-comparison-counts.mjs (nightly,
+  // resolvers-all job) so cards can advertise «Τιμές σε N καταστήματα»
+  // without per-row similarity work. 0 = no comparison available.
+  comparisonCount Int      @default(0) @map("comparison_count")
   // The chain's own SKU for this offer — the stable dedup key that lets the
   // ingest pipeline write offers BEFORE they're matched to a Product
   // (display-first: productId null until the resolver/admin claims the row).

@@ -1066,6 +1066,23 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   padding: 2px 7px; border-radius: 6px;
   margin-bottom: 6px;
 }
+/* Verdict + comparison chips share one wrapping row on the card. */
+.pill-row {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-bottom: 6px;
+}
+.pill-row .verdict-pill { margin-bottom: 0; }
+/* «Τιμές σε N καταστήματα» — this offer's comparison sheet has price rows
+   from N stores (precomputed comparisonCount). Informational blue, quieter
+   than the green verdict: it invites the tap, it doesn't judge the price. */
+.compare-pill {
+  display: inline-block;
+  background: color-mix(in oklab, #009de0 10%, #fff);
+  color: #0077b6;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 6px;
+  white-space: nowrap;
+}
 .add-btn {
   width: 34px; height: 34px; border-radius: 50%;
   background: var(--brand); color: var(--brand-ink);

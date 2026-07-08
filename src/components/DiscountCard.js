@@ -73,6 +73,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
 
   const showVerdict = isPositiveVerdict(d.priceVerdict);
 
+  // Precomputed count of OTHER chains the comparison sheet renders rows for
+  // (recompute-comparison-counts.mjs). +1 = total stores with a price shown,
+  // which is what the shopper cares about. 0/undefined → no chip.
+  const compareChains = (d.comparisonCount ?? d.comparison_count ?? 0) + 1;
+  const showCompare = compareChains >= 2;
+
   return (
     <div
       className="card"
@@ -180,8 +186,15 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
           </div>
         )}
 
-        {showVerdict && (
-          <div className="verdict-pill">{VERDICT_LABEL[d.priceVerdict]}</div>
+        {(showVerdict || showCompare) && (
+          <div className="pill-row">
+            {showVerdict && (
+              <div className="verdict-pill">{VERDICT_LABEL[d.priceVerdict]}</div>
+            )}
+            {showCompare && (
+              <div className="compare-pill">⚖️ Τιμές σε {compareChains} καταστήματα</div>
+            )}
+          </div>
         )}
 
         <div className="card-price-row">
