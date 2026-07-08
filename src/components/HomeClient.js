@@ -7,6 +7,7 @@ import { useShoppingListStore } from "@/lib/store";
 import { getActiveDeals } from "@/actions/get-active-deals";
 import { dedupeDeals } from "@/lib/dedupe-deals";
 import { loadProfile, decayProfile, topCategories, scoreOffer } from "@/lib/interest-profile";
+import { getConsent, onConsentChange } from "@/lib/consent";
 
 import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
@@ -41,8 +42,19 @@ function PublicSite({ initial, onAdmin }) {
     let opened = false;
     try { opened = !!window.localStorage.getItem("pp-onboarded"); } catch { opened = true; }
     if (opened) return;
-    const t = setTimeout(() => { setIntroMode(true); setIsSettingsOpen(true); }, 700);
-    return () => clearTimeout(t);
+    // A true first visit also shows the GDPR cookie banner. Two modals at
+    // once is a hostile hello — so the welcome sheet waits until the banner
+    // is answered (either way; consent state itself is lib/consent's job)
+    // and only then takes the stage.
+    let t = null;
+    const openIntro = () => { t = setTimeout(() => { setIntroMode(true); setIsSettingsOpen(true); }, 700); };
+    let unsub = () => {};
+    if (getConsent() !== null) {
+      openIntro();
+    } else {
+      unsub = onConsentChange((value) => { if (value !== null) { unsub(); openIntro(); } });
+    }
+    return () => { unsub(); if (t) clearTimeout(t); };
   }, []);
   const closeSettings = () => {
     setIsSettingsOpen(false);
