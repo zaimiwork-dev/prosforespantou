@@ -44,6 +44,43 @@ The product thesis (discount-first, cross-chain, honest prices, elderly-mobile a
 - **Resend:** free tier, do in week 3 (T9). **R2 custom domain / sklavenitis image mirroring:** defer.
 - **Premature — do NOT decide yet:** Android vs iOS, login provider, similarity-floor tuning, e-fresh.
 
+### ⛔ OWNER TO-DO — everything now waiting on you (2026-09-03)
+
+Six of the ten planned tasks are done and deployed. **Every remaining task is blocked on one of these five items.** Roughly in order of what unblocks the most.
+
+---
+
+#### 1. Enable Web Analytics in the Vercel dashboard  ·  free  ·  1 minute
+Project → **Analytics** → **Enable**. The tracking code is already live, but Vercel discards data until the feature is switched on, so until you click this we still cannot count visitors — which is the whole point of weeks 4–6.
+
+#### 2. Buy a residential proxy, then set `PROXY_URL`  ·  ~€5–15/mo  ·  unblocks T5
+This is the one recurring cost recommended, and it is now the **only red alarm on the site**. Sklavenitis has been stale since 2026-08-27 because the dev-PC task keeps failing (403, killed mid-run, PC asleep — three different causes in four attempts). It is the largest Greek chain.
+
+```bash
+gh secret set PROXY_URL     # paste http://user:pass@host:port
+```
+Until then the watchdog emails you a failure every morning. That is correct behaviour, not a bug — the chain really is down.
+
+#### 3. Read the new privacy wording  ·  free  ·  10 minutes
+`/cookies` and `/aporrito` now explain, in Greek, that visit counting runs without consent because it stores nothing on the visitor's device. Everything else shipped this session is a verified fact; **this one is a legal judgement**, it is the standard basis for cookieless analytics in the EU, and it should be yours to accept rather than mine.
+
+#### 4. Resend key + verified domain  ·  free tier  ·  unblocks T9
+`RESEND_API_KEY` into Vercel and `.env.local`, verify `prosforespantou.gr` in Resend, set `EMAIL_FROM`. Without the verified domain, Resend only delivers to your own address. This unblocks the watch-list alert emails that have been coded since June — the retention hook.
+
+#### 5. A decision from Fable on comparison gating  ·  free  ·  unblocks T6
+The audit found only **31% of products carry a barcode** and **65% of rendered comparison rows are unprovable**. The plan says to gate shelf-price rows on barcode provenance, but on these numbers that deletes most of them rather than tightening them. Three options are written up in CONTEXT.md under T6. It is a product call about coverage versus provability, so it was raised rather than decided.
+
+---
+
+#### Also worth a look when you're back
+- **The supermarket pages were never signed off** after July's refactor (T10). A click-through on a real phone is the last launch-hygiene item.
+- **The watchdog will be red every morning until item 2 is done.** Once the proxy lands it should go green; if it does not, something else is wrong and worth telling me.
+
+#### Running on its own, nothing needed from you
+- The resolver backlog drains nightly, now ~245 items/day and capped per chain so no single chain starves the rest.
+- AB recovers its own API hash if the chain rotates it again.
+- Price-history badges recompute nightly with the corrected per-chain logic.
+
 ---
 ### WEEK 1 — stop the bleeding (all €0)
 
