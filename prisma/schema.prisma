@@ -331,6 +331,17 @@ model ChainProductMapping {
   productId     String   @db.Uuid @map("product_id")
   supermarket   String   // 'masoutis' | 'ab' | 'lidl' | ...
   chainItemcode String   @map("chain_itemcode") // chain's internal SKU
+  // HOW this mapping was established - the difference between a comparison we
+  // can prove and one we merely believe:
+  //   'barcode' - the chain's own GTIN matched Product.barcode. Provable.
+  //   'catalog' - Product was created FROM this chain's catalog item, no GTIN.
+  //               Correct by construction, but single-chain: nothing to compare.
+  //   'cache'   - resolved by NAME (MatchCache, i.e. an earlier LLM/admin call).
+  //               Plausible, not proven - this is where mis-mappings live.
+  //   null      - legacy row written before provenance existed. Unknown.
+  // Never downgrade 'barcode' to a weaker value on re-bind.
+  matchedVia    String?   @map("matched_via")
+  verifiedAt    DateTime? @map("verified_at")
   createdAt     DateTime @default(now()) @map("created_at")
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -384,4 +395,26 @@ model PendingMatch {
   @@unique([rawName, supermarket])
   @@index([supermarket])
   @@map("pending_matches")
+}
+
+// Small key/value store for scraper facts that ROTATE on the chain's side and
+// therefore cannot live in a source constant.
+//
+// First use: AB Vasilopoulos' Apollo persisted-query hash. AB's API refuses
+// plain GraphQL and only accepts a SHA-256 identifying a query it already
+// knows; that hash is baked into their frontend build and changes when they
+// redeploy. It rotated around 2026-08-02 and the daily job failed for five
+// weeks because recovery meant a human editing a constant.
+//
+// A DB row rather than a committed file on purpose: the recovery runs in CI,
+// and having CI push to main would add commit noise and race real work.
+model ScraperState {
+  key       String   @id
+  value     String
+  // Free-form provenance, e.g. how the value was recovered and whether it was
+  // verified against the live API before being stored.
+  note      String?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("scraper_state")
 }

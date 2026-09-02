@@ -16,11 +16,23 @@
 //      returns ~70% loyalty-points-only items; we skip those because they
 //      aren't really discounts. Set INCLUDE_POINTS=1 to keep them.
 //
-// FRAGILITY NOTE: the persisted-query hash is tied to AB's frontend build. If
-// AB redeploys, the hash may change and we'll get "PersistedQueryNotFound".
-// Recovery is to re-capture via probe-ab-offers-capture.mjs and update PQ_HASH.
+// PERSISTED-QUERY HASH: tied to AB's frontend build, so an AB redeploy can
+// rotate it and every request then answers "PersistedQueryNotFound". That is
+// not hypothetical — it rotated ~2026-08-02 and this job failed nightly for
+// five weeks, taking AB from ~255 live offers to 1, because recovery meant a
+// human editing a constant.
+// Now: the hash is read from ScraperState (recovered from AB's own frontend by
+// src/scripts/recover-ab-pq-hash.mjs) and falls back to the compiled-in value.
+// On PersistedQueryNotFound this exits with code 78 so CI can run the recovery
+// and retry automatically.
 
 import { ingestOffers, printReport } from '../lib/ingest-offers.mjs';
+import {
+  KNOWN_PQ_HASH,
+  buildProductListUrl,
+  resolvePqHash,
+  AB_PQ_STATE_KEY,
+} from '../lib/ab-persisted-query.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
 import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
@@ -31,7 +43,10 @@ const PACE_MS = envInt('PACE_MS', 900);
 const JITTER_MS = envInt('JITTER_MS', 500);
 
 const ENDPOINT = 'https://www.ab.gr/api/v1/';
-const PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800'; // ProductList
+// The hash is resolved at run time: a value recovered from AB's live
+// frontend (ScraperState) wins over this compiled-in fallback, so a rotation
+// heals without a deploy. See lib/ab-persisted-query.mjs.
+let PQ_HASH = KNOWN_PQ_HASH; // ProductList
 const PAGE_SIZE = 10;
 const MAX_PAGES = envInt('MAX_PAGES', 200);
 
@@ -54,18 +69,10 @@ const PRICE_AFFECTING_PROMOS = new Set([
   'percentageDiscount',
 ]);
 
+// Shared with the probe and the recovery script so all three ask in the same
+// shape — a mismatch there would make a good hash look broken.
 function buildUrl(pageNumber) {
-  const variables = encodeURIComponent(JSON.stringify({
-    productListingType: 'PROMOTION_SEARCH', lang: 'gr',
-    productCodes: '', categoryCode: '', excludedProductCodes: '', brands: '',
-    keywords: '', productTypes: '', lazyLoadCount: PAGE_SIZE, pageNumber,
-    sort: '', searchQuery: '', hideProductsWithoutPromo: false,
-    hideUnavailableProducts: true, maxItemsToDisplay: 0, includePotentialActivatableOffers: true,
-  }));
-  const ext = encodeURIComponent(JSON.stringify({
-    persistedQuery: { version: 1, sha256Hash: PQ_HASH },
-  }));
-  return `${ENDPOINT}?operationName=ProductList&variables=${variables}&extensions=${ext}`;
+  return buildProductListUrl(PQ_HASH, pageNumber, PAGE_SIZE);
 }
 
 async function fetchPage(pageNumber) {
@@ -74,7 +81,11 @@ async function fetchPage(pageNumber) {
   const j = await res.json();
   if (j.errors) {
     const persisted = j.errors.some((e) => /PersistedQueryNotFound/i.test(e.message || ''));
-    if (persisted) throw new Error(`PersistedQueryNotFound — AB frontend hash changed. Re-run probe-ab-offers-capture.mjs and update PQ_HASH.`);
+    if (persisted) {
+      const err = new Error('PersistedQueryNotFound — AB rotated the frontend hash.');
+      err.persistedQueryRotated = true;
+      throw err;
+    }
     throw new Error(`GraphQL errors: ${JSON.stringify(j.errors).slice(0, 300)}`);
   }
   return j.data?.productList;
@@ -150,6 +161,14 @@ function toOfferItem(p) {
 async function run() {
   console.log(`🛒 AB adapter${DRY_RUN ? ' (DRY_RUN)' : ''}${INCLUDE_POINTS ? ' [+points]' : ''}`);
 
+  // Prefer a hash recovered from AB's live frontend over the compiled-in one.
+  // Loaded before the first request, so a rotation already healed by an earlier
+  // recovery run costs this run nothing.
+  {
+    const { default: prisma } = await import('../lib/prisma.ts');
+    PQ_HASH = await resolvePqHash(prisma, (m) => console.log(`   ${m}`));
+  }
+
   const byCode = new Map();
   let totalResults = null, totalPages = null;
   for (let page = 0; page < MAX_PAGES; page++) {
@@ -196,4 +215,16 @@ async function run() {
   process.exit(report.healthOk ? 0 : 1);
 }
 
-run().catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
+run().catch((e) => {
+  if (e.persistedQueryRotated) {
+    // Distinct exit code so CI can tell "AB rotated their hash — recover and
+    // retry" apart from a genuine scrape failure. Exiting 1 here every night
+    // for five weeks is exactly what produced a dead chain and no signal.
+    console.error(`\n❌ ${e.message}`);
+    console.error(`   Recover it with: node src/scripts/recover-ab-pq-hash.mjs`);
+    console.error(`   (writes ScraperState["${AB_PQ_STATE_KEY}"]; CI does this automatically)`);
+    process.exit(78);
+  }
+  console.error(`\n❌ ${e.stack || e.message}`);
+  process.exit(1);
+});

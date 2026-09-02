@@ -21,6 +21,7 @@ dotenv.config();
 import { ingestCatalog } from './lib/ingest-catalog.mjs';
 import { mirrorImages } from './lib/mirror-images.mjs';
 import { envInt, fetchWithBackoff, pace } from './lib/polite-http.mjs';
+import { KNOWN_PQ_HASH, resolvePqHash } from './lib/ab-persisted-query.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
@@ -30,7 +31,11 @@ const PAGE_SIZE = 50;
 const MAX_PAGES = envInt('MAX_PAGES', 400);
 
 const ENDPOINT = 'https://www.ab.gr/api/v1/';
-const PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800';
+// Same rotating persisted-query hash as the offers adapter — this used to be a
+// second hardcoded copy, so the two could silently drift. Resolved at run time
+// from ScraperState (recovered from AB's live frontend) with this as fallback.
+// The weekly catalog run has been failing on the 2026-08 rotation since 08-02.
+let PQ_HASH = KNOWN_PQ_HASH;
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
   Accept: 'application/json',
@@ -100,6 +105,13 @@ async function getRoots() {
 
 async function run() {
   console.log(`🛒 AB catalog scraper${DRY_RUN ? ' (DRY_RUN)' : ''}`);
+
+  // Resolve the persisted-query hash before the first request (see PQ_HASH).
+  {
+    const { default: prisma } = await import('../lib/prisma.ts');
+    PQ_HASH = await resolvePqHash(prisma, (m) => console.log(`   ${m}`));
+  }
+
   const roots = await getRoots();
   console.log(`   ${roots.length} root categories: ${roots.join(',')}`);
 

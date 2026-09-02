@@ -85,6 +85,7 @@ on:
           - ab-catalog
           - ab-catalog-probe
           - ab-pq-probe
+          - ab-pq-recover
           - sklavenitis-offers-probe
           - sklavenitis-offers
           - mymarket-offers
@@ -172,7 +173,40 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx prisma generate
+      # AB rotates its Apollo persisted-query hash on redeploys. When that
+      # happens the adapter exits 78 (distinct from a real scrape failure) and
+      # the two steps below recover the new hash from AB's own frontend and
+      # retry. Before this, a rotation just failed nightly: AB sat at 1 live
+      # offer for five weeks with nobody notified.
       - name: Run AB adapter
+        id: ab
+        run: |
+          set +e
+          node src/scripts/adapters/ab.mjs
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 78 is handled by the recovery steps; anything else is a real failure.
+          if [ "$code" -ne 0 ] && [ "$code" -ne 78 ]; then exit "$code"; fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PACE_MS: '900'
+          JITTER_MS: '500'
+      - name: Recover AB persisted-query hash (only when AB rotated it)
+        if: steps.ab.outputs.code == '78'
+        # Needs a real browser: the hash is computed at runtime by AB's Apollo
+        # client, so we load the page and read what it actually sends. Chromium
+        # is installed only on this path, so normal nights pay nothing.
+        run: |
+          npx playwright install --with-deps chromium
+          node src/scripts/recover-ab-pq-hash.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Re-run AB adapter with the recovered hash
+        if: steps.ab.outputs.code == '78'
         run: node src/scripts/adapters/ab.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -494,6 +528,26 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: node src/scripts/probe-ab-pq-hash.mjs
+
+  ab-pq-recover:
+    # Manual entry point for the same recovery the ab-offers job runs itself.
+    # Useful to heal the hash ahead of the next nightly run.
+    if: github.event.inputs.chain == 'ab-pq-recover'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx playwright install --with-deps chromium
+      - run: node src/scripts/recover-ab-pq-hash.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
   ab-catalog:
     # Weekly Sun 04:30 UTC + manual. Walks AB's ~14 root categories via the

@@ -31,6 +31,56 @@ export const KNOWN_PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa17782
 export const AB_ORIGIN = 'https://www.ab.gr';
 // The page whose bundle graph contains the ProductList operation.
 export const AB_PROMOTIONS_PAGE = `${AB_ORIGIN}/search/promotions`;
+export const AB_ENDPOINT = `${AB_ORIGIN}/api/v1/`;
+// ScraperState row holding the hash recovered from AB's live frontend. The
+// adapter prefers it over KNOWN_PQ_HASH so a rotation heals without a deploy.
+export const AB_PQ_STATE_KEY = 'ab.persistedQueryHash.ProductList';
+
+export const AB_API_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+  Accept: 'application/json',
+  'Accept-Language': 'el-GR,el;q=0.9',
+  Origin: AB_ORIGIN,
+  Referer: AB_PROMOTIONS_PAGE,
+  'x-apollo-operation-name': 'ProductList',
+  'apollo-require-preflight': 'true',
+};
+
+// One small ProductList page — enough to tell "hash accepted" from
+// "PersistedQueryNotFound". Shared so the probe, the recovery script and the
+// adapter all ask the API in exactly the same shape.
+export function buildProductListUrl(hash, pageNumber = 0, pageSize = 10) {
+  const variables = encodeURIComponent(JSON.stringify({
+    productListingType: 'PROMOTION_SEARCH', lang: 'gr',
+    productCodes: '', categoryCode: '', excludedProductCodes: '', brands: '',
+    keywords: '', productTypes: '', lazyLoadCount: pageSize, pageNumber,
+    sort: '', searchQuery: '', hideProductsWithoutPromo: false,
+    hideUnavailableProducts: true, maxItemsToDisplay: 0,
+    includePotentialActivatableOffers: true,
+  }));
+  const ext = encodeURIComponent(JSON.stringify({
+    persistedQuery: { version: 1, sha256Hash: hash },
+  }));
+  return `${AB_ENDPOINT}?operationName=ProductList&variables=${variables}&extensions=${ext}`;
+}
+
+// The hash the adapter should use: the recovered one when present, else the
+// compiled-in fallback. Takes the prisma client so this module stays free of
+// DB imports (dotenv ordering — see CLAUDE.md).
+export async function resolvePqHash(prisma, log = () => {}) {
+  try {
+    const row = await prisma.scraperState.findUnique({ where: { key: AB_PQ_STATE_KEY } });
+    if (row?.value) {
+      log(`persisted-query hash from ScraperState (updated ${row.updatedAt.toISOString().slice(0, 10)})`);
+      return row.value;
+    }
+  } catch (e) {
+    // A missing table or an unreachable DB must not stop a scrape that the
+    // compiled-in hash can still serve.
+    log(`ScraperState unavailable (${e.message.slice(0, 80)}) — using the compiled-in hash`);
+  }
+  return KNOWN_PQ_HASH;
+}
 
 const HEX64 = /[0-9a-f]{64}/g;
 
