@@ -37,6 +37,30 @@ export function isPositiveVerdict(v: Verdict | null | undefined): boolean {
 const MIN_POINTS = 3;
 
 /**
+ * The price this chain normally charges: the median of its `normal` (shelf)
+ * snapshots. Returned separately from the series average because mixing shelf
+ * and promo prices produces a number that describes neither — how many of each
+ * we hold is an artefact of when the scrapers happened to run, not a fact about
+ * the market. Phase 9 added PriceSnapshot.kind exactly to keep them apart.
+ *
+ * Median rather than mean so one mis-scraped outlier can't move the reference
+ * a shopper is asked to judge a discount against.
+ */
+export function normalReference(
+  snapshots: { price: number; kind?: string | null }[] | null | undefined
+): number | null {
+  if (!snapshots || snapshots.length === 0) return null;
+  const shelf = snapshots
+    .filter((s) => s.kind === 'normal' && Number.isFinite(s.price) && s.price > 0)
+    .map((s) => s.price)
+    .sort((a, b) => a - b);
+  if (shelf.length === 0) return null;
+  const mid = Math.floor(shelf.length / 2);
+  const med = shelf.length % 2 ? shelf[mid] : (shelf[mid - 1] + shelf[mid]) / 2;
+  return round2(med);
+}
+
+/**
  * @param current the offer price the shopper sees (Discount.discountedPrice)
  * @param prices  recorded prices over the window (PriceSnapshot.price[])
  * @param opts.minPoints minimum data points before a verdict is offered (default 3)

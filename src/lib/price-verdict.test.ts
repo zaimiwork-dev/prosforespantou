@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeVerdict, isPositiveVerdict } from './price-verdict';
+import { computeVerdict, isPositiveVerdict, normalReference } from './price-verdict';
 
 describe('computeVerdict', () => {
   it('returns null verdict with no history', () => {
@@ -58,5 +58,56 @@ describe('computeVerdict', () => {
     expect(isPositiveVerdict('meh')).toBe(false);
     expect(isPositiveVerdict('high')).toBe(false);
     expect(isPositiveVerdict(null)).toBe(false);
+  });
+});
+
+describe('normalReference', () => {
+  it('returns null when there are no snapshots at all', () => {
+    expect(normalReference([])).toBeNull();
+    expect(normalReference(null)).toBeNull();
+  });
+
+  it('returns null when the chain has only promo snapshots', () => {
+    // No shelf baseline yet — better to show nothing than to pass a promo
+    // price off as "what you normally pay".
+    expect(normalReference([
+      { price: 1.99, kind: 'mono' },
+      { price: 2.10, kind: 'strikethrough' },
+    ])).toBeNull();
+  });
+
+  it('ignores promo snapshots when shelf prices exist', () => {
+    expect(normalReference([
+      { price: 0.99, kind: 'mono' },
+      { price: 2.49, kind: 'normal' },
+      { price: 2.49, kind: 'normal' },
+      { price: 2.59, kind: 'normal' },
+    ])).toBe(2.49);
+  });
+
+  it('uses the median, so one mis-scraped outlier cannot move the reference', () => {
+    expect(normalReference([
+      { price: 2.40, kind: 'normal' },
+      { price: 2.50, kind: 'normal' },
+      { price: 99.0, kind: 'normal' },
+    ])).toBe(2.5);
+  });
+
+  it('averages the middle pair for an even number of shelf prices', () => {
+    expect(normalReference([
+      { price: 2.00, kind: 'normal' },
+      { price: 3.00, kind: 'normal' },
+    ])).toBe(2.5);
+  });
+
+  it('treats a null kind as not-shelf (legacy rows predate the field)', () => {
+    expect(normalReference([{ price: 2.49, kind: null }])).toBeNull();
+  });
+
+  it('drops non-positive prices', () => {
+    expect(normalReference([
+      { price: 0, kind: 'normal' },
+      { price: 2.20, kind: 'normal' },
+    ])).toBe(2.2);
   });
 });

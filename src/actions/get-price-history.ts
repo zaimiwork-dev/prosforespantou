@@ -2,12 +2,13 @@
 
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
-import { computeVerdict } from '@/lib/price-verdict';
+import { computeVerdict, normalReference } from '@/lib/price-verdict';
 
 export interface PricePoint {
   recordedAt: string;
   price: number;
   supermarket: string;
+  kind: string | null;
 }
 
 export interface PriceHistory {
@@ -27,6 +28,12 @@ export interface PriceHistory {
   // Percent above the window min (0 when at min). Useful for "↓ X% below average".
   percentAboveMin: number | null;
   daysCovered: number;
+  // Median of this chain's `normal` (shelf) snapshots — "what you normally pay
+  // here". Null when the chain has no shelf baseline for this product yet.
+  // Kept apart from `avg` on purpose: see normalReference in lib/price-verdict.
+  normalPrice: number | null;
+  // Which chain the series describes, or null for an unscoped (legacy) call.
+  supermarket: string | null;
 }
 
 const FALLBACK: PriceHistory = {
@@ -38,12 +45,29 @@ const FALLBACK: PriceHistory = {
   verdict: null,
   percentAboveMin: null,
   daysCovered: 0,
+  normalPrice: null,
+  supermarket: null,
 };
 
-// Fetch price history for one canonical product. `days` defaults to 90 — we
-// have a month of data today; queries will gracefully shorten to that.
-// Pass supermarket=null/undefined to get cross-chain history (preferred — more
-// data points). Pass a slug to scope to one chain.
+// Price history for one canonical product AT ONE CHAIN.
+//
+// `supermarket` should always be the chain whose offer is on screen. Callers
+// used to omit it, which pooled every chain into one series — so the chart's
+// «Χαμηλότερη» could be a price this store never charged, and the shopper was
+// shown another supermarket's low as if it were this one's.
+//
+// Measured before changing it (.local-scratch/verdict-blend-impact.mjs +
+// verdict-loss-breakdown.mjs over 13,675 live offers): scoping per chain
+// changes 3,032 verdicts. Notably it corrects ZERO false badges — a
+// cross-chain 'lowest' is mathematically also a same-chain 'lowest', since the
+// pooled minimum can only be lower. What pooling actually did was the
+// opposite: it SUPPRESSED 491 deserved badges whose offer is the cheapest that
+// store has charged but looked ordinary beside a rival's price. The cost is
+// 880 truthful badges that fall below the 3-point minimum once scoped; those
+// return on their own as each chain's history thickens.
+//
+// Pass supermarket=null only for a deliberate cross-chain view; nothing does
+// today, and such a series must not be labelled as one store's prices.
 export async function getPriceHistory(
   productId: string | null | undefined,
   options: { days?: number; supermarket?: string | null; currentPrice?: number | null } = {}
@@ -64,7 +88,7 @@ export async function getPriceHistory(
             ...(options.supermarket ? { supermarket: options.supermarket } : {}),
           },
           orderBy: { recordedAt: 'asc' },
-          select: { recordedAt: true, price: true, supermarket: true },
+          select: { recordedAt: true, price: true, supermarket: true, kind: true },
         });
 
         if (rows.length === 0) return FALLBACK;
@@ -83,6 +107,7 @@ export async function getPriceHistory(
             recordedAt: r.recordedAt.toISOString(),
             price: r.price,
             supermarket: r.supermarket,
+            kind: r.kind ?? null,
           })),
           min: v.min,
           max: v.max,
@@ -91,6 +116,8 @@ export async function getPriceHistory(
           verdict: v.verdict,
           percentAboveMin: v.percentAboveMin,
           daysCovered: days,
+          normalPrice: normalReference(rows),
+          supermarket: options.supermarket ?? null,
         };
       } catch (error) {
         Sentry.captureException(error);

@@ -88,7 +88,13 @@ export default async function OfferPage({ params }) {
   const [comparison, history, similar] = await Promise.all([
     getPriceComparison(id),
     // Judge the verdict against THIS offer's price, not the last snapshot.
-    getPriceHistory(offer.productId, { days: 90, currentPrice: Number(offer.discountedPrice) }),
+    // Scoped to THIS offer's chain: a pooled series made «Χαμηλότερη» a price
+    // this store may never have charged. See get-price-history.ts.
+    getPriceHistory(offer.productId, {
+      days: 90,
+      supermarket: offer.supermarket,
+      currentPrice: Number(offer.discountedPrice),
+    }),
     getSimilarOffers(id),
   ]);
 

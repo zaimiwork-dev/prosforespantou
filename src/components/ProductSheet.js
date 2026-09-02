@@ -66,7 +66,12 @@ function ProductSheetInner({ product, onClose, onAdd }) {
     if (productId) {
       // Judge the verdict against THIS offer's price, not the last snapshot.
       const offerPrice = Number(product.discountedPrice ?? product.discounted_price);
-      getPriceHistory(productId, { days: 90, currentPrice: Number.isFinite(offerPrice) ? offerPrice : null })
+      getPriceHistory(productId, {
+        days: 90,
+        // Same chain scoping as the offer page — see get-price-history.ts.
+        supermarket: product.supermarket || product.supermarket_id || null,
+        currentPrice: Number.isFinite(offerPrice) ? offerPrice : null,
+      })
         .then((h) => { if (!cancelled) setHistory(h); })
         .catch(() => {});
     }

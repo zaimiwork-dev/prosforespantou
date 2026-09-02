@@ -33,7 +33,7 @@ export function PriceHistory({ history, compact = false }) {
 
   if (!history || !history.points || history.points.length === 0) return null;
 
-  const { points, min, avg, verdict, percentAboveMin } = history;
+  const { points, min, avg, verdict, percentAboveMin, normalPrice } = history;
 
   const style = VERDICT_STYLE[verdict];
   const showBadge = isPositiveVerdict(verdict) && style;
@@ -165,7 +165,15 @@ export function PriceHistory({ history, compact = false }) {
         <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.45, marginTop: 6 }}>
           Χαμηλότερη: <strong style={{ color: 'var(--ink)' }}>{lo.toFixed(2)}€</strong>
           {' · '}
-          Μέση: <strong style={{ color: 'var(--ink)' }}>{avg?.toFixed(2) ?? min?.toFixed(2)}€</strong>
+          {/* Prefer the real shelf price over an average that blends shelf and
+              promo snapshots — that average describes neither, since the mix
+              just reflects when the scrapers happened to run. Fall back to the
+              average only while a chain has no shelf baseline yet. */}
+          {normalPrice != null ? (
+            <>Κανονική τιμή: <strong style={{ color: 'var(--ink)' }}>{normalPrice.toFixed(2)}€</strong></>
+          ) : (
+            <>Μέση: <strong style={{ color: 'var(--ink)' }}>{avg?.toFixed(2) ?? min?.toFixed(2)}€</strong></>
+          )}
           {percentAboveMin > 0 && (
             <>
               {' · '}

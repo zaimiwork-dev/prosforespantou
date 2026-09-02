@@ -38,25 +38,35 @@ async function run() {
 
   const deals = await prisma.discount.findMany({
     where: { isActive: true, validUntil: { gt: now } },
-    select: { id: true, productId: true, discountedPrice: true, priceVerdict: true },
+    select: { id: true, productId: true, supermarket: true, discountedPrice: true, priceVerdict: true },
   });
   console.log(`🔢 active deals: ${deals.length}${DRY_RUN ? ' (DRY_RUN)' : ''}`);
 
-  // Build productId -> prices[] over the window, in chunks (avoids a giant IN).
+  // productId+chain -> prices[], in chunks (avoids a giant IN).
+  //
+  // KEYED BY CHAIN, and it must stay that way: the offer page and the modal
+  // compute this live per chain (actions/get-price-history.ts). If this pass
+  // pooled every chain the way it used to, a card would carry a badge the
+  // detail view then refused to show — the same lockstep trap as the
+  // comparison chip. Pooling also suppressed badges: an offer that is the
+  // cheapest its own store has ever charged looked ordinary next to a rival's
+  // lower price.
   const productIds = [...new Set(deals.map((d) => d.productId).filter(Boolean))];
   const priceMap = new Map();
+  const key = (productId, supermarket) => `${productId}|${supermarket ?? ''}`;
   for (const ids of chunk(productIds, 500)) {
     const snaps = await prisma.priceSnapshot.findMany({
       where: { productId: { in: ids }, recordedAt: { gte: since } },
-      select: { productId: true, price: true },
+      select: { productId: true, supermarket: true, price: true },
     });
     for (const s of snaps) {
-      const arr = priceMap.get(s.productId) || [];
+      const k = key(s.productId, s.supermarket);
+      const arr = priceMap.get(k) || [];
       arr.push(s.price);
-      priceMap.set(s.productId, arr);
+      priceMap.set(k, arr);
     }
   }
-  console.log(`   products with history: ${priceMap.size}`);
+  console.log(`   (product, chain) series with history: ${priceMap.size}`);
 
   const tally = {};
   let updated = 0, unchanged = 0;
@@ -65,7 +75,7 @@ async function run() {
   async function worker() {
     while (queue.length) {
       const d = queue.pop();
-      const prices = (d.productId && priceMap.get(d.productId)) || [];
+      const prices = (d.productId && priceMap.get(key(d.productId, d.supermarket))) || [];
       const { verdict } = computeVerdict(d.discountedPrice, prices);
       tally[verdict || 'none'] = (tally[verdict || 'none'] || 0) + 1;
       if (verdict === (d.priceVerdict ?? null)) { unchanged++; continue; }
