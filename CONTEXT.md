@@ -87,6 +87,24 @@ Each resolver step is now capped at `LIMIT=150` per night. Slower overall drain,
 
 Also note for anyone reading the pending counts: they move only when a row **resolves**. An item the LLM judges as low-confidence stays in `pending_matches` with its suggestion updated, so a long run can consume budget while the total barely moves. That is the design (the Review Queue is the manual gate), not a stall.
 
+##### T1 follow-up 2 — 2026-09-03: prompt slimmed, drain roughly 50% faster
+
+The deferred token-reduction lever, now pulled. Groq's free tier caps us on **tokens per day, not requests**, so tokens per call is what sets the drain rate.
+
+Ten 36-character UUIDs per prompt cost ~150 tokens and bought nothing — the model only had to point at rows we already hold in memory. Candidates are now numbered 1..N and mapped back locally, with a tighter scaffold: the candidate list drops from 1,049 to 690 characters.
+
+Measured in CI `33685203658` (lidl, LIMIT=8, 0 errors):
+
+| | before | after |
+|---|---|---|
+| tokens/call | 1,241 | **815** |
+| free-tier ceiling | ~161 items/day | **~245 items/day** |
+| TPM-safe pace floor | 9.3 s | 6.1 s |
+
+`PACE_MS` accordingly dropped 13s → 8s (a third of headroom over the floor). A faster pace does not raise the daily total — TPD binds either way — but it spends the allowance sooner, which is what keeps the combined nightly job inside its 350-minute budget.
+
+It also **deletes a failure class rather than detecting one**: a hallucinated UUID had to be caught after the fact, whereas an index is either in range or it isn't. `0` now means "no candidate has the right brand and size", a clearer question than asking for the string "NEW".
+
 #### T2 — AB adapter self-heals on PersistedQueryNotFound
 - `PQ_HASH` is duplicated in [adapters/ab.mjs](src/scripts/adapters/ab.mjs) and [ab-catalog.mjs](src/scripts/ab-catalog.mjs) — centralise it in `src/scripts/lib/`.
 - AB redeploys will recur, so recovery must be automatic and must run in CI (ab.gr is IP-blocked from the dev machine; the Playwright capture probe only works from CI). Candidate mechanisms — Opus probes, then picks: (a) on `PersistedQueryNotFound`, fetch `https://www.ab.gr/search/promotions`, follow its JS chunk(s), regex the 64-hex sha256 adjacent to the `ProductList` operation, retry with it, log the new hash loudly; (b) APQ fallback — send the full `query` text alongside the hash (Apollo servers usually register it) IF the query text exists in `library_data/ab_offers_api_capture.json`. Persist the discovered hash somewhere CI can reuse it (a small JSON committed by the job, or a DB row — either is fine).

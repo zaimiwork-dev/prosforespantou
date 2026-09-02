@@ -65,11 +65,9 @@ const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 // not process more per day — it finishes the day's allowance sooner, which is
 // what keeps the combined nightly job inside its 350-minute budget.
 //
-// The run prints its own measured tokens/call and items/day at the end. Trust
-// those over this comment.
-//
-// The run stops cleanly when the daily allowance is spent and resumes on the
-// next nightly pass.
+// When the daily allowance is spent the run stops cleanly and the next nightly
+// pass resumes. It prints its own measured tokens/call and items/day at the
+// end — trust those numbers over this comment.
 const PACE_MS = parseInt(process.env.PACE_MS || '8000', 10);
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const DRY_RUN = process.env.DRY_RUN === '1';
