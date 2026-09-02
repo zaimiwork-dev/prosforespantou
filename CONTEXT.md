@@ -240,6 +240,25 @@ Run the truth audit after one nightly cycle post-T4 (UNKNOWN should be draining)
 ### WEEK 3 — launch hygiene (all €0)
 #### T8 — cookieless aggregate analytics
 Add a cookieless page-view counter that is NOT behind the consent banner (Vercel Web Analytics free tier or equivalent; no cookies, no cross-site identifiers → no consent needed; say so on /cookies). The consent-gated `trackEvent` stays as is. You cannot run a distribution experiment blind.
+
+##### T8 addendum — 2026-09-02 (code DONE — needs ONE dashboard click from the owner)
+
+**Shipped:** `b3b39eb`.
+
+**⛔ OWNER ACTION, or this collects nothing:** enable **Web Analytics** for the project in the Vercel dashboard (Project → Analytics → Enable). The script ships with the app, but Vercel does not accept data until the feature is switched on. Free on Hobby.
+
+**Why a second analytics path at all.** `lib/track.js` is behind the opt-in banner, and correctly so — it records behavioural events plus a per-device `sessionId`, which is precisely the non-essential profiling ePrivacy requires consent for. The consequence is that **504 events in five months and 4 sessions in 30 days measure our opt-in rate, not our traffic**. Weeks 4–6 are a distribution experiment; running one blind is pointless.
+
+**What was added:** Vercel Web Analytics, not consent-gated, answering only *how many people opened which page*. Verified against Vercel's privacy documentation rather than assumed: no cookie, nothing written to or read from the device, a visitor is a hash derived from the incoming request that is discarded after 24 hours, and no identifier that can follow anyone to another site. Collected: path, timestamp, referrer, country/region, device and browser type.
+
+**`beforeSend` strips query strings entirely.** Vercel would retain filtered params, but ours carry the shopper's own search text (`/search?q=…`). That is their input and has no business in an analytics store; page paths answer the question we are asking. An unparseable URL drops the event rather than shipping something unexpected.
+
+**The behavioural tracker is untouched** and remains strictly opt-in, as does the equal-prominence banner. The two signals answer different questions and neither replaces the other.
+
+**Legal wording is the one judgement call here.** Both `/cookies` and `/aporrito` now describe, in Greek, what is collected, what is not, and why this measurement does not need consent while the other kind does. The reasoning is the standard basis for cookieless analytics in the EU — no storage or access on the terminal equipment, aggregate-only output — but it is a position, not a certainty. **Owner should read that wording** and, if it ever matters commercially, have it checked.
+
+**Verified:** tests 246, build green, `@vercel/analytics` 2.0.1.
+
 #### T9 — Resend activation
 Owner: `RESEND_API_KEY` in Vercel + `.env.local`, verify `prosforespantou.gr` in Resend, set `EMAIL_FROM`. Opus: confirm the signup confirmation arrives < 30 s; then build the small **daily post-ingest alert pass** (Phase 3 note: bulk writes don't fire alerts by design) so watch-list emails actually go out. Anti-spam rules in `lib/alert-match.ts` stand.
 #### T10 — real-phone pass + owner sign-off
