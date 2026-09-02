@@ -46,12 +46,12 @@ The product thesis (discount-first, cross-chain, honest prices, elderly-mobile a
 
 ### ⛔ OWNER TO-DO — everything now waiting on you (2026-09-03)
 
-Six of the ten planned tasks are done and deployed. **Every remaining task is blocked on one of these five items.** Roughly in order of what unblocks the most.
+Six of the ten planned tasks are done and deployed. **Every remaining task is blocked on one of these items.** Roughly in order of what unblocks the most.
 
 ---
 
-#### 1. Enable Web Analytics in the Vercel dashboard  ·  free  ·  1 minute
-Project → **Analytics** → **Enable**. The tracking code is already live, but Vercel discards data until the feature is switched on, so until you click this we still cannot count visitors — which is the whole point of weeks 4–6.
+#### 1. ~~Enable Web Analytics in the Vercel dashboard~~ — ALREADY DONE, nothing to do
+Checked after deploying: `/_vercel/insights/script.js` returns **HTTP 200**, which Vercel only serves when the feature is switched on for the project. So visit counting is live as of 2026-09-03. Just glance at Project → Analytics in a few days to confirm numbers are actually accumulating.
 
 #### 2. Buy a residential proxy, then set `PROXY_URL`  ·  ~€5–15/mo  ·  unblocks T5
 This is the one recurring cost recommended, and it is now the **only red alarm on the site**. Sklavenitis has been stale since 2026-08-27 because the dev-PC task keeps failing (403, killed mid-run, PC asleep — three different causes in four attempts). It is the largest Greek chain.
@@ -308,7 +308,7 @@ Add a cookieless page-view counter that is NOT behind the consent banner (Vercel
 
 **Shipped:** `b3b39eb`.
 
-**⛔ OWNER ACTION, or this collects nothing:** enable **Web Analytics** for the project in the Vercel dashboard (Project → Analytics → Enable). The script ships with the app, but Vercel does not accept data until the feature is switched on. Free on Hobby.
+**Verified live after deploy:** `/_vercel/insights/script.js` returns HTTP 200, which Vercel serves only when Web Analytics is enabled for the project — so it was already switched on and **no owner action is needed**. (Had it returned 404, the fix would have been Project → Analytics → Enable.)
 
 **Why a second analytics path at all.** `lib/track.js` is behind the opt-in banner, and correctly so — it records behavioural events plus a per-device `sessionId`, which is precisely the non-essential profiling ePrivacy requires consent for. The consequence is that **504 events in five months and 4 sessions in 30 days measure our opt-in rate, not our traffic**. Weeks 4–6 are a distribution experiment; running one blind is pointless.
 
