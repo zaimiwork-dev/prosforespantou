@@ -165,6 +165,37 @@ The product thesis (discount-first, cross-chain, honest prices, elderly-mobile a
 - `npm run test:run` (206/206) → `npm run build` → commit (include `audit-comparison-truth.mjs`) → push. Then run `node src/scripts/audit-comparison-truth.mjs` once for the baseline (expect mostly UNKNOWN until nightly runs re-stamp).
 - **Acceptance:** tests green, build green, pushed, columns present, baseline audit output pasted into the addendum.
 
+
+##### T4 addendum — 2026-09-02 (DONE — suite fully green for the first time since 08-23)
+
+**Shipped:** `0df6838`. Working tree is now clean; nothing from the 08-23 pass is left dangling.
+
+**The regression, precisely.** `γάλακτος` is the Greek genitive of "milk". Added on 08-23 as an unconditional marker family, it fired on every dairy drink and split «Μεβγάλ Γάλα Protein Μπανάνα» from «Μεβγάλ High Protein Ρόφημα Γάλακτος Μπανάνα» — the same product at two chains. That inverts the guard's purpose, which is to stop us claiming two *different* products are the same.
+
+**Fix:** product-type families now require an **anchor** word. `γάλακτος`/`υγείας` count only inside a chocolate name, coffee types only inside a coffee name. Outside their domain the words are inert — something a flat family list could not express. `χρωματιστά/λευκών`, `αλατισμένα/ανάλατα` and `στέβια` stayed unconditional; they don't occur as ordinary descriptors of unrelated products.
+
+**Writing the tests caught a flaw in my own first attempt.** I initially let the type roots anchor themselves, reasoning that a pack may print "Espresso" without ever printing «καφές». That made «Brita Φίλτρου Νερού» read as a coffee type. Only genuinely coffee-only words anchor now. Protection survives because `variantConflict` compares family SETS, so **one anchored side is enough**: a pack printing «Espresso» still registers a family that its «Φίλτρου» counterpart lacks.
+
+**Honest cost of the fix:** the 08-23 unconditional rule also blocked pairs like «Ξηρά Τροφή Για Γάτες Junior Κροκέτες **Γάλακτος** Με Κοτόπουλο» vs «Whiskas Junior Κοτόπουλο», which the anchored version no longer blocks. That pair sits at similarity 0.50 and both sides are barcode-less — it is a stale-mapping problem that the old rule happened to catch by accident, not a variant problem. Fixing it belongs to the mapping audit (T1's drain), not to the flavour guard.
+
+**Verified:** 239/239 tests (was 205 passing + 1 failing), build green.
+
+**Baseline truth audit (the first ever run):**
+
+| | |
+|---|---|
+| active public offers with a product | 13,673 |
+| cross-chain candidate pairs | 6,198 |
+| blocked by pack/variant/quantity/similarity | 2,391 (38.6%) |
+| **comparison rows a user can actually see** | **3,807** |
+| PROVEN / NAME-MATCH / UNKNOWN / UNPROVABLE | 0% / 0% / 35% / **65%** |
+
+**Read the provenance numbers with care — they are not yet meaningful.** All 61,060 mappings still read `null(legacy)` because the stamping code only shipped in this commit; nothing has re-stamped yet. UNKNOWN will drain once nightly runs re-bind. **UNPROVABLE (65%) will not drain**: it means the canonical Product carries no GTIN at all, and only 19,640 of 63,909 products (31%) have one. That is a structural ceiling on how much of our comparison can ever be barcode-proven, and it directly affects T6's design — see the open question raised for Fable.
+
+**Two other numbers worth having, both confirming later tasks:**
+- **Price history is as blended as suspected**: of 1,765 compared products, **92.4% pool more than one chain** and **94.6% pool more than one price kind** into the series behind «Χαμηλότερη τιμή που έχουμε δει». That is T7's justification, now quantified.
+- **Same-chain collisions**: mymarket 602, masoutis 229, sklavenitis 179, ab 64 products claimed by more than one SKU of the same chain — the stale-mapping backlog T1's drain and the mapping audit exist to fix.
+
 #### T5 — Sklavenitis to CI via residential proxy (owner buys; Opus wires)
 - Owner: buy a small residential proxy, then `gh secret set PROXY_URL` (permission-gated for agents).
 - Opus: confirm `sklavenitis-offers` + `sklavenitis-catalog` (its mirror step already gets the R2 env) go healthy on dispatch; flip `EXPECTED_FEEDS` to CI/36h; leave the Windows tasks registered as a documented manual fallback only, or unregister — owner's call; note it either way.
@@ -172,6 +203,10 @@ The product thesis (discount-first, cross-chain, honest prices, elderly-mobile a
 
 ### WEEK 2 — make the comparison honest for real
 #### T6 — comparison-truth baseline + shelf-row gating
+
+> **❓ OPEN QUESTION FOR FABLE, raised 2026-09-02 by the T4 baseline audit.** T6 says to gate «Κανονική τιμή» shelf rows on `matchedVia='barcode'`. The audit now shows only **19,640 of 63,909 products (31%) carry a GTIN at all**, and **65% of currently rendered comparison rows are UNPROVABLE** — no barcode exists on either side to check against. So strict barcode gating would not tighten the shelf rows so much as delete most of them, and would shrink the comparison layer that is the product's headline promise, at a moment when the measured alternative is "we cannot prove these are the same item". Three readings, and the choice is a product call rather than an engineering one: (a) gate strictly anyway — correctness over coverage, accept a much smaller comparison surface; (b) gate strictly but only for the shelf rows, leaving offer-vs-offer rows on the existing name guards, which is the narrow reading of the plan's words; (c) add a middle tier — barcode-proven rows shown plainly, name-matched rows shown with a visible hedge. Recommend deciding before T6 starts, since (a) and (c) imply different UI work. Note the PROVEN/NAME-MATCH split reads 0%/0% today only because stamping shipped in `0df6838` and nothing has re-run yet; re-run the audit after one nightly cycle before judging.
+
+
 Run the truth audit after one nightly cycle post-T4 (UNKNOWN should be draining). Then gate «Κανονική τιμή» shelf rows in [get-price-comparison.ts](src/actions/get-price-comparison.ts) AND its twin [comparison-count.ts](src/lib/comparison-count.ts) on `matchedVia='barcode'` for the snapshot's (chain, product) — the comment claims GTIN gating, the code only checks that the source product has a barcode. Keep the two in lockstep (otherwise the chip lies). Re-run `recompute-comparison-counts.mjs`.
 #### T7 — price history stops blending chains and price kinds
 [get-price-history.ts](src/actions/get-price-history.ts) is called from the offer page and ProductSheet with no `supermarket` and ignores `PriceSnapshot.kind`. Scope the verdict series to the offer's own chain; treat `normal` vs `mono`/`strikethrough` explicitly (the "average" must not blend shelf and promo). Other chains may appear only as separate series if the chart wants them. «Χαμηλότερη τιμή που έχουμε δει» must never mean "cheapest chain". Update [PriceHistory.js](src/components/PriceHistory.js) copy if semantics change. Tests on the `computeVerdict` inputs.
