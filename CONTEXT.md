@@ -55,12 +55,69 @@ The product thesis (discount-first, cross-chain, honest prices, elderly-mobile a
 - Then the mapping audit, also in CI: `gh workflow run audit-mappings.yml` — confirm the workflow passes `LLM=1`; review the artifact; `APPLY=1` **only for verdict=different** (PHASES.md rule). This is the root cause of the 369 masoutis / 131 lidl / 35 sklavenitis productless "collision" rows that re-queue every run.
 - **Acceptance:** resolvers-all log shows resolved > 0 and no 404s; `pending_matches` well under 1,000; Lidl productless < 40; audit artifact reviewed and `different` rows applied; addendum records counts before/after.
 
+
+##### T1 addendum — 2026-09-02 (DONE for the code; the drain runs nightly from here)
+
+**Shipped:** `a77e3f8` (model swap + failure visibility), `f8e5335` (CI `limit` input), `8bb2aa2` (reasoning-model fix + token accounting). All pushed to `origin/main`.
+
+**Root cause confirmed, and it was three bugs, not one.** The dead model was only the trigger; two independent defects are what kept it invisible for 7 weeks:
+1. `resolve-pending-matches.mjs` logged `Groq fatal` on a permanent error and then **continued to the next item** — so a retired model read as 482 individually-unlucky rows and the script still exited 0. Permanent statuses (400/401/403/404/413) now throw `GroqFatalError` and abort the run non-zero.
+2. Every step in the `resolvers` job is `continue-on-error`, so even a non-zero exit left the workflow **green**. Added step ids + a final gate step that re-asserts any step failure. Without this, fix (1) would have changed nothing visible.
+3. Groq free-tier daily exhaustion is now a *separate* class (`GroqBudgetExhausted`) that stops cleanly and exits 0 — expected, not a defect, and the next night resumes.
+
+**Two plan assumptions were wrong — corrected in code:**
+- **`llama-3.3-70b-versatile` is NOT on Groq's free tier.** It is a production model, but the free-tier rate-limit table lists only compound / prompt-guard / gpt-oss (20b,120b,safeguard) / qwen3.6-27b / qwen3.8-27b / whisper. Using it would have failed exactly like the retired model. Chosen instead: **`openai/gpt-oss-120b`**, a documented successor that IS on the free tier. The MODEL note in the script says this so nobody "upgrades" back into the trap.
+- **gpt-oss is a REASONING model.** The first CI smoke run (`33623301115`, LIMIT=8) got a valid answer on item 1 and then died on item 2 with `400 json_validate_failed — max completion tokens reached before generating a valid document`: the model spends output tokens thinking before emitting JSON, and the old `max_tokens: 256` truncated it. Fixed with `reasoning_effort: 'low'`, `include_reasoning: false`, `max_completion_tokens: 1024` (2048 for the batched audit). `max_tokens` is deprecated in favour of `max_completion_tokens`.
+
+**Verified green:** CI run `33623570913` (lidl, LIMIT=8) — 8 processed, **0 errors**, 1 resolved, 7 correctly left pending (Lidl produce/own-brand with no canonical counterpart). The abort path was also verified by the failing run above: it fired on the first permanent error instead of burning the queue.
+
+**MEASURED free-tier budget (replaces the estimate in the MODEL note's first draft):** avg **1,241 tokens/call**. Against gpt-oss-120b's free tier (8K TPM / 200K TPD) that is **~161 items/day**, TPM-safe pace ≥ 9.3 s (PACE_MS 13000 keeps margin). The run now prints these numbers itself at the end, so the budget is re-measured on every pass instead of assumed.
+
+**⚠️ Acceptance criterion revised — read this before judging T1 "incomplete".** The original line ("pending_matches well under 1,000" after the run) is **not achievable in a single run and never was**: 2,732 rows ÷ ~161/day ≈ **17 nightly passes**, i.e. ~3 weeks, on a €0 budget. The scheduled 04:00 UTC `resolvers` job now drains continuously and unattended, stopping cleanly each night when the daily allowance is spent. **Do NOT block T2 on the queue being empty** — the user-visible cost of the backlog is that ~4% of offers are productless (still VISIBLE, just excluded from comparison), whereas T2's AB outage is an entire chain missing from the site. T1's real exit criterion is met: the resolver resolves, errors are 0, failures are now loud.
+
+**Follow-ups created here (not done, deliberately):**
+- **Token reduction — the lever that shortens the drain.** The prompt is ~2.4k chars, of which ten 36-char UUIDs tokenize terribly. Swapping the candidate list to 1-based indices (mapped back locally) plus trimming the scaffold should roughly halve tokens → ~2× items/day, and would also delete the "hallucinated UUID" failure class outright. Deferred so the model swap could be verified against CI one variable at a time.
+- **Mixed-script homoglyph names break the brand guard.** CI run `33623570913` item 4 rejected `ΝΩMA` vs `ΝΩΜΑ` as a brand mismatch — the chain's name carries a **Latin `M`** inside a Greek word. Measured prevalence: **12 / 2,731 pending rows** and **297 / 63,909 products** have a mixed-script first word (`.local-scratch/homoglyph-first.mjs`). Real, but 0.4% — and the fix belongs in the shared brand/similarity normalisation that **T4 is already editing**, so it is NOT done here to avoid a conflicting change. Fold Latin↔Greek homoglyphs (Α/A Β/B Ε/E Ζ/Z Η/H Ι/I Κ/K Μ/M Ν/N Ο/O Ρ/P Τ/T Υ/Y Χ/X) in `normalizeBrandToken` when T4 touches that file. Note the naive detector over-counts: `2x200γρ` and `Δέλτα Μμμmilk` are legitimate, so gate on the FIRST word and ignore tokens containing digits.
+
 #### T2 — AB adapter self-heals on PersistedQueryNotFound
 - `PQ_HASH` is duplicated in [adapters/ab.mjs](src/scripts/adapters/ab.mjs) and [ab-catalog.mjs](src/scripts/ab-catalog.mjs) — centralise it in `src/scripts/lib/`.
 - AB redeploys will recur, so recovery must be automatic and must run in CI (ab.gr is IP-blocked from the dev machine; the Playwright capture probe only works from CI). Candidate mechanisms — Opus probes, then picks: (a) on `PersistedQueryNotFound`, fetch `https://www.ab.gr/search/promotions`, follow its JS chunk(s), regex the 64-hex sha256 adjacent to the `ProductList` operation, retry with it, log the new hash loudly; (b) APQ fallback — send the full `query` text alongside the hash (Apollo servers usually register it) IF the query text exists in `library_data/ab_offers_api_capture.json`. Persist the discovered hash somewhere CI can reuse it (a small JSON committed by the job, or a DB row — either is fine).
 - Add a unit test for the hash extractor against a saved bundle snippet.
 - Verify with `gh workflow run scrape-chains.yml -f chain=ab-catalog-probe` (DRY_RUN) then `-f chain=ab-offers`.
 - **Acceptance:** `ab/web` IngestRun healthy with ≥ 300 scraped; the next Sunday `ab/catalog` healthy; a forced wrong hash in a test recovers without a human.
+
+
+##### T2 addendum — 2026-09-02 (DONE — AB is back: 1 → 258 active offers)
+
+**Shipped:** `e2082fa` (discovery + probe), `dd2f9a0` (self-heal + ScraperState + adapter/catalog wiring), plus an import-depth fix and the `ab-catalog` limit wiring.
+
+**Confirmed the diagnosis before building.** The CI probe verified the hardcoded hash is **REJECTED** by AB's API, so the hash rotation really was the cause — not a scrape shape change, not an IP block.
+
+**Two cheaper designs were tried and rejected on evidence, not taste:**
+1. *Read the hash out of the JS bundles.* CI `33649125528`: 26 bundles scanned, **zero** pair the operation name with a 64-hex string.
+2. *Recompute the hash from the query document.* CI `33649370007` found the document as a minified AST in `3994.*.js` (operation `QlProductList`, `kind:"Document"`). But the hash is `sha256(print(query))`, so this needs a byte-exact reimplementation of graphql's `print()` — and `graphql` is not even a dependency. One whitespace difference gives a wrong hash and a silent failure. Rejected as too fragile for an unattended pipeline.
+
+**What shipped instead:** let AB's own frontend compute the hash and watch what it sends. `recover-ab-pq-hash.mjs` loads the promotions page in Playwright (already a dependency), reads `extensions.persistedQuery.sha256Hash` off the outgoing request, **verifies each candidate against the live API**, and only then stores it. A hash is never adopted merely because it was observed.
+
+**Storage:** a new `ScraperState` key/value model (`scraper_state` table, created over the pooled 6543 connection since 5432 is unreachable here). Chosen over committing the hash to the repo because the recovery runs in CI, and CI pushing to `main` would add commit noise and race real work. Both `adapters/ab.mjs` and `ab-catalog.mjs` now call `resolvePqHash()` at startup — recovered value wins, compiled-in constant is the fallback, and an unreachable DB degrades to the constant instead of failing the scrape.
+
+**Self-healing loop:** the adapter exits **78** on `PersistedQueryNotFound` specifically, distinct from a real scrape failure. The `ab-offers` job reacts to 78 by installing Chromium, running the recovery, and re-running the adapter in the same run. Chromium is installed only on that path, so ordinary nights pay nothing. `ab-pq-recover` is the manual equivalent.
+
+**Also fixed:** `ab-catalog.mjs` carried a **second hardcoded copy** of the hash that could silently drift from the adapter's. Both now share one source.
+
+**Verified end to end in CI:**
+
+| Check | Result |
+|---|---|
+| `ab-pq-recover` (33650132471) | observed 1 hash, verified ACCEPTED, stored |
+| `ab-offers` (33650611898) | 258 scraped, 250 matched, 10 to review, **health ✅ OK**, 78 images mirrored |
+| `ab-catalog` smoke, LIMIT=20 (33651516601) | reads the hash from ScraperState, discovers all **13 root categories** — previously every category failed at page 0 |
+| Live DB | **ab/web 1 → 258 active offers**; `ingest_runs` ab/web healthOk=true |
+| Tests | 217 passing (12 new); the 1 failure is still T4's pre-existing dedupe regression |
+
+**One self-inflicted bug worth recording:** the first `ab-offers` run (33650467887) died instantly on `Cannot find module '.../src/scripts/lib/prisma.ts'` — `adapters/ab.mjs` sits one level deeper than the scripts that use `'../lib/prisma.ts'`. Fixed to `'../../lib/prisma.ts'`, matching `lib/ingest-offers.mjs`. Notably the failure behaved *correctly*: it exited 1, not 78, so CI treated it as a real failure rather than kicking off a pointless hash recovery.
+
+**Not done here:** the weekly full `ab-catalog` crawl (~10k products) was only smoke-tested at LIMIT=20; the scheduled Sunday 04:30 UTC run is the real proof. It should now succeed, and T3's watchdog will say so if it does not.
 
 #### T3 — a watchdog that can actually alarm
 - [pipeline-health/route.ts](src/app/api/cron/pipeline-health/route.ts): return **HTTP 503** when `alarms.length > 0` (keep the JSON body + the Sentry message). `curl -f` in the GH step then fails → workflow red → GitHub emails the owner. That email is the alerting channel; it costs nothing.
