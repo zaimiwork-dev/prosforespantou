@@ -5,6 +5,9 @@
 // the rootCategoryFacet codes so the feeder can walk every department.
 
 const ENDPOINT = 'https://www.ab.gr/api/v1/';
+// NOTE: this one-off probe still carries the pre-2026-08 hash, which AB has
+// since rotated. The live scripts resolve the hash at runtime via
+// lib/ab-persisted-query.mjs — use that, not this constant.
 const PQ_HASH = '1c53d86bec1b38b5767f39df2af0949e3bb90ce2a0afa177829d93cf26905800';
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
