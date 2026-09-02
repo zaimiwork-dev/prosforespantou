@@ -66,12 +66,15 @@ export async function withDbRetry(label, fn) {
 // When dryRun is true, performs only reads — never writes mappings/cache.
 async function matchItem(prisma, item, chain, dryRun) {
   // Bind a chain SKU → Product mapping so future runs hit step 1 directly.
-  async function bind(productId) {
+  async function bind(productId, via) {
     if (dryRun || !item.chainItemcode) return;
+    const stamp = { matchedVia: via, verifiedAt: new Date() };
     await prisma.chainProductMapping.upsert({
       where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: String(item.chainItemcode) } },
-      create: { supermarket: chain, chainItemcode: String(item.chainItemcode), productId },
-      update: { productId },
+      create: { supermarket: chain, chainItemcode: String(item.chainItemcode), productId, ...stamp },
+      // A barcode match is proof and may overwrite anything. A name match must
+      // never downgrade a mapping that was previously proven by GTIN.
+      update: via === 'barcode' ? { productId, ...stamp } : { productId },
     });
   }
 
@@ -88,7 +91,7 @@ async function matchItem(prisma, item, chain, dryRun) {
   if (barcode) {
     const product = await prisma.product.findUnique({ where: { barcode } });
     if (product) {
-      await bind(product.id);
+      await bind(product.id, 'barcode');
       return { productId: product.id, via: 'barcode' };
     }
   }
@@ -101,7 +104,7 @@ async function matchItem(prisma, item, chain, dryRun) {
     if (!dryRun) {
       await prisma.matchCache.update({ where: { id: cached.id }, data: { lastUsedAt: new Date() } });
     }
-    await bind(cached.productId);
+    await bind(cached.productId, 'cache');
     return { productId: cached.productId, via: 'cache' };
   }
 

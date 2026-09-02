@@ -147,8 +147,10 @@ export async function ingestCatalog({
         if (writeMappings && !skuToPid.has(sku)) {
           await withDbRetry('catalog map', () => prisma.chainProductMapping.upsert({
             where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: sku } },
-            create: { supermarket: chain, chainItemcode: sku, productId: pid },
-            update: { productId: pid },
+            // Reached only when the SKU was unknown and `pid` came from the
+            // barcode index — i.e. the chain's own GTIN matched this Product.
+            create: { supermarket: chain, chainItemcode: sku, productId: pid, matchedVia: 'barcode', verifiedAt: new Date() },
+            update: { productId: pid, matchedVia: 'barcode', verifiedAt: new Date() },
           }));
           skuToPid.set(sku, pid);
           out.mapped++;
@@ -169,7 +171,10 @@ export async function ingestCatalog({
         if (writeMappings) {
           await withDbRetry('catalog map-new', () => prisma.chainProductMapping.upsert({
             where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: sku } },
-            create: { supermarket: chain, chainItemcode: sku, productId: pid },
+            // Product was just created FROM this catalog item, so the mapping
+            // is right by construction — but only a GTIN makes it comparable
+            // across chains.
+            create: { supermarket: chain, chainItemcode: sku, productId: pid, matchedVia: bc ? 'barcode' : 'catalog', verifiedAt: new Date() },
             update: { productId: pid },
           }));
           skuToPid.set(sku, pid);

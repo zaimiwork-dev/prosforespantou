@@ -9,6 +9,43 @@ import {
 } from './offer-similarity';
 
 describe('variantConflict (flavour/fat/type guard)', () => {
+  it('blocks product-type variants that shared one family before 2026-08-23', () => {
+    // Both names used to land in the single 'sokolat' family and compare.
+    expect(variantConflict('ΙΟΝ Σοκολάτα Γάλακτος 100gr', 'ΙΟΝ Σοκολάτα Υγείας 100gr')).toBe(true);
+    expect(variantConflict('Nescafe Καφές Espresso 200g', 'Nescafe Καφές Φίλτρου 200g')).toBe(true);
+    expect(variantConflict('Ariel Σκόνη Χρωματιστά 40 μεζ', 'Ariel Σκόνη Λευκών 40 μεζ')).toBe(true);
+    expect(variantConflict('Λαχανικά Αλατισμένα 200g', 'Λαχανικά Ανάλατα 200g')).toBe(true);
+  });
+  it('ignores a product-type word OUTSIDE its domain (regression, 2026-09-02)', () => {
+    // 'γάλακτος' is just the genitive of "milk". Added unconditionally on
+    // 2026-08-23, it fired on every dairy drink and split the SAME product at
+    // two chains — which is what broke dedupe-deals' cross-chain test.
+    expect(variantConflict(
+      'Μεβγάλ Γάλα Protein Μπανάνα 330ml',
+      'Μεβγάλ High Protein Ρόφημα Γάλακτος Μπανάνα 330ml.',
+    )).toBe(false);
+    // Same shape, no chocolate anywhere: the type words must stay inert.
+    expect(variantConflict('Νουνού Ρόφημα Γάλακτος 1lt', 'Νουνού Γάλα 1lt')).toBe(false);
+  });
+
+  it('still splits milk vs dark chocolate, where the word DOES mark a type', () => {
+    expect(variantConflict('ΙΟΝ Σοκολάτα Γάλακτος 100gr', 'ΙΟΝ Σοκολάτα Υγείας 100gr')).toBe(true);
+  });
+
+  it('splits coffee types even when the pack never prints «καφές»', () => {
+    // The type roots anchor themselves — seeing "Espresso" is already proof we
+    // are looking at coffee.
+    expect(variantConflict('Lavazza Espresso 250g', 'Lavazza Φίλτρου 250g')).toBe(true);
+  });
+
+  it('leaves a water filter alone — «φίλτρου» outside coffee is not a type', () => {
+    expect(variantConflict('Brita Φίλτρου Νερού Ανταλλακτικό', 'Brita Ανταλλακτικό Νερού')).toBe(false);
+  });
+
+  it('still allows the same product-type across scripts', () => {
+    expect(variantConflict('ION Sokolata Galaktos 100g', 'ΙΟΝ Σοκολάτα Γάλακτος 100γρ')).toBe(false);
+    expect(variantConflict('Nescafe Espresso 200g', 'Νεσκαφέ Εσπρέσο 200γρ')).toBe(false);
+  });
   it('blocks different flavours that otherwise score high', () => {
     expect(variantConflict('LIPTON ICE TEA GREEN LEMON 500ML', 'Lipton Ice Tea Green Φράουλα 500ml')).toBe(true);
     expect(variantConflict('Παπαδοπούλου Μπισκότα Σοκολάτα 200g', 'Παπαδοπούλου Μπισκότα Λεμόνι 200g')).toBe(true);

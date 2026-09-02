@@ -129,7 +129,10 @@ export function nameSimilarity(a: string | null | undefined, b: string | null | 
 const MARKER_FAMILIES: string[][] = [
   ['lemon', 'λεμον'],
   ['fraoul', 'φραουλ', 'strawberr'],
-  ['sokolat', 'chocolat', 'cacao', 'κακαο', 'choco'],
+  // 'σοκολατ' was missing until 2026-08-23: latin "Sokolata" hit this family
+  // but Greek "Σοκολάτα" hit nothing, so a cross-script pair of the SAME
+  // product looked like a variant conflict and was silently un-compared.
+  ['sokolat', 'σοκολατ', 'chocolat', 'cacao', 'κακαο', 'choco'],
   ['vanil', 'βανιλ'],
   ['portokal', 'orange', 'πορτοκαλ'],
   ['rodakin', 'peach', 'ροδακιν'],
@@ -160,6 +163,48 @@ const MARKER_FAMILIES: string[][] = [
   ['plir', 'πληρ', 'full'],
   ['zero', 'ζερο'],
   ['decaf', 'ντεκαφ'],
+  // PRODUCT-TYPE families that are safe unconditionally — these words don't
+  // occur as ordinary descriptors of unrelated products.
+  ['chromatik', 'χρωματιστ', 'color'],
+  ['λευκων', 'whites'],
+  ['analat', 'αναλατ', 'unsalted'],
+  ['alatism', 'αλατισμ', 'salted'],
+  ['stevi', 'στεβι'],
+];
+
+// ANCHORED product-type families (2026-09-02).
+//
+// Added 2026-08-23 as ordinary families, which regressed: 'γάλακτος' is simply
+// the Greek genitive of "milk", so it fired on every dairy drink. It split
+// «Μεβγάλ Γάλα Protein Μπανάνα» from «Μεβγάλ High Protein Ρόφημα Γάλακτος
+// Μπανάνα» — the same product at two chains — and broke dedupe-deals'
+// cross-chain test.
+//
+// These words only distinguish a product TYPE inside a domain: γάλακτος vs
+// υγείας means milk vs dark CHOCOLATE, not "contains milk". So a family here
+// counts only when an anchor word is present in the name being examined.
+// Outside its domain the word is ignored, which is what the plain families
+// could not express.
+type AnchoredFamily = { roots: string[]; anchors: string[] };
+
+const CHOCOLATE = ['sokolat', 'σοκολατ', 'chocolat', 'choco', 'cacao', 'κακαο'];
+// Coffee anchors are the words that PROVE the domain. 'espresso' qualifies —
+// it is coffee-only. 'φίλτρου' and 'instant' deliberately do NOT: they are
+// ordinary words elsewhere (φίλτρο νερού, χαρτί φίλτρου), and self-anchoring
+// them made «Brita Φίλτρου Νερού» read as a coffee type.
+//
+// One anchored side is enough. variantConflict compares family SETS, so if a
+// pack prints «Espresso» and its counterpart only «Φίλτρου», the first still
+// registers a family the second lacks and the pair conflicts — the protection
+// survives without letting the looser words drag in unrelated products.
+const COFFEE = ['kafe', 'καφε', 'coffee', 'nescaf', 'espresso', 'εσπρεσο'];
+
+const ANCHORED_FAMILIES: AnchoredFamily[] = [
+  { roots: ['galaktos', 'γαλακτοσ'], anchors: CHOCOLATE },
+  { roots: ['ygeias', 'υγειασ', 'dark'], anchors: CHOCOLATE },
+  { roots: ['espresso', 'εσπρεσο'], anchors: COFFEE },
+  { roots: ['filtrou', 'φιλτρ', 'filter'], anchors: COFFEE },
+  { roots: ['stigmiai', 'στιγμιαι', 'instant'], anchors: COFFEE },
 ];
 
 function rawWordTokens(name: string | null | undefined): string[] {
@@ -173,18 +218,31 @@ function rawWordTokens(name: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+// Does any token carry one of these roots as its stem?
+function hasRoot(tokens: string[], roots: string[]): boolean {
+  for (const tok of tokens) {
+    // ignore very short tokens to avoid spurious prefix hits ("με", "ro")
+    if (tok.length < 3) continue;
+    // Forward-prefix ONLY (token carries the root as its stem, tolerating Greek
+    // inflection: "λεμονι".startsWith("λεμον")). The reverse direction let a
+    // generic short word like "χωρίς" match a longer root and over-block.
+    if (roots.some((r) => tok.startsWith(r))) return true;
+  }
+  return false;
+}
+
 function markerFamilies(name: string | null | undefined): Set<number> {
   const tokens = rawWordTokens(name);
   const fams = new Set<number>();
   MARKER_FAMILIES.forEach((roots, idx) => {
-    for (const tok of tokens) {
-      // ignore very short tokens to avoid spurious prefix hits ("με", "ro")
-      if (tok.length < 3) continue;
-      // Forward-prefix ONLY (token carries the root as its stem, tolerating Greek
-      // inflection: "λεμονι".startsWith("λεμον")). The reverse direction let a
-      // generic short word like "χωρίς" match a longer root and over-block.
-      if (roots.some((r) => tok.startsWith(r))) { fams.add(idx); return; }
-    }
+    if (hasRoot(tokens, roots)) fams.add(idx);
+  });
+  // Anchored families occupy their own index range so they can't collide with
+  // the plain ones. They contribute only inside their domain — see the note on
+  // ANCHORED_FAMILIES for why 'γάλακτος' outside a chocolate name must not count.
+  ANCHORED_FAMILIES.forEach((fam, i) => {
+    if (!hasRoot(tokens, fam.anchors)) return;
+    if (hasRoot(tokens, fam.roots)) fams.add(MARKER_FAMILIES.length + i);
   });
   return fams;
 }
