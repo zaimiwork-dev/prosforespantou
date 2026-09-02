@@ -165,7 +165,9 @@ async function run() {
   // Loaded before the first request, so a rotation already healed by an earlier
   // recovery run costs this run nothing.
   {
-    const { default: prisma } = await import('../lib/prisma.ts');
+    // '../../lib' — this file sits in src/scripts/adapters/, one level deeper
+    // than the scripts that import '../lib/prisma.ts'.
+    const { default: prisma } = await import('../../lib/prisma.ts');
     PQ_HASH = await resolvePqHash(prisma, (m) => console.log(`   ${m}`));
   }
 
