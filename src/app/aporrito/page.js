@@ -56,7 +56,12 @@ export default function PrivacyPage() {
 
       <H2>3. Πάροχοι / αποδέκτες (εκτελούντες την επεξεργασία)</H2>
       <ul>
-        <li><strong>Vercel</strong> — φιλοξενία &amp; logs.</li>
+        <li>
+          <strong>Vercel</strong> — φιλοξενία &amp; logs, καθώς και ανώνυμη, συγκεντρωτική
+          μέτρηση επισκεψιμότητας χωρίς cookies (Vercel Web Analytics). Δεν αποθηκεύεται
+          τίποτα στη συσκευή σου και δεν δημιουργείται αναγνωριστικό που σε ακολουθεί —
+          δες την <a href="/cookies" style={{ color: '#009de0' }}>Πολιτική Cookies</a>.
+        </li>
         <li><strong>Supabase</strong> — βάση δεδομένων &amp; αποθήκευση εικόνων.</li>
         <li><strong>Sentry</strong> — καταγραφή τεχνικών σφαλμάτων.</li>
         <li><strong>Resend</strong> — αποστολή ενημερωτικών email (όταν ενεργοποιηθεί).</li>
