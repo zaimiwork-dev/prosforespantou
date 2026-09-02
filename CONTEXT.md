@@ -212,6 +212,31 @@ Run the truth audit after one nightly cycle post-T4 (UNKNOWN should be draining)
 [get-price-history.ts](src/actions/get-price-history.ts) is called from the offer page and ProductSheet with no `supermarket` and ignores `PriceSnapshot.kind`. Scope the verdict series to the offer's own chain; treat `normal` vs `mono`/`strikethrough` explicitly (the "average" must not blend shelf and promo). Other chains may appear only as separate series if the chart wants them. «Χαμηλότερη τιμή που έχουμε δει» must never mean "cheapest chain". Update [PriceHistory.js](src/components/PriceHistory.js) copy if semantics change. Tests on the `computeVerdict` inputs.
 - **Week 2 acceptance:** truth audit shows PROVEN + NAME-MATCH ≫ UNKNOWN; zero shelf rows from non-barcode mappings; a mono offer's history no longer shows a foreign chain's shelf price as its "lowest".
 
+
+##### T7 addendum — 2026-09-02 (DONE — done ahead of T5/T6, which are blocked)
+
+**Shipped:** `07b77b7`. Taken out of order deliberately: T5 waits on the owner buying a proxy and T6 waits on the barcode-gating question above, while T7 needed neither.
+
+**⚠️ The premise in the 08-23 note was wrong, and measuring first is what caught it.** That note said pooling chains meant «Χαμηλότερη τιμή που έχουμε δει» could mean "cheapest chain", implying false badges. It cannot produce a false badge: a pooled minimum is by definition ≤ a single chain's minimum, so a cross-chain `lowest` is *always* also a same-chain `lowest`. Measured across 13,675 live offers: of the 885 positive badges that per-chain scoping removes, **0 were false** — 880 merely fall under the 3-point minimum once scoped (they return as each chain's history thickens) and 5 have a flat own-chain price.
+
+**The real damage ran the other way: pooling SUPPRESSED deserved badges.** 491 offers are the cheapest their own store has ever charged but looked ordinary beside a rival's lower price (`fair→lowest` 265, `good→lowest` 181, `high→lowest` 45). So scoping mostly buys accuracy rather than fewer claims.
+
+| positive badges | before | after |
+|---|---|---|
+| shown | 4,173 | 3,845 |
+| of which false | — | 0 removed were false |
+| deserved but suppressed | 491 | 0 |
+
+**Still worth doing even though no badge was lying,** because the displayed numbers were wrong about the store on screen: a Masoutis offer could show «Χαμηλότερη: 2.18€» where €2.18 was AB's price and Masoutis never went below €2.19. Every figure now describes the shop the shopper is looking at.
+
+**Kinds.** 9,488 of 12,850 same-chain series mix shelf with promo snapshots, and the displayed «Μέση» over that mixture describes neither — the ratio only reflects when the scrapers happened to run. The summary now prefers **«Κανονική τιμή»**, the median of that chain's `normal` snapshots, which is what a discount should actually be judged against and precisely what Phase 9 added `PriceSnapshot.kind` for. Median so a single mis-scrape can't move the reference. Falls back to the old average only while a chain has no shelf baseline.
+
+**Lockstep kept.** `recompute-price-verdicts.mjs` is now keyed by **(product, chain)** to match the live action. Had it stayed pooled, a card would advertise a badge the detail view then refused to show — the same trap the comparison chip already taught us. Dry run: 3,123 verdicts change, distribution `lowest 2,890 · good 955 · fair 1,539 · meh 95 · high 2,188 · none 6,703`.
+
+**Verified:** tests **246** (7 new on `normalReference`), build green, precompute dry-run clean.
+
+**Sequencing note:** the long-running resolver drain (`33648713039`) checked the repo out *before* this commit, so its final recompute step writes pooled verdicts. The real recompute must be re-run after that job ends, otherwise prod keeps the old badges until the 04:00 UTC nightly picks the new code up.
+
 ### WEEK 3 — launch hygiene (all €0)
 #### T8 — cookieless aggregate analytics
 Add a cookieless page-view counter that is NOT behind the consent banner (Vercel Web Analytics free tier or equivalent; no cookies, no cross-site identifiers → no consent needed; say so on /cookies). The consent-gated `trackEvent` stays as is. You cannot run a distribution experiment blind.
