@@ -729,10 +729,21 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Ping pipeline-health route
+        # The route answers 503 when a feed is down. Capture the body BEFORE
+        # failing: `curl -f` alone reports "error: 503" and swallows the
+        # payload, so the owner would get a failure email naming no feed.
+        # Print the detail and put it in the job's error annotation instead.
         run: |
-          curl -fsS --max-time 120 \
+          code=$(curl -sS --max-time 120 -o health.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" \
-            https://prosforespantou.gr/api/cron/pipeline-health
+            https://prosforespantou.gr/api/cron/pipeline-health) || true
+          echo "HTTP $code"
+          jq . health.json || cat health.json
+          if [ "$code" != "200" ]; then
+            detail=$(jq -r '.detail // .error // "no detail"' health.json 2>/dev/null || echo 'no detail')
+            echo "::error::Pipeline health $code — $detail"
+            exit 1
+          fi
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
