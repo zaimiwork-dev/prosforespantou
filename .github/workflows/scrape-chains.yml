@@ -380,6 +380,13 @@ jobs:
     # failed. Without that gate the 2026-07-17 dead-model outage stayed green
     # for 7 weeks: every step failed, every step was allowed to, nobody knew.
     # 350-min budget for first-day backfills; steady-state takes < 5 min.
+    #
+    # Each step is capped at LIMIT=150 (2026-09-02). Groq's free tier forces
+    # ~13s between calls, so one chain with a large queue eats the whole
+    # 350-min budget and the chains after it never run at all: masoutis alone
+    # has ~1,190 rows = 4.3h, which starved masoutis-leaflet and lidl in the
+    # 2026-09-02 backfill. A per-chain cap trades a slower drain for one that
+    # actually reaches every chain each night.
     if: github.event.schedule == '0 4 * * *' || github.event.inputs.chain == 'resolvers-all'
     runs-on: ubuntu-latest
     timeout-minutes: 350
@@ -401,6 +408,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Resolve Sklavenitis pending
         id: r_sklavenitis
         continue-on-error: true
@@ -411,6 +419,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Resolve Bazaar pending
         id: r_bazaar
         continue-on-error: true
@@ -421,6 +430,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Resolve My Market pending
         id: r_mymarket
         continue-on-error: true
@@ -431,6 +441,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Resolve Masoutis pending (web)
         id: r_masoutis_web
         continue-on-error: true
@@ -441,6 +452,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Resolve Masoutis pending (leaflet)
         id: r_masoutis_leaflet
         continue-on-error: true
@@ -451,6 +463,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Resolve Lidl pending (leaflet)
         id: r_lidl
         continue-on-error: true
@@ -461,6 +474,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LIMIT: '150'
       - name: Recompute price verdicts (honest "good deal" card badges)
         # Each new daily snapshot can flip an offer's verdict (e.g. a product
         # reaching its 3rd point becomes eligible). Idempotent. Runs BEFORE the
