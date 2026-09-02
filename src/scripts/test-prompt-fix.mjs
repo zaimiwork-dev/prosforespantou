@@ -64,7 +64,9 @@ OUTPUT shape:
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      // Keep in step with resolve-pending-matches.mjs — the old default was
+      // retired by Groq on 2026-07-17 (see the MODEL note there).
+      model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0,

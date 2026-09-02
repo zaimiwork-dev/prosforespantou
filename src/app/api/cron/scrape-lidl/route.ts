@@ -11,11 +11,12 @@ import { NextResponse } from 'next/server';
 //      cover a 59-page OCR run at ~30 s/page → ~30 min of work.
 //
 // Replacement (shipped 2026-06-07):
-//   - src/scripts/adapters/lidl.mjs — discovers the current flyer by parsing
-//     www.lidl-hellas.gr/c/fylladio-lidl/s10020481, fetches pages via the
-//     per-flyer endpoint that still works, OCRs each page and hands the
-//     result to ingest-offers (source-isolated, MatchCache-aware,
-//     PriceSnapshot-tracked).
+//   - src/scripts/adapters/lidl.mjs — reads the weekly offers as STRUCTURED
+//     data from lidl-hellas.gr's e-shop search API and hands them to
+//     ingest-offers (source-isolated, MatchCache-aware, PriceSnapshot-tracked).
+//     OCR was dropped entirely on 2026-06-15: it garbled ~15% of Greek names,
+//     and the same offers are available as clean JSON. No Groq call remains in
+//     the Lidl path — do not reintroduce a vision model here.
 //   - .github/workflows/scrape-chains.yml runs the adapter weekly on Thu
 //     06:00 UTC (no Vercel timeout to worry about), and the daily 04:00 UTC
 //     `resolvers` job clears PendingMatch rows via the LLM resolver.

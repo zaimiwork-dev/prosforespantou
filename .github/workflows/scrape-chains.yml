@@ -335,7 +335,10 @@ jobs:
   resolvers:
     # Daily 04:00 UTC + manual `resolvers-all`. Walks every chain's PendingMatch
     # queue sequentially. continue-on-error so one stuck chain doesn't block
-    # the rest. 350-min budget for first-day backfills; steady-state takes < 5 min.
+    # the rest — but a FINAL GATE step then fails the job if any resolver step
+    # failed. Without that gate the 2026-07-17 dead-model outage stayed green
+    # for 7 weeks: every step failed, every step was allowed to, nobody knew.
+    # 350-min budget for first-day backfills; steady-state takes < 5 min.
     if: github.event.schedule == '0 4 * * *' || github.event.inputs.chain == 'resolvers-all'
     runs-on: ubuntu-latest
     timeout-minutes: 350
@@ -348,6 +351,7 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - name: Resolve AB pending
+        id: r_ab
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -357,6 +361,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Resolve Sklavenitis pending
+        id: r_sklavenitis
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -366,6 +371,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Resolve Bazaar pending
+        id: r_bazaar
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -375,6 +381,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Resolve My Market pending
+        id: r_mymarket
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -384,6 +391,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Resolve Masoutis pending (web)
+        id: r_masoutis_web
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -393,6 +401,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Resolve Masoutis pending (leaflet)
+        id: r_masoutis_leaflet
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -402,6 +411,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Resolve Lidl pending (leaflet)
+        id: r_lidl
         continue-on-error: true
         run: node src/scripts/resolve-pending-matches.mjs
         env:
@@ -439,6 +449,27 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Gate — fail the job if any resolver step failed
+        # THE POINT: every resolver step above is continue-on-error so one
+        # stuck chain can't block the others. That also meant the workflow
+        # reported SUCCESS while all 7 steps failed for 7 weeks straight
+        # (Groq retired the model on 2026-07-17; every call 404'd). This step
+        # re-asserts the failures so the run turns red and GitHub emails the
+        # owner. Note a Groq daily-budget stop is NOT a failure — the script
+        # exits 0 for that on purpose and resumes the next night.
+        if: always()
+        run: |
+          failed=""
+          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"; do
+            name="${pair%%:*}"; outcome="${pair#*:}"
+            echo "  $name -> $outcome"
+            if [ "$outcome" = "failure" ]; then failed="$failed $name"; fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Resolver failed for:$failed — see the step logs above."
+            exit 1
+          fi
+          echo "All resolver steps OK."
 
   ab-catalog:
     # Weekly Sun 04:30 UTC + manual. Walks AB's ~14 root categories via the

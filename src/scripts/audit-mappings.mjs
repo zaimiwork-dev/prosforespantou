@@ -47,9 +47,18 @@ const APPLY = process.env.APPLY === '1';
 const LLM = process.env.LLM === '1' || APPLY; // applying requires verdicts
 const HARD_FLOOR = 0.34; // below this = clearly a different product (report label)
 const SUSPECT_FLOOR = 0.5; // matches COMPARISON_SIMILARITY_FLOOR
-const PACE_MS = parseInt(process.env.PACE_MS || '2200', 10);
+const PACE_MS = parseInt(process.env.PACE_MS || '8000', 10);
 const BATCH = 8;
-const MODEL = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+// See the MODEL note in resolve-pending-matches.mjs: the old default
+// (meta-llama/llama-4-scout-17b-16e-instruct) was retired by Groq on
+// 2026-07-17, which is why this audit "couldn't run" for weeks and was
+// mis-attributed to a billing block. openai/gpt-oss-120b is a documented
+// successor AND is on the free tier (llama-3.3-70b-versatile is not).
+//
+// This script batches 8 pairs per request (~1.5k chars ≈ 0.5–0.9k tokens), so
+// it is far more token-efficient than the per-item resolver: free-tier TPM 8K
+// allows ~8 requests/min → PACE_MS 8000; TPD 200K covers ~1.6k mappings/day.
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const VERDICT_CACHE = './mapping-audit-verdicts.json';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -192,6 +201,14 @@ async function run() {
     const batch = todo.slice(i, i + BATCH);
     const res = await judgeBatch(apiKey, batch);
     if (res.error) {
+      // A per-DAY 429 will never clear inside this job. Retrying it every 60s
+      // just spins until the workflow timeout, so stop: the verdict cache is
+      // written after every batch, and a re-dispatch resumes where we left off.
+      if (res.status === 429 && /per\s*day|\bTPD\b|\bRPD\b/i.test(res.error)) {
+        console.log(`  batch ${i / BATCH + 1}: Groq daily free-tier budget spent — stopping; re-dispatch to resume.`);
+        fatalError = res.error;
+        break;
+      }
       console.log(`  batch ${i / BATCH + 1}: ${res.error}${res.status === 429 ? ' — backing off 60s' : ''}`);
       if (res.status === 429) {
         await sleep(60000);

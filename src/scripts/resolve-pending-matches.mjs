@@ -21,8 +21,8 @@
 //   CHAIN      (required) chain slug — masoutis/ab/kritikos/...
 //   SOURCE     (default 'web') 'web' | 'leaflet' — source tag for resolved Discounts
 //   LIMIT      (default ∞) cap items to process (smoke test)
-//   PACE_MS    (default 2000) throttle between Groq calls
-//   GROQ_MODEL (default 'meta-llama/llama-4-scout-17b-16e-instruct')
+//   PACE_MS    (default 13000) throttle between Groq calls — see MODEL note
+//   GROQ_MODEL (default 'openai/gpt-oss-120b')
 //   DRY_RUN=1  → no DB writes
 //
 // dotenv first (ESM hoist trap — DB import comes later).
@@ -37,8 +37,31 @@ import { samePack } from '../lib/packaging.ts';
 const CHAIN = process.env.CHAIN;
 const SOURCE = process.env.SOURCE || 'web';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const PACE_MS = parseInt(process.env.PACE_MS || '2000', 10);
-const MODEL = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+// MODEL — 2026-09-02. The previous default, meta-llama/llama-4-scout-17b-16e-
+// instruct, was DEPRECATED by Groq and shut down on 2026-07-17. Every nightly
+// resolver run from that date to 2026-09-02 called it, got `404
+// model_not_found` on all ~482 items, and still exited 0 — which is why the
+// backlog silently grew to 2,732 while CI stayed green. See GroqFatalError
+// below: a permanent Groq error must now abort the whole run, non-zero. The
+// resolvers workflow additionally gates on step outcomes, because every step
+// there is continue-on-error and would otherwise still report success.
+//
+// Replacement chosen: openai/gpt-oss-120b — one of Groq's two documented
+// successors for the retired scout model, and present in the FREE-TIER rate
+// limit table. NOTE: llama-3.3-70b-versatile is a Groq production model but is
+// NOT on the free tier, so it would fail the same way; do not "upgrade" to it
+// without a paid plan.
+//
+// Free-tier budget for openai/gpt-oss-120b: 30 RPM, 1K RPD, 8K TPM, 200K TPD.
+// Measured prompt size for this resolver is ~2.4k chars ≈ 0.8–1.5k tokens plus
+// 256 output, so the TOKEN limits bind long before the request limits:
+//   TPM 8K   → ~4.5 requests/min → PACE_MS must be ≥ ~13s (hence the default)
+//   TPD 200K → ~112 items/day    → the 2.7k backlog drains over ~3-4 weeks
+// The run therefore stops cleanly when the daily budget is spent and resumes
+// on the next nightly pass. Reducing tokens per request (short candidate ids,
+// trimmed scaffold) is the lever that shortens the drain — a follow-up.
+const PACE_MS = parseInt(process.env.PACE_MS || '13000', 10);
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const DRY_RUN = process.env.DRY_RUN === '1';
 
 if (!CHAIN) {
@@ -140,6 +163,21 @@ const isUuid = (s) => typeof s === 'string' && UUID_RE.test(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── Groq call ────────────────────────────────────────────────────────────────
+
+// A permanent, run-level Groq failure: wrong/retired model, bad key, no access.
+// Retrying the next item cannot help, so this aborts the whole run and exits
+// non-zero. Before 2026-09-02 these were swallowed per-item and the job still
+// reported success — the failure mode that hid a 7-week outage.
+class GroqFatalError extends Error {}
+// The free-tier daily token/request allowance is spent. Expected, not a defect:
+// stop cleanly, report how many rows remain, exit 0 so the nightly job stays
+// green and simply continues tomorrow.
+class GroqBudgetExhausted extends Error {}
+
+const PERMANENT_STATUSES = new Set([400, 401, 403, 404, 413]);
+// Groq spells the window in the 429 body, e.g. "... on tokens per day (TPD) ...".
+const isDailyLimit = (body) => /per\s*day|\bTPD\b|\bRPD\b/i.test(body || '');
+
 async function callGroq(apiKey, prompt) {
   let res;
   try {
@@ -160,7 +198,15 @@ async function callGroq(apiKey, prompt) {
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    return { error: `${res.status}: ${body.slice(0, 200)}`, status: res.status };
+    if (PERMANENT_STATUSES.has(res.status)) {
+      throw new GroqFatalError(`${res.status} ${body.slice(0, 300)}`);
+    }
+    if (res.status === 429 && isDailyLimit(body)) {
+      throw new GroqBudgetExhausted(body.slice(0, 200));
+    }
+    // Groq sends `retry-after` in seconds on a per-minute 429.
+    const retryAfterMs = Math.round(parseFloat(res.headers.get('retry-after') || '0') * 1000);
+    return { error: `${res.status}: ${body.slice(0, 200)}`, status: res.status, retryAfterMs };
   }
   let data;
   try { data = await res.json(); } catch (err) { return { error: `json-parse: ${err.message}`, status: null }; }
@@ -245,6 +291,8 @@ async function run() {
   );
 
   let resolved = 0, stillPending = 0, errors = 0, brandRejects = 0, hallucinations = 0, lowConf = 0, packRejects = 0;
+  // Set when the free-tier daily allowance runs out mid-run (see MODEL note).
+  let stoppedEarly = null;
 
   for (let i = 0; i < pending.length; i++) {
     const pm = pending[i];
@@ -262,14 +310,17 @@ async function run() {
 
       const prompt = buildPrompt(pm.rawName, pm.rawPrice, pm.brand, top);
 
+      // Permanent failures and daily-budget exhaustion now THROW out of
+      // callGroq and are handled at run level — never per-item, or a dead
+      // model looks like 482 individually-unlucky items (see MODEL note).
       let llm = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const { result, error, status } = await callGroq(apiKey, prompt);
+        const { result, error, status, retryAfterMs } = await callGroq(apiKey, prompt);
         if (result) { llm = result; break; }
-        const transient = !status || status === 429 || status >= 500;
-        if (!transient) { console.log(`❌ Groq fatal: ${error}`); break; }
-        const wait = status === 429 ? 30000 : 2000 * attempt;
-        console.log(`🔁 Groq ${status || 'err'} (${attempt}/3), wait ${wait}ms`);
+        // Honour Groq's own retry-after when it sends one (per-minute token
+        // window); otherwise back off progressively.
+        const wait = retryAfterMs || (status === 429 ? 30000 : 2000 * attempt);
+        console.log(`🔁 Groq ${status || 'err'} (${attempt}/3) ${String(error).slice(0, 120)} — wait ${wait}ms`);
         await sleep(wait);
       }
       if (!llm) { console.log('⛔ giving up'); errors++; await sleep(PACE_MS); continue; }
@@ -427,6 +478,11 @@ async function run() {
       console.log(`✅ RESOLVED (conf=${llm.confidence}) → ${llm.category}`);
       resolved++;
     } catch (e) {
+      // Run-level conditions must not be counted as one item's bad luck.
+      // Fatal → propagate, run exits non-zero, CI turns red, owner is emailed.
+      if (e instanceof GroqFatalError) throw e;
+      // Budget → expected on the free tier; stop cleanly and resume tomorrow.
+      if (e instanceof GroqBudgetExhausted) { stoppedEarly = e.message; break; }
       console.log(`❌ ${e.message?.slice(0, 200)}`);
       errors++;
     }
@@ -437,8 +493,28 @@ async function run() {
   console.log(`   ✅ resolved:       ${resolved}`);
   console.log(`   ⚠️  still pending:  ${stillPending} (low-conf=${lowConf} brand-rej=${brandRejects} pack-rej=${packRejects} hallucination=${hallucinations})`);
   console.log(`   ❌ errors:         ${errors}`);
+  if (stoppedEarly) {
+    const touched = resolved + stillPending + errors;
+    console.log(`   ⏸️  STOPPED EARLY — Groq free-tier daily budget spent after ${touched} item(s).`);
+    console.log(`      ${pending.length - touched} row(s) of this chain's queue remain; the next nightly run continues.`);
+    console.log(`      Groq said: ${stoppedEarly}`);
+  }
 
   await prisma.$disconnect();
 }
 
-run().catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
+run().catch((e) => {
+  if (e instanceof GroqFatalError) {
+    // Loud and specific: this is the class of failure that ran silently from
+    // 2026-07-17 to 2026-09-02 (retired model → 404 on every item).
+    console.error(`\n❌ GROQ PERMANENT FAILURE — aborting the whole run.`);
+    console.error(`   ${e.message}`);
+    console.error(`   Model in use: ${MODEL}`);
+    console.error(`   If this is 404/model_not_found, the model was retired: check`);
+    console.error(`   https://console.groq.com/docs/deprecations and update GROQ_MODEL`);
+    console.error(`   (free tier only — see the MODEL note at the top of this file).`);
+    process.exit(1);
+  }
+  console.error(`\n❌ ${e.stack || e.message}`);
+  process.exit(1);
+});
