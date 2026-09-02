@@ -4,6 +4,142 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-09-02 — DIRECTION SET by Fable review; Opus executes tasks IN ORDER, one at a time)
+
+**Owner returned after 7 weeks. A Fable session read the docs, then verified against the live DB, CI logs and code. Several claims in the 08-23 block below are wrong (listed under "Corrections"). This block is the single source of truth for the next 6 weeks. Work the tasks in order; do not start T(n+1) until T(n)'s acceptance line passes. Report each task's outcome as a dated addendum under it.**
+
+### Verified state (2026-09-02, read-only queries in `.local-scratch/fable-state.mjs` + `fable-traffic.mjs`)
+
+| Signal | Value |
+|---|---|
+| click_events all time (since 2026-04-20) | 504 |
+| distinct sessions last 30d | 4 (consent-gated → real is a few × this; still ~zero) |
+| subscribers confirmed / users / alerts / push tokens | 0 / 0 / 0 / 0 |
+| AB `web` active offers | **1** (last healthy run 2026-07-28; every daily run since exits 1 with `PersistedQueryNotFound`; `ab/catalog` failing the same way weekly since 08-02) |
+| Lidl `leaflet` active / productless | 191 / **131** |
+| pending_matches backlog | **2,732** (ab 256, lidl 482, masoutis 1,190, mymarket 532, sklavenitis 118, kritikos 152, bazaar 2) |
+| Sklavenitis `web` last healthy run | 2026-08-27 (local task: 08-29 → 403, 08-31 → killed mid-run, 09-02 → died after 5 pages when the PC slept) |
+| resolvers-all nightly job | "succeeds" in 2.5h with **0 resolved**: every Groq call is `404 model_not_found` |
+| pipeline-health watchdog | green every day while AB has been STALE for 5 weeks |
+| `chain_product_mappings.matched_via` | **column does not exist** — the 08-23 DDL was never applied |
+| `git status` | 08-23 work is UNCOMMITTED (6 modified + 1 untracked); origin/main = d7aefb6 (07-08) |
+| `npm run test:run` | **1 failed / 205 passed** — `dedupe-deals.test.ts` Μεβγάλ case broken by the 08-23 guard change |
+| Healthy today | kritikos 2,979 · mymarket 4,452 · masoutis 3,246 leaflet + 285 web · bazaar 99 · all catalogs except AB |
+
+### Corrections to the 08-23 block (read before trusting it)
+1. **"Groq billing blocked" is FALSE.** The default model `meta-llama/llama-4-scout-17b-16e-instruct` was **deprecated by Groq, shutdown 2026-07-17** (console.groq.com/docs/deprecations). The resolver has run nightly since and 404'd on every item. This — not OCR, not billing — is why Lidl went productless and why the mapping audit "couldn't run". Fix = model name. €0.
+2. **AB is not "returning near-empty"; the job fails outright** at `fetchPage` with `PersistedQueryNotFound` (CI log, run 33604158473). The 1 remaining row is a leftover with a 31/12 date.
+3. **"Code is committed" is false** — see git status above. The provenance DDL was never run.
+4. **The 08-23 variant-guard change regresses:** family `['galaktos','γαλακτοσ']` fires on ANY «γάλακτος» (Ρόφημα Γάλακτος, Προϊόν Γάλακτος…), not only chocolate type → `dedupeDeals` no longer collapses the Μεβγάλ cross-chain pair. Product-type families need an ANCHOR (only conflict when both names contain σοκολατ/choco, καφε/coffee, etc.).
+5. **Lidl no longer uses Groq vision** (the adapter has read the e-shop search API since 06-15). Its drop is (a) the dead resolver and (b) the 08-20 partial scrape (39/106, deactivation correctly skipped).
+6. **The watchdog cannot alarm.** `/api/cron/pipeline-health` returns HTTP 200 with `ok:false`; the GH step's `curl -f` therefore never fails; alarms go to Sentry only, which nobody reads. AB stale 5 weeks, zero notifications.
+7. **The local Windows Sklavenitis path is not viable** (3 of the last 4 runs failed for 3 different reasons). Decision below.
+
+### Direction (Fable, 2026-09-02) — the strategy is right, the execution path is not
+The product thesis (discount-first, cross-chain, honest prices, elderly-mobile audience) stands. But 4 months went into ingestion depth with ~zero users, the June "launch in days" never became a launch, and the "autonomous" pipeline degraded silently for 7 weeks. Next 6 weeks = (1) one week to stop the bleeding, (2) one week to make comparison honest for real, (3) one week of launch hygiene, (4) three weeks of DISTRIBUTION, which has never happened. Product decisions (app stores, login, 8th chain) are deferred to week 6 when a traffic number exists.
+
+### Decisions taken (owner confirmed 2026-09-02: "let's get this going")
+- **Groq:** model swap, no billing. `llama-3.3-70b-versatile` (Groq production text model) as the new default.
+- **Sklavenitis proxy: BUY IT** (~€5–15/mo residential). The only recurring cost approved. Owner adds the `PROXY_URL` GH secret (T5).
+- **Resend:** free tier, do in week 3 (T9). **R2 custom domain / sklavenitis image mirroring:** defer.
+- **Premature — do NOT decide yet:** Android vs iOS, login provider, similarity-floor tuning, e-fresh.
+
+---
+### WEEK 1 — stop the bleeding (all €0)
+
+#### T1 — Groq model swap + drain the resolver backlog + mapping audit
+- Change the DEFAULT in code (not only the env): [resolve-pending-matches.mjs](src/scripts/resolve-pending-matches.mjs) line ~41, [audit-mappings.mjs](src/scripts/audit-mappings.mjs) line ~52, `test-prompt-fix.mjs`. Keep the `GROQ_MODEL` env override. Groq's listed replacements are `openai/gpt-oss-120b` / `qwen/qwen3.6-27b`; the production text model `llama-3.3-70b-versatile` is the conservative pick for a same/different name judgement. Check the free-tier rate limits of the chosen model and set `PACE_MS` so a 2,732-row backlog fits the 350-min job budget (today the job paces ~2.3 s/item).
+- `src/app/api/cron/scrape-lidl/route.ts` still names the dead vision model. It is a legacy manual endpoint, not scheduled. Do NOT rewrite it; add a top comment "dead model, superseded by adapters/lidl.mjs" and move on.
+- Groq is IP-blocked from the dev machine → **all verification in CI**: `gh workflow run scrape-chains.yml -f chain=lidl-resolver-only` first (smallest chain, biggest productless share), inspect the log for zero `Groq fatal`, then `-f chain=resolvers-all`.
+- Watch the resolver's existing guards (brand-guard, pack-reject, low-conf, hallucination). A new model may skew confidence; if those reject rates jump vs the July logs, tighten before draining the full backlog.
+- Then the mapping audit, also in CI: `gh workflow run audit-mappings.yml` — confirm the workflow passes `LLM=1`; review the artifact; `APPLY=1` **only for verdict=different** (PHASES.md rule). This is the root cause of the 369 masoutis / 131 lidl / 35 sklavenitis productless "collision" rows that re-queue every run.
+- **Acceptance:** resolvers-all log shows resolved > 0 and no 404s; `pending_matches` well under 1,000; Lidl productless < 40; audit artifact reviewed and `different` rows applied; addendum records counts before/after.
+
+#### T2 — AB adapter self-heals on PersistedQueryNotFound
+- `PQ_HASH` is duplicated in [adapters/ab.mjs](src/scripts/adapters/ab.mjs) and [ab-catalog.mjs](src/scripts/ab-catalog.mjs) — centralise it in `src/scripts/lib/`.
+- AB redeploys will recur, so recovery must be automatic and must run in CI (ab.gr is IP-blocked from the dev machine; the Playwright capture probe only works from CI). Candidate mechanisms — Opus probes, then picks: (a) on `PersistedQueryNotFound`, fetch `https://www.ab.gr/search/promotions`, follow its JS chunk(s), regex the 64-hex sha256 adjacent to the `ProductList` operation, retry with it, log the new hash loudly; (b) APQ fallback — send the full `query` text alongside the hash (Apollo servers usually register it) IF the query text exists in `library_data/ab_offers_api_capture.json`. Persist the discovered hash somewhere CI can reuse it (a small JSON committed by the job, or a DB row — either is fine).
+- Add a unit test for the hash extractor against a saved bundle snippet.
+- Verify with `gh workflow run scrape-chains.yml -f chain=ab-catalog-probe` (DRY_RUN) then `-f chain=ab-offers`.
+- **Acceptance:** `ab/web` IngestRun healthy with ≥ 300 scraped; the next Sunday `ab/catalog` healthy; a forced wrong hash in a test recovers without a human.
+
+#### T3 — a watchdog that can actually alarm
+- [pipeline-health/route.ts](src/app/api/cron/pipeline-health/route.ts): return **HTTP 503** when `alarms.length > 0` (keep the JSON body + the Sentry message). `curl -f` in the GH step then fails → workflow red → GitHub emails the owner. That email is the alerting channel; it costs nothing.
+- Add a second check in [pipeline-health.ts](src/lib/pipeline-health.ts): per expected feed, current active-offer count < 50 % of the max `scraped_items` among healthy runs in the last 14 days ⇒ alarm ("healthy run, wrong data" — the failure mode a recency check can't see). Unit-test it next to `evaluateFeed`.
+- Update the `EXPECTED_FEEDS` sklavenitis row to CI/36h once T5 lands.
+- **Acceptance:** `gh workflow run scrape-chains.yml -f chain=pipeline-health` is RED today (AB stale) and GREEN after T2; the owner received GitHub's failure email.
+
+#### T4 — land the 08-23 provenance work properly
+- Fix the guard regression in [offer-similarity.ts](src/lib/offer-similarity.ts): product-type families (γάλακτος/υγείας, espresso/φίλτρου/στιγμιαίος, χρωματιστά/λευκών, αλατισμένα/ανάλατα, στέβια) only count when an ANCHOR token is present in both names (σοκολατ|choco|cacao for the chocolate pair; καφε|coffee|nescafe for coffee; a detergent word for colours/whites; etc.). Both the four new 08-23 tests AND the Μεβγάλ dedupe test must pass. Do not add more families.
+- Apply the DDL over the pooled connection (5432 is unreachable here): `node .local-scratch/add-provenance-columns.mjs` → `npx prisma generate` → `Remove-Item -Recurse -Force .next`.
+- `npm run test:run` (206/206) → `npm run build` → commit (include `audit-comparison-truth.mjs`) → push. Then run `node src/scripts/audit-comparison-truth.mjs` once for the baseline (expect mostly UNKNOWN until nightly runs re-stamp).
+- **Acceptance:** tests green, build green, pushed, columns present, baseline audit output pasted into the addendum.
+
+#### T5 — Sklavenitis to CI via residential proxy (owner buys; Opus wires)
+- Owner: buy a small residential proxy, then `gh secret set PROXY_URL` (permission-gated for agents).
+- Opus: confirm `sklavenitis-offers` + `sklavenitis-catalog` (its mirror step already gets the R2 env) go healthy on dispatch; flip `EXPECTED_FEEDS` to CI/36h; leave the Windows tasks registered as a documented manual fallback only, or unregister — owner's call; note it either way.
+- **Acceptance:** two consecutive scheduled `sklavenitis/web` runs healthy from CI; Υγεία tab OK.
+
+### WEEK 2 — make the comparison honest for real
+#### T6 — comparison-truth baseline + shelf-row gating
+Run the truth audit after one nightly cycle post-T4 (UNKNOWN should be draining). Then gate «Κανονική τιμή» shelf rows in [get-price-comparison.ts](src/actions/get-price-comparison.ts) AND its twin [comparison-count.ts](src/lib/comparison-count.ts) on `matchedVia='barcode'` for the snapshot's (chain, product) — the comment claims GTIN gating, the code only checks that the source product has a barcode. Keep the two in lockstep (otherwise the chip lies). Re-run `recompute-comparison-counts.mjs`.
+#### T7 — price history stops blending chains and price kinds
+[get-price-history.ts](src/actions/get-price-history.ts) is called from the offer page and ProductSheet with no `supermarket` and ignores `PriceSnapshot.kind`. Scope the verdict series to the offer's own chain; treat `normal` vs `mono`/`strikethrough` explicitly (the "average" must not blend shelf and promo). Other chains may appear only as separate series if the chart wants them. «Χαμηλότερη τιμή που έχουμε δει» must never mean "cheapest chain". Update [PriceHistory.js](src/components/PriceHistory.js) copy if semantics change. Tests on the `computeVerdict` inputs.
+- **Week 2 acceptance:** truth audit shows PROVEN + NAME-MATCH ≫ UNKNOWN; zero shelf rows from non-barcode mappings; a mono offer's history no longer shows a foreign chain's shelf price as its "lowest".
+
+### WEEK 3 — launch hygiene (all €0)
+#### T8 — cookieless aggregate analytics
+Add a cookieless page-view counter that is NOT behind the consent banner (Vercel Web Analytics free tier or equivalent; no cookies, no cross-site identifiers → no consent needed; say so on /cookies). The consent-gated `trackEvent` stays as is. You cannot run a distribution experiment blind.
+#### T9 — Resend activation
+Owner: `RESEND_API_KEY` in Vercel + `.env.local`, verify `prosforespantou.gr` in Resend, set `EMAIL_FROM`. Opus: confirm the signup confirmation arrives < 30 s; then build the small **daily post-ingest alert pass** (Phase 3 note: bulk writes don't fire alerts by design) so watch-list emails actually go out. Anti-spam rules in `lib/alert-match.ts` stand.
+#### T10 — real-phone pass + owner sign-off
+Owner clicks through on a real phone: supermarket pages (the P4 refactor was never signed off), comparison sheet, shopping list, onboarding. Opus fixes what's found. No redesigns.
+
+### WEEKS 4–6 — distribution (the thing that has never happened)
+Pick ONE channel and run it for three weeks: Greek FB offer groups / Viber communities / a weekly «Οι 10 καλύτερες προσφορές της εβδομάδας» post generated from the data (interleave-deals + comparison winners make this nearly free). Metrics: sessions/week, returning sessions, list adds. **At the end of week 6, with numbers, decide:** Capacitor + Android-first, login, e-fresh. Not before.
+
+### ⛔ Do NOT (until the week-6 review)
+- No 8th chain, no e-fresh. No Capacitor / app-store / Apple $99. No login/accounts work. No partner pitch or admin charts. No more MARKER_FAMILIES or floor tuning beyond T4's anchor fix. No personalization rung 2–3, no embeddings/pgvector, no TSX migration, no R2 custom domain, no sklavenitis image mirroring. All PHASES.md invariants stand (source isolation, soft delete, never auto-create SKUs, GTIN normalization, read CONTRACT.md before touching an adapter).
+
+### Gotchas for these tasks
+- Groq and ab.gr are IP-blocked from the dev machine: T1/T2 verification is CI-only (`gh workflow run … -f chain=…`, then `gh run view <id> --log`).
+- 5432/DIRECT_URL is unreachable here → DDL via pooled 6543 (`ALTER … IF NOT EXISTS`); never chain `prisma db push | tail` with `&&`.
+- After any schema change: `npx prisma generate` + delete `.next`.
+- node-pg shows timestamps in local (Athens) time — don't diagnose cron gaps from raw query output.
+- Keep `.ps1` files ASCII-only (PS 5.1 parses BOM-less UTF-8 as ANSI).
+
+---
+## ⚡ Pick up here (2026-08-23 — comparison PROVENANCE instrumented; owner returning after 7 weeks away)
+
+**Owner was away 2026-07-08 → 08-23. Site stayed up and unattended automation kept running. This pass answers ONE question the codebase could not previously answer: *what fraction of the price comparisons we render are provably the same product?* Code is committed but NOT yet run — see "Owner must run" below.**
+
+### Found while away (not previously in this file)
+- **AB collapsed to 17 active offers** (was ~255 on 06-04; catalog 11,828 → 10,343). The job runs and writes fresh `Έως` dates, so this is the ADAPTER returning near-empty — almost certainly the rotating persisted-query hash flagged in PHASES.md "AB persisted-query hash auto-recovery". Highest-visibility defect on the site.
+- **Lidl down to 42 offers** (was ~102). Weekly Groq-vision OCR; Groq billing has been blocked since June, which would also explain the idle pending-match resolver.
+- **Sklavenitis image mirroring is dead on the local Windows task**: every run logs `Image mirroring skipped — no storage backend configured` and the catalog mirror fails 121/121 with `fetch failed`. `run-sklavenitis.ps1` is not passed the `R2_*` env vars the GH jobs get. Images still serve from the chain CDN so nothing looks broken.
+- Sklavenitis local task missed ~14 nights (07-25→08-04, 08-13→08-17) — PC off. Soft-delete + the 48h window meant no user-visible damage.
+- Working tree shows 61 modified files but `git diff --ignore-cr-at-eol` is EMPTY — pure CRLF/LF noise, no lost work. Worth a `.gitattributes`.
+
+### Shipped this pass
+- **`ChainProductMapping.matchedVia` + `.verifiedAt`.** The ingest waterfall already computed `via` (`barcode|cache|mapping|none`) and threw it away, so once a mapping row existed every later run reported `mapping` regardless of how it was originally established — a barcode-proven join and an LLM name-guess were indistinguishable at render time. Now persisted by `bind()` in [ingest-offers.mjs](src/scripts/lib/ingest-offers.mjs) and by both upserts in [ingest-catalog.mjs](src/scripts/lib/ingest-catalog.mjs). **A name match never downgrades a row already stamped `barcode`.** Vocabulary: `barcode` (provable) / `catalog` (Product created from this chain's own item, no GTIN — single-chain) / `cache` (name-derived, i.e. LLM or admin) / null (legacy, re-stamps itself on the next run).
+- **[audit-comparison-truth.mjs](src/scripts/audit-comparison-truth.mjs)** — read-only. Replays the exact guard chain (`samePack` → variant/quantity → similarity floor → one-best-per-chain → 8-row cap) over the live active-offer set and classifies every row a user can actually see as PROVEN / NAME-MATCH / UNKNOWN / UNPROVABLE, plus a similarity histogram, same-chain collision counts, price-history blending exposure, and a ranked list of the riskiest rendered rows.
+- **Variant guard: two real bugs fixed.** (1) The `sokolat` family had **no Greek root** — latin "Sokolata" hit the family but «Σοκολάτα» hit nothing, so cross-script pairs of the SAME product looked like a variant conflict and were silently un-compared. (2) Added PRODUCT-TYPE families the guard was letting through entirely: γάλακτος/υγείας (milk vs dark chocolate compared as one product), espresso/φίλτρου/στιγμιαίος, χρωματιστά/λευκών, αλατισμένα/ανάλατα, στέβια. Deliberately NOT added: «χωρίς X» labels and wine colours — existing `toBe(false)` tests encode that a chain omitting those is still the same item.
+
+### Known-but-unfixed (deliberate, needs the measurement first)
+- **Price history blends chains AND price kinds.** Both callers of `getPriceHistory` (offer page, ProductSheet) pass no `supermarket`, and the query ignores `PriceSnapshot.kind` entirely — so «Χαμηλότερη τιμή που έχουμε δει» can mean "cheapest chain", and the average it warns against blends shelf + promo prices (structurally biased low). Phase 9 created `kind` precisely to separate these. Fix after the audit gives us the numbers.
+- **Shelf-price rows are looser than their own comment claims.** `get-price-comparison.ts` says the «Κανονική τιμή» rows are GTIN-gated; in practice it only checks that the SOURCE product has a barcode. The snapshots still arrive through possibly-stale `ChainProductMapping` and carry no chain-side name, so neither the variant nor the pack guard can vet them. Restrict to `matchedVia='barcode'` once provenance is populated.
+
+### Owner must run (in this order — nothing above takes effect otherwise)
+```powershell
+node .local-scratch\add-provenance-columns.mjs   # DDL over pooled 6543 (5432 unreachable here)
+npx prisma generate
+Remove-Item -Recurse -Force .next                # stale generated client
+npm run test:run -- src/lib/offer-similarity.test.ts
+npm run build
+node src/scripts/audit-comparison-truth.mjs      # baseline: mostly UNKNOWN until runs re-stamp
+```
+Then let one nightly cycle run and re-run the audit — UNKNOWN drains into PROVEN / NAME-MATCH as mappings re-bind.
+
+---
 ## ⚡ Pick up here (2026-07-06 → 07-08 — "fully functional" push: ALL SHIPPED & DEPLOYED; read the dated addenda below in order)
 
 **Owner asked for the site to be flawless: navigate offers + non-offers, correct comparison, automated & up-to-date data with real expiry dates. Everything below (P0–P4, the feedback round, the production tour, the 07-08 refinement round) is committed, pushed to `origin/main` and live. The GH secret CRON_SECRET is set; GH Actions is the single scheduler. Remaining owner levers: Groq billing (mapping audit), RESEND_API_KEY/AUTH_SECRET (alerts+login), R2 custom domain.**
