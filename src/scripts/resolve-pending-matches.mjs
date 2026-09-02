@@ -189,7 +189,17 @@ async function callGroq(apiKey, prompt) {
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0,
-        max_tokens: 256,
+        // gpt-oss is a REASONING model: it spends output tokens thinking
+        // before it emits the JSON. The old `max_tokens: 256` (fine for the
+        // retired scout model) truncated it mid-thought, and Groq rejected the
+        // request with 400 json_validate_failed / "max completion tokens
+        // reached before generating a valid document" — verified in CI run
+        // 33623301115. So: ask for minimal reasoning, don't ship it back, and
+        // give the answer real headroom. max_tokens is deprecated in favour of
+        // max_completion_tokens.
+        reasoning_effort: 'low',
+        include_reasoning: false,
+        max_completion_tokens: 1024,
       }),
       signal: AbortSignal.timeout(30000),
     });
@@ -210,9 +220,12 @@ async function callGroq(apiKey, prompt) {
   }
   let data;
   try { data = await res.json(); } catch (err) { return { error: `json-parse: ${err.message}`, status: null }; }
+  // Real token usage, so the free-tier budget maths below is measured rather
+  // than estimated (reasoning tokens count against TPD too).
+  const usage = data.usage ? { total: data.usage.total_tokens ?? 0 } : null;
   const text = data.choices?.[0]?.message?.content;
-  if (!text) return { error: 'Empty Groq response' };
-  try { return { result: JSON.parse(text) }; } catch { return { error: `unparseable: ${text.slice(0, 200)}` }; }
+  if (!text) return { error: 'Empty Groq response', usage };
+  try { return { result: JSON.parse(text), usage }; } catch { return { error: `unparseable: ${text.slice(0, 200)}`, usage }; }
 }
 
 function buildPrompt(rawName, rawPrice, rawBrand, candidates) {
@@ -293,6 +306,9 @@ async function run() {
   let resolved = 0, stillPending = 0, errors = 0, brandRejects = 0, hallucinations = 0, lowConf = 0, packRejects = 0;
   // Set when the free-tier daily allowance runs out mid-run (see MODEL note).
   let stoppedEarly = null;
+  // Measured Groq token consumption — turns the free-tier drain estimate into
+  // a real number (reasoning tokens count against TPD as well).
+  let tokensUsed = 0, tokenedCalls = 0;
 
   for (let i = 0; i < pending.length; i++) {
     const pm = pending[i];
@@ -315,7 +331,8 @@ async function run() {
       // model looks like 482 individually-unlucky items (see MODEL note).
       let llm = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const { result, error, status, retryAfterMs } = await callGroq(apiKey, prompt);
+        const { result, error, status, retryAfterMs, usage } = await callGroq(apiKey, prompt);
+        if (usage) { tokensUsed += usage.total; tokenedCalls += 1; }
         if (result) { llm = result; break; }
         // Honour Groq's own retry-after when it sends one (per-minute token
         // window); otherwise back off progressively.
@@ -493,6 +510,13 @@ async function run() {
   console.log(`   ✅ resolved:       ${resolved}`);
   console.log(`   ⚠️  still pending:  ${stillPending} (low-conf=${lowConf} brand-rej=${brandRejects} pack-rej=${packRejects} hallucination=${hallucinations})`);
   console.log(`   ❌ errors:         ${errors}`);
+  if (tokenedCalls > 0) {
+    const avg = Math.round(tokensUsed / tokenedCalls);
+    // Free tier: 8K tokens/min, 200K tokens/day (openai/gpt-oss-120b).
+    console.log(`   🔢 groq tokens:    ${tokensUsed} over ${tokenedCalls} call(s), avg ${avg}/call`);
+    console.log(`      → free-tier ceiling at this size: ~${Math.floor(200000 / avg)} items/day, ` +
+                `TPM-safe pace ≥ ${Math.ceil(60000 / (8000 / avg))}ms (PACE_MS is ${PACE_MS})`);
+  }
   if (stoppedEarly) {
     const touched = resolved + stillPending + errors;
     console.log(`   ⏸️  STOPPED EARLY — Groq free-tier daily budget spent after ${touched} item(s).`);
@@ -510,9 +534,17 @@ run().catch((e) => {
     console.error(`\n❌ GROQ PERMANENT FAILURE — aborting the whole run.`);
     console.error(`   ${e.message}`);
     console.error(`   Model in use: ${MODEL}`);
-    console.error(`   If this is 404/model_not_found, the model was retired: check`);
-    console.error(`   https://console.groq.com/docs/deprecations and update GROQ_MODEL`);
-    console.error(`   (free tier only — see the MODEL note at the top of this file).`);
+    if (/model_not_found|does not exist/i.test(e.message)) {
+      console.error(`   → The model was RETIRED. Check`);
+      console.error(`     https://console.groq.com/docs/deprecations, pick a successor that is`);
+      console.error(`     on the FREE TIER, and update the MODEL default in this file.`);
+    } else if (/json_validate_failed|max completion tokens/i.test(e.message)) {
+      console.error(`   → The model ran out of output budget before emitting valid JSON.`);
+      console.error(`     Reasoning models spend output tokens thinking: raise`);
+      console.error(`     max_completion_tokens and/or lower reasoning_effort in callGroq.`);
+    } else if (/invalid_api_key|401|403/i.test(e.message)) {
+      console.error(`   → Auth problem: check the GROQ_API_KEY secret.`);
+    }
     process.exit(1);
   }
   console.error(`\n❌ ${e.stack || e.message}`);

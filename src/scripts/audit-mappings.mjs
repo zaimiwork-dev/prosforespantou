@@ -84,7 +84,13 @@ Reply with strict JSON: {"verdicts": ["same"|"different"|"unsure", ...]} with ex
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0,
-        max_tokens: 512,
+        // gpt-oss reasons before answering, and a truncated thought is a hard
+        // 400 (json_validate_failed), not a soft error — see the same fix in
+        // resolve-pending-matches.mjs. A batch of 8 verdicts needs real
+        // headroom, so this is more generous than the resolver's per-item ask.
+        reasoning_effort: 'low',
+        include_reasoning: false,
+        max_completion_tokens: 2048,
       }),
       signal: AbortSignal.timeout(45000),
     });
