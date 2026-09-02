@@ -125,6 +125,40 @@ The product thesis (discount-first, cross-chain, honest prices, elderly-mobile a
 - Update the `EXPECTED_FEEDS` sklavenitis row to CI/36h once T5 lands.
 - **Acceptance:** `gh workflow run scrape-chains.yml -f chain=pipeline-health` is RED today (AB stale) and GREEN after T2; the owner received GitHub's failure email.
 
+
+##### T3 addendum — 2026-09-02 (DONE — the watchdog can finally raise an alarm)
+
+**Shipped:** `e37504a` (503 + volume check), `162aab3` (name the failing feed in CI).
+
+**The bug was one status code.** The CI job pings the route with `curl -fsS`, which fails only on an HTTP error status — but the route answered **200 with `{ok:false}`**. curl succeeded, the workflow went green, and the only alarm was a Sentry message nobody reads. The job's own comment said it lived in Actions "so a dead watchdog is a visibly red workflow run": the intent was right, the status code defeated it. This is precisely how AB stayed dead 08-02 → 09-02 with a "passing" health check every day. Confirmed against production before the fix: `HTTP 200` with `"ok":false`.
+
+**Now:** 503 when any feed alarms → run red → GitHub emails the owner, free.
+
+**Second check — "it ran, but came back wrong".** Freshness only answers *did the feed run?*. A run can succeed and still return a fraction of the usual items. `evaluateVolume` compares the newest healthy run's item count against the **median of the healthy runs before it**.
+
+**⚠️ DEVIATION from the plan, deliberate — please sanity-check.** The plan asked for *"current active-offer count < 50 % of the max scraped_items of healthy runs in the last 14 days"*. I did **not** implement that, because active-offer counts legitimately fall to near zero whenever a weekly leaflet's offers expire before the next scrape — masoutis leaflet holds 3,246 rows all expiring 09-09, so that rule would alarm every week for normal behaviour and train us to ignore the alarm we just built. Comparing **run to run** uses the same metric on both sides and is immune to expiry; **median rather than max** so one unusually large week doesn't condemn ordinary ones. Same protection against the failure the plan was aiming at, far fewer false alarms. Easy to switch if the active-count reading was intentional.
+
+**Anti-cry-wolf guards:** `unknown` (never alarms) when fewer than 3 prior healthy runs or typical volume < 20 items; `warn` still doesn't alarm, since the ingest safety rails already keep last-good data live.
+
+**Validated against LIVE data before deploying** (`.local-scratch/watchdog-preview.mjs`) — this mattered more than the unit tests:
+
+| feed | fresh | volume | last / typical |
+|---|---|---|---|
+| mymarket/web | ok | ok | 4,452 / 5,501 |
+| **sklavenitis/web** | **stale** | ok | 2,784 / 3,099 |
+| kritikos/web | ok | ok | 2,979 / 2,905 |
+| bazaar/web | ok | ok | 99 / 135 |
+| ab/web | ok | ok | 258 / 339 |
+| masoutis/web | ok | ok | 285 / 284 |
+| masoutis/leaflet | ok | ok | 3,246 / 2,939 |
+| lidl/leaflet | ok | ok | 191 / 90 |
+
+**Zero false positives**, including the awkward cases (lidl's weekly swing, masoutis' 3k leaflet), and exactly **one true alarm**: sklavenitis/web, genuinely stale at 139 h against a 48 h window.
+
+**Verified end to end:** prod returns `HTTP 503` with `alarms:["sklavenitis/web"]`; CI `33652636011` failed (curl exit 22); after the follow-up, CI `33652802992` prints the reason — `sklavenitis/web is STALE (last ok 2026-08-27T23:45Z; expected καθημερινά 02:30 τοπική ώρα — Windows task (dev PC))` — as a `::error::` annotation, so the failure email names the feed instead of just saying 503. Tests 235 total (27 in this file), build green.
+
+**Expect a red watchdog every morning until T5.** That is not a defect: sklavenitis really has been down since 08-27 because the dev-PC task keeps failing. The alarm is doing its job, and it stops when the proxy lands.
+
 #### T4 — land the 08-23 provenance work properly
 - Fix the guard regression in [offer-similarity.ts](src/lib/offer-similarity.ts): product-type families (γάλακτος/υγείας, espresso/φίλτρου/στιγμιαίος, χρωματιστά/λευκών, αλατισμένα/ανάλατα, στέβια) only count when an ANCHOR token is present in both names (σοκολατ|choco|cacao for the chocolate pair; καφε|coffee|nescafe for coffee; a detergent word for colours/whites; etc.). Both the four new 08-23 tests AND the Μεβγάλ dedupe test must pass. Do not add more families.
 - Apply the DDL over the pooled connection (5432 is unreachable here): `node .local-scratch/add-provenance-columns.mjs` → `npx prisma generate` → `Remove-Item -Recurse -Force .next`.
