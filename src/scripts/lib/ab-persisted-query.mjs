@@ -77,6 +77,76 @@ export function findHashesNear(source, operationName, window = 400) {
   return [...best.values()].sort((a, b) => a.distance - b.distance);
 }
 
+// Enumerate every chunk in a Next.js build, not just the ones referenced by the
+// initial HTML. A client-side route's chunk is lazy-loaded, so the operation we
+// want can live in a file the promotions page never lists inline — which is
+// exactly what the first CI probe hit (27 scripts scanned, 0 mentions).
+export async function listBuildManifestChunks({ html, fetchImpl = fetch, headers = {}, origin = AB_ORIGIN }) {
+  const buildId = html.match(/"buildId"\s*:\s*"([^"]+)"/)?.[1]
+    ?? html.match(/\/_next\/static\/([^/]+)\/_buildManifest\.js/)?.[1];
+  if (!buildId) return { buildId: null, chunks: [] };
+  const urls = [
+    `${origin}/_next/static/${buildId}/_buildManifest.js`,
+    `${origin}/_next/static/${buildId}/_app-build-manifest.json`,
+  ];
+  const chunks = new Set();
+  for (const u of urls) {
+    try {
+      const r = await fetchImpl(u, { headers });
+      if (!r.ok) continue;
+      const text = await r.text();
+      for (const m of text.matchAll(/["'](static\/[^"']+\.js|\/_next\/static\/[^"']+\.js)["']/g)) {
+        const path = m[1].startsWith('/') ? m[1] : `/_next/${m[1]}`;
+        chunks.add(`${origin}${path}`);
+      }
+    } catch { /* manifest shape varies by Next version; try the next one */ }
+  }
+  return { buildId, chunks: [...chunks] };
+}
+
+// Reconnaissance: which bundles mention the operation at all, and what markers
+// sit around it? Used to work out HOW the hash is produced before assuming a
+// shape. Returns per-bundle marker hits plus context snippets.
+export async function reconOperation({
+  operationName = 'ProductList',
+  fetchImpl = fetch,
+  headers = {},
+  log = () => {},
+  maxBundles = 400,
+} = {}) {
+  const pageRes = await fetchImpl(AB_PROMOTIONS_PAGE, { headers });
+  if (!pageRes.ok) throw new Error(`promotions page HTTP ${pageRes.status}`);
+  const html = await pageRes.text();
+
+  const inline = extractScriptUrls(html);
+  const { buildId, chunks } = await listBuildManifestChunks({ html, fetchImpl, headers });
+  const all = [...new Set([...inline, ...chunks])];
+  log(`buildId=${buildId ?? 'unknown'} · ${inline.length} inline script(s) · ${chunks.length} manifest chunk(s) · ${all.length} unique`);
+
+  const MARKERS = [operationName, 'persistedQuery', 'sha256', 'PROMOTION_SEARCH', `query ${operationName}`, 'kind:"Document"', 'documentId'];
+  const findings = [];
+  let scanned = 0;
+  for (const url of all.slice(0, maxBundles)) {
+    let src;
+    try {
+      const r = await fetchImpl(url, { headers });
+      if (!r.ok) continue;
+      src = await r.text();
+    } catch { continue; }
+    scanned += 1;
+    const hits = MARKERS.filter((m) => src.includes(m));
+    if (!hits.length) continue;
+    const snippets = [];
+    if (src.includes(operationName)) {
+      const i = src.indexOf(operationName);
+      snippets.push(src.slice(Math.max(0, i - 220), i + 320).replace(/\s+/g, ' '));
+    }
+    findings.push({ url, size: src.length, hits, snippets });
+  }
+  log(`scanned ${scanned} bundle(s), ${findings.length} with at least one marker`);
+  return { buildId, scanned, total: all.length, findings };
+}
+
 // Walk AB's frontend and return ranked hash candidates for `operationName`.
 // `fetchImpl` is injected so callers can supply a proxy-aware fetch, and so
 // this is testable without network access.

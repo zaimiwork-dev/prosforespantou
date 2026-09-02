@@ -10,6 +10,7 @@
 // Background in src/scripts/lib/ab-persisted-query.mjs.
 import {
   discoverPersistedQueryHash,
+  reconOperation,
   verifyHash,
   KNOWN_PQ_HASH,
   AB_ORIGIN,
@@ -71,6 +72,30 @@ try {
   });
 } catch (e) {
   console.error(`\n discovery failed: ${e.message}`);
+}
+
+// 2b. If nothing was found, the assumption "a hash sits next to the operation
+//     name in a bundle" is wrong. Widen to every chunk in the build manifest
+//     (client-route chunks are lazy-loaded and absent from the initial HTML)
+//     and report which markers appear, so we can see HOW the hash is produced.
+if (!ranked.length) {
+  console.log(`\n--- no name-adjacent hash; deeper recon over the whole build ---`);
+  try {
+    const r = await reconOperation({
+      operationName: OPERATION,
+      headers: HEADERS,
+      log: (m) => console.log(`  ${m}`),
+    });
+    console.log(`  buildId=${r.buildId ?? 'unknown'} scanned=${r.scanned}/${r.total}`);
+    for (const f of r.findings.slice(0, 12)) {
+      console.log(`\n  ${f.url.split('/').pop()} (${f.size} bytes)`);
+      console.log(`    markers: ${f.hits.join(', ')}`);
+      for (const s of f.snippets) console.log(`    …${s.slice(0, 460)}…`);
+    }
+    if (!r.findings.length) console.log('  no bundle mentions the operation or any persisted-query marker.');
+  } catch (e) {
+    console.error(`  recon failed: ${e.message}`);
+  }
 }
 
 console.log(`\n--- ranked candidates (closest to the operation name first) ---`);
