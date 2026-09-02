@@ -21,7 +21,7 @@
 //   CHAIN      (required) chain slug — masoutis/ab/kritikos/...
 //   SOURCE     (default 'web') 'web' | 'leaflet' — source tag for resolved Discounts
 //   LIMIT      (default ∞) cap items to process (smoke test)
-//   PACE_MS    (default 13000) throttle between Groq calls — see MODEL note
+//   PACE_MS    (default 8000) throttle between Groq calls — see MODEL note
 //   GROQ_MODEL (default 'openai/gpt-oss-120b')
 //   DRY_RUN=1  → no DB writes
 //
@@ -58,14 +58,19 @@ const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 // on 2026-09-02 (CI 33623570913): ~161 items/day, PACE_MS ≥ ~9.3s.
 //
 // 2026-09-03: the prompt was cut down (numbered candidates instead of UUIDs, a
-// tighter scaffold — see buildPrompt) specifically to raise that ceiling. The
-// run prints its own measured tokens/call and the resulting items/day at the
-// end, so re-read those numbers rather than trusting this comment; PACE_MS can
-// come down if the measured TPM headroom allows.
+// tighter scaffold — see buildPrompt). Re-measured in CI 33685203658:
+// 815 tokens/call, so ~245 items/day and a TPM-safe floor of 6.1s. PACE_MS
+// dropped 13s → 8s accordingly (33% headroom over that floor, for prompts
+// larger than the sample). Since TPD is the binding limit, a faster pace does
+// not process more per day — it finishes the day's allowance sooner, which is
+// what keeps the combined nightly job inside its 350-minute budget.
+//
+// The run prints its own measured tokens/call and items/day at the end. Trust
+// those over this comment.
 //
 // The run stops cleanly when the daily allowance is spent and resumes on the
 // next nightly pass.
-const PACE_MS = parseInt(process.env.PACE_MS || '13000', 10);
+const PACE_MS = parseInt(process.env.PACE_MS || '8000', 10);
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const DRY_RUN = process.env.DRY_RUN === '1';
 
