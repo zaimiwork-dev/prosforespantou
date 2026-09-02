@@ -84,6 +84,7 @@ on:
           - ab-offers
           - ab-catalog
           - ab-catalog-probe
+          - ab-pq-probe
           - sklavenitis-offers-probe
           - sklavenitis-offers
           - mymarket-offers
@@ -476,6 +477,23 @@ jobs:
             exit 1
           fi
           echo "All resolver steps OK."
+
+  ab-pq-probe:
+    # Read-only discovery for the AB persisted-query hash. www.ab.gr blocks the
+    # dev machine but serves GitHub runners, so this can only run here. No DB
+    # access, no writes — it reports which hash the frontend currently uses and
+    # verifies each candidate against the live API.
+    if: github.event.inputs.chain == 'ab-pq-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: node src/scripts/probe-ab-pq-hash.mjs
 
   ab-catalog:
     # Weekly Sun 04:30 UTC + manual. Walks AB's ~14 root categories via the
