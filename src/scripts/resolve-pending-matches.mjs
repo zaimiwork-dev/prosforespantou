@@ -53,13 +53,18 @@ const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 // without a paid plan.
 //
 // Free-tier budget for openai/gpt-oss-120b: 30 RPM, 1K RPD, 8K TPM, 200K TPD.
-// Measured prompt size for this resolver is ~2.4k chars ≈ 0.8–1.5k tokens plus
-// 256 output, so the TOKEN limits bind long before the request limits:
-//   TPM 8K   → ~4.5 requests/min → PACE_MS must be ≥ ~13s (hence the default)
-//   TPD 200K → ~112 items/day    → the 2.7k backlog drains over ~3-4 weeks
-// The run therefore stops cleanly when the daily budget is spent and resumes
-// on the next nightly pass. Reducing tokens per request (short candidate ids,
-// trimmed scaffold) is the lever that shortens the drain — a follow-up.
+// The TOKEN limits bind long before the request limits, so tokens per call —
+// not calls — decide how fast the backlog drains. Measured at 1,241 tokens/call
+// on 2026-09-02 (CI 33623570913): ~161 items/day, PACE_MS ≥ ~9.3s.
+//
+// 2026-09-03: the prompt was cut down (numbered candidates instead of UUIDs, a
+// tighter scaffold — see buildPrompt) specifically to raise that ceiling. The
+// run prints its own measured tokens/call and the resulting items/day at the
+// end, so re-read those numbers rather than trusting this comment; PACE_MS can
+// come down if the measured TPM headroom allows.
+//
+// The run stops cleanly when the daily allowance is spent and resumes on the
+// next nightly pass.
 const PACE_MS = parseInt(process.env.PACE_MS || '13000', 10);
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const DRY_RUN = process.env.DRY_RUN === '1';
@@ -158,8 +163,8 @@ function brandsMatchWithBrand(rawBrand, candFull) {
   return false;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUuid = (s) => typeof s === 'string' && UUID_RE.test(s);
+// (The UUID validator that lived here is gone: the model now answers with a
+// candidate number, so a bad answer is out-of-range rather than a fake id.)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── Groq call ────────────────────────────────────────────────────────────────
@@ -228,34 +233,38 @@ async function callGroq(apiKey, prompt) {
   try { return { result: JSON.parse(text), usage }; } catch { return { error: `unparseable: ${text.slice(0, 200)}`, usage }; }
 }
 
+// Candidates are numbered 1..N rather than listed by UUID (2026-09-03).
+//
+// A UUID is 36 characters of high-entropy hex that no tokenizer compresses —
+// roughly 12-18 tokens each, so ten of them cost ~150 tokens per call and buy
+// nothing: the model only has to point at a row we already hold in memory.
+// Groq's free tier caps us on TOKENS per day, not requests, so this is the
+// lever that shortens the backlog drain.
+//
+// It also deletes a whole failure class. With UUIDs the model could invent a
+// plausible-looking id, which we had to detect after the fact ("hallucinated
+// UUID"). An index is either within 1..N or it isn't.
 function buildPrompt(rawName, rawPrice, rawBrand, candidates) {
-  const list = candidates.map((p) => `${p.id} | ${p.name}`).join('\n');
+  const list = candidates.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
   const brandLine = rawBrand ? `Brand: "${rawBrand}" (chain-supplied; may be missing from Name)\n` : '';
-  return `
-You are an expert data matching AI for a Greek supermarket aggregator.
-Match a RAW extracted deal name against a short list of CANDIDATE PRODUCTS, and assign a CATEGORY.
+  return `You match Greek supermarket product names.
 
-CANDIDATE PRODUCTS (Format: ID | Name):
+CANDIDATES:
 ${list}
 
-RAW DEAL TO MATCH:
+DEAL:
 ${brandLine}Name: "${rawName}"
 Price: ${rawPrice}
 
-ALLOWED CATEGORIES (Pick exactly one):
+CATEGORIES (pick exactly one):
 "Φρούτα & Λαχανικά", "Κρέας & Ψάρι", "Γαλακτοκομικά & Είδη Ψυγείου", "Τυριά & Αλλαντικά", "Σαλάτες & Αλοιφές", "Κονσέρβες", "Αρτοποιία", "Κατεψυγμένα", "Είδη Παντοπωλείου", "Πρωινό & Ροφήματα", "Σνακ & Γλυκά", "Κάβα", "Προσωπική Φροντίδα", "Βρεφικά Είδη", "Είδη Καθαρισμού & Σπιτιού", "Είδη Κατοικιδίων", "Άλλο"
 
-INSTRUCTIONS:
-1. **BRAND MUST MATCH EXACTLY.** First word(s) of name = brand. If RAW DEAL brand differs from EVERY candidate's brand → "suggestedProductId": "NEW", confidence 100.
-2. **QUANTITY MUST MATCH EXACTLY.** Compare weight (γρ/g/kg), volume (ml/lt), pack size (τεμ/x). 750ml vs 1lt → NEW. 6x53γρ vs 10x53γρ → NEW.
-3. Only if BOTH brand and quantity match → return the candidate's UUID with confidence reflecting how exact the variant match is.
-4. Confidence 0-100. Use 0 when no candidate has the right brand at all.
-5. Category hints: Eggs → Είδη Παντοπωλείου; Cheeses/Deli → Τυριά & Αλλαντικά; Dips/Spreads → Σαλάτες & Αλοιφές; Canned → Κονσέρβες.
-6. Return JSON ONLY with keys: rawName, suggestedProductId, confidence, category. No prose.
-
-OUTPUT shape:
-{ "rawName": "${rawName}", "suggestedProductId": "uuid-or-NEW", "confidence": 95, "category": "..." }
-`;
+RULES:
+1. BRAND must match exactly (brand = first word(s)). If no candidate shares the deal's brand → match 0.
+2. QUANTITY must match exactly — weight (γρ/g/kg), volume (ml/lt), pack (τεμ/x). 750ml vs 1lt → 0. 6x53γρ vs 10x53γρ → 0.
+3. Only when BOTH match, return that candidate's NUMBER; otherwise 0.
+4. confidence 0-100, reflecting how exact the variant match is.
+5. Return JSON only: {"match": <number 1-${candidates.length} or 0>, "confidence": <0-100>, "category": "<one above>"}`;
 }
 
 // ── DB retry (same shape as ingest-offers.mjs) ───────────────────────────────
@@ -342,12 +351,16 @@ async function run() {
       }
       if (!llm) { console.log('⛔ giving up'); errors++; await sleep(PACE_MS); continue; }
 
-      // Validate the LLM response
+      // Validate the LLM response. `match` is a 1-based index into `top` (0 =
+      // "none of these"); anything outside that range is a malformed answer,
+      // not a product — see buildPrompt for why this replaced UUIDs.
       let chosenProductId = null;
       let rejectReason = null;
-      if (llm.confidence >= 90 && isUuid(llm.suggestedProductId)) {
-        const cand = top.find((c) => c.id === llm.suggestedProductId);
-        if (!cand) { rejectReason = 'hallucinated UUID'; hallucinations++; }
+      const matchIdx = Number(llm.match);
+      const inRange = Number.isInteger(matchIdx) && matchIdx >= 1 && matchIdx <= top.length;
+      if (llm.confidence >= 90 && inRange) {
+        const cand = top[matchIdx - 1];
+        if (!cand) { rejectReason = 'index out of range'; hallucinations++; }
         else {
           // Use brand-aware guard when the adapter persisted a brand;
           // otherwise fall back to first-token matching.
@@ -365,14 +378,15 @@ async function run() {
             rejectReason = `pack mismatch ('${pm.rawName}' vs '${cand.name}')`;
             packRejects++;
           } else {
-            chosenProductId = llm.suggestedProductId;
+            chosenProductId = cand.id;
           }
         }
-      } else if (llm.suggestedProductId === 'NEW' || llm.confidence < 90) {
-        rejectReason = `low confidence (${llm.confidence}%, suggestion=${llm.suggestedProductId})`;
+      } else if (matchIdx === 0 || llm.confidence < 90) {
+        // 0 = the model found no candidate with the right brand and size.
+        rejectReason = `no confident match (conf=${llm.confidence}%, match=${llm.match})`;
         lowConf++;
       } else {
-        rejectReason = `malformed UUID "${llm.suggestedProductId}"`;
+        rejectReason = `malformed match "${llm.match}" (expected 0-${top.length})`;
         hallucinations++;
       }
 
@@ -385,7 +399,10 @@ async function run() {
               where: { id: pm.id },
               data: {
                 aiConfidence: llm.confidence || 0,
-                suggestedProductId: isUuid(llm.suggestedProductId) ? llm.suggestedProductId : null,
+                // The model answers with a candidate NUMBER, so resolve it back
+                // to the real id here — the Review tab still gets the LLM's
+                // best guess even when a guard rejected it.
+                suggestedProductId: inRange ? top[matchIdx - 1].id : null,
               },
             })
           );
