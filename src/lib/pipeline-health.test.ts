@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateFeed, isAlarming, EXPECTED_FEEDS, type FeedSpec } from './pipeline-health';
+import {
+  evaluateFeed,
+  isAlarming,
+  evaluateVolume,
+  feedAlarms,
+  median,
+  EXPECTED_FEEDS,
+  VOLUME_MIN_REFERENCE,
+  type FeedSpec,
+} from './pipeline-health';
 
 const daily: FeedSpec = { chain: 'masoutis', source: 'web', maxAgeHours: 36, schedule: 'test' };
 const weekly: FeedSpec = { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'test' };
@@ -71,5 +80,86 @@ describe('EXPECTED_FEEDS', () => {
       'mymarket',
       'sklavenitis',
     ]));
+  });
+});
+
+describe('median', () => {
+  it('returns null for an empty sample', () => {
+    expect(median([])).toBeNull();
+  });
+  it('averages the middle pair for an even count', () => {
+    expect(median([10, 20, 30, 40])).toBe(25);
+  });
+  it('is order-independent', () => {
+    expect(median([300, 10, 200])).toBe(200);
+  });
+});
+
+describe('evaluateVolume', () => {
+  const typical = [300, 310, 295, 305];
+
+  it('flags a run that succeeded but came back a fraction of the usual size', () => {
+    // The AB shape: the job passes, the data does not.
+    expect(evaluateVolume(12, typical)).toBe('collapsed');
+  });
+
+  it('accepts a normal run', () => {
+    expect(evaluateVolume(298, typical)).toBe('ok');
+  });
+
+  it('accepts a run right at the threshold', () => {
+    // median 302.5 → half is 151.25; 152 must not alarm.
+    expect(evaluateVolume(152, typical)).toBe('ok');
+  });
+
+  it('flags just below the threshold', () => {
+    expect(evaluateVolume(151, typical)).toBe('collapsed');
+  });
+
+  it('says "unknown" rather than guessing from too little history', () => {
+    expect(evaluateVolume(5, [300, 310])).toBe('unknown');
+  });
+
+  it('says "unknown" for feeds too small for the ratio to mean anything', () => {
+    const tiny = new Array(4).fill(VOLUME_MIN_REFERENCE - 1);
+    expect(evaluateVolume(0, tiny)).toBe('unknown');
+  });
+
+  it('says "unknown" when there is no latest run to judge', () => {
+    expect(evaluateVolume(null, typical)).toBe('unknown');
+  });
+
+  it('uses the median, so one unusually big run does not condemn normal ones', () => {
+    // A single 3,000-item week must not make 300 look like a collapse.
+    expect(evaluateVolume(300, [3000, 300, 310, 295])).toBe('ok');
+  });
+
+  it('does not flag a weekly feed whose offers merely expired between runs', () => {
+    // Regression guard for the rejected design: comparing the latest run
+    // against CURRENTLY ACTIVE offers would alarm every time a weekly leaflet
+    // lapsed before its next scrape. Run-to-run comparison is immune.
+    expect(evaluateVolume(3029, [3046, 3029, 2900, 3100])).toBe('ok');
+  });
+});
+
+describe('feedAlarms', () => {
+  it('alarms when the feed stopped running', () => {
+    expect(feedAlarms({ status: 'stale', volumeStatus: 'ok' })).toBe(true);
+  });
+
+  it('alarms when a fresh, healthy-looking run came back small', () => {
+    expect(feedAlarms({ status: 'ok', volumeStatus: 'collapsed' })).toBe(true);
+  });
+
+  it('stays quiet for a healthy feed', () => {
+    expect(feedAlarms({ status: 'ok', volumeStatus: 'ok' })).toBe(false);
+  });
+
+  it('stays quiet on warn — the safety rails kept last-good data live', () => {
+    expect(feedAlarms({ status: 'warn', volumeStatus: 'ok' })).toBe(false);
+  });
+
+  it('never alarms on unknown volume', () => {
+    expect(feedAlarms({ status: 'ok', volumeStatus: 'unknown' })).toBe(false);
   });
 });
