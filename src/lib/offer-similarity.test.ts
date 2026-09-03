@@ -6,6 +6,7 @@ import {
   variantConflict,
   quantityConflict,
   COMPARISON_SIMILARITY_FLOOR,
+  foldHomoglyphs,
 } from './offer-similarity';
 
 describe('variantConflict (flavour/fat/type guard)', () => {
@@ -236,5 +237,48 @@ describe('filterComparable', () => {
       getChain,
     );
     expect(kept).toEqual([]);
+  });
+});
+
+describe('foldHomoglyphs (mixed-script typos in chain feeds)', () => {
+  it('repairs a Latin letter sitting inside a Greek word', () => {
+    // «ΝΩMA» carries a Latin M. This exact pair was rejected as a brand
+    // mismatch against «ΝΩΜΑ» in CI run 33623570913.
+    expect(foldHomoglyphs('νωma')).toBe('νωμα');
+    expect(foldHomoglyphs('mπριζολεσ')).toBe('μπριζολεσ');
+    expect(foldHomoglyphs('kαδοσ')).toBe('καδοσ');
+  });
+
+  it('leaves a purely Latin word alone', () => {
+    // Folding a real Latin brand would corrupt it — "nescafe" must not become
+    // Greek letters.
+    expect(foldHomoglyphs('nescafe')).toBe('nescafe');
+    expect(foldHomoglyphs('gold')).toBe('gold');
+    expect(foldHomoglyphs('no3')).toBe('no3');
+  });
+
+  it('leaves a purely Greek word alone', () => {
+    expect(foldHomoglyphs('νωμα')).toBe('νωμα');
+  });
+
+  it('makes the typo and the correct spelling compare as one token', () => {
+    expect(foldHomoglyphs('νωma')).toBe(foldHomoglyphs('νωμα'));
+  });
+
+  it('handles empty input', () => {
+    expect(foldHomoglyphs('')).toBe('');
+  });
+
+  it('lifts similarity for a real mixed-script pair', () => {
+    // Same product, one side typo'd — previously these lost a shared token.
+    const a = nameSimilarity('ΝΩMA Λευκό τυρί Τελεμές 400g', 'ΝΩΜΑ Λευκό τυρί Τελεμές 400g');
+    expect(a).toBe(1);
+  });
+
+  it('does not merge genuinely different Latin and Greek words', () => {
+    // "no" (Latin) and "νο" (Greek) only converge when the token is mixed;
+    // two clean single-script words stay distinct.
+    expect(foldHomoglyphs('no')).toBe('no');
+    expect(foldHomoglyphs('νο')).toBe('νο');
   });
 });

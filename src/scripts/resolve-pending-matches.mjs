@@ -33,6 +33,7 @@ dotenv.config();
 import { computeHotScore } from '../lib/hotness.ts';
 import { categorize } from '../lib/categories.ts';
 import { samePack } from '../lib/packaging.ts';
+import { foldHomoglyphs } from '../lib/offer-similarity.ts';
 
 const CHAIN = process.env.CHAIN;
 const SOURCE = process.env.SOURCE || 'web';
@@ -118,7 +119,12 @@ const LATIN_TO_GREEK = {
 
 function normalizeBrandToken(s) {
   if (!s) return '';
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ').replace(/[^a-zα-ω0-9]/gi, '');
+  const flat = s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ').replace(/[^a-zα-ω0-9]/gi, '');
+  // Repair mixed-script typos: chain feeds write «ΝΩMA» with a Latin M, which
+  // made this guard reject a correct match as a brand mismatch against «ΝΩΜΑ»
+  // (CI run 33623570913). Only mixed-script words are touched — see
+  // foldHomoglyphs; a real Latin brand like "Nescafe" is left alone.
+  return foldHomoglyphs(flat);
 }
 function transliterateLatinToGreek(s) {
   if (!s) return '';

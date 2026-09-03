@@ -48,6 +48,32 @@ const UNIT_CANON: Record<string, string> = {
 };
 const UNIT_TOKEN_RE = /^(\d+(?:[.,]\d+)?)([a-zα-ω]+)$/;
 
+// Latin letters that are visually identical to Greek ones. Chain feeds are
+// full of words where a single Latin glyph sits inside an otherwise Greek word
+// — «ΝΩMA» with a Latin M, «Mπριζόλες», «Kάδος», «Νo3». They look right to a
+// shopper and are invisible in a diff, but they make string comparison fail:
+// the resolver rejected a correct match as a brand mismatch ('ΝΩMA' vs 'ΝΩΜΑ')
+// in CI run 33623570913.
+//
+// Only applied to MIXED-script words. A purely Latin token is a real Latin
+// word — "Nescafe", "Gold", "no3" — and folding it would corrupt it. The mixed
+// case is essentially always a typo, since genuine bilingual names separate the
+// scripts into different words ("Nescafe Κλασικός").
+const HOMOGLYPH_LATIN_TO_GREEK: Record<string, string> = {
+  a: 'α', b: 'β', e: 'ε', h: 'η', i: 'ι', k: 'κ', m: 'μ', n: 'ν',
+  o: 'ο', p: 'ρ', t: 'τ', u: 'υ', v: 'ν', x: 'χ', y: 'υ', z: 'ζ',
+};
+const GREEK_RE = /[α-ω]/;
+const LATIN_RE = /[a-z]/;
+
+// Expects an already-lowercased, accent-stripped word.
+export function foldHomoglyphs(word: string): string {
+  if (!word || !GREEK_RE.test(word) || !LATIN_RE.test(word)) return word;
+  let out = '';
+  for (const ch of word) out += HOMOGLYPH_LATIN_TO_GREEK[ch] ?? ch;
+  return out;
+}
+
 export function salientTokens(name: string | null | undefined): Set<string> {
   if (!name) return new Set();
   const cleaned = name
@@ -62,7 +88,8 @@ export function salientTokens(name: string | null | undefined): Set<string> {
   const out = new Set<string>();
   for (const raw of cleaned.split(' ')) {
     if (!raw) continue;
-    let token = raw;
+    // Repair mixed-script typos before anything compares this token.
+    let token = foldHomoglyphs(raw);
     const unit = token.match(UNIT_TOKEN_RE);
     if (unit) {
       const canon = UNIT_CANON[unit[2]];
