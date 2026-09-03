@@ -67,7 +67,8 @@ Until then the watchdog emails you a failure every morning. That is correct beha
 #### 4. Resend key + verified domain  ·  free tier  ·  unblocks T9
 `RESEND_API_KEY` into Vercel and `.env.local`, verify `prosforespantou.gr` in Resend, set `EMAIL_FROM`. Without the verified domain, Resend only delivers to your own address. This unblocks the watch-list alert emails that have been coded since June — the retention hook.
 
-#### 5. A decision from Fable on comparison gating  ·  free  ·  unblocks T6
+#### 5. A decision on the shelf-price layer (Fable)  ·  free  ·  unblocks T6
+**The question changed on 2026-09-03.** It is no longer "should we tighten shelf rows to barcode-proven ones" but "**do we want a shelf-price layer at all, and gated how?**" — because those rows already render for only **83 offers out of 13,991**. A stale-window bug suppresses ~96% of the shelf prices we already hold (snapshots are written only on price change; the reader demands one from the last 14 days). Widening only that window gives 85 → 2,032 rows. Left unfixed deliberately so it informs the decision instead of pre-empting it. Full write-up under T6 below.
 The audit found only **31% of products carry a barcode** and **65% of rendered comparison rows are unprovable**. The plan says to gate shelf-price rows on barcode provenance, but on these numbers that deletes most of them rather than tightening them. Three options are written up in CONTEXT.md under T6. It is a product call about coverage versus provability, so it was raised rather than decided.
 
 ---
