@@ -4,7 +4,30 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (2026-09-02 — DIRECTION SET by Fable review; Opus executes tasks IN ORDER, one at a time)
+## ⚡ Pick up here (updated 2026-09-03 — 7 of 10 tasks done; everything left is waiting on the owner or Fable)
+
+### STATUS AT A GLANCE — read this, then the ⛔ OWNER TO-DO below
+
+| Task | State |
+|---|---|
+| T1 Groq resolver | ✅ done — model was **retired**, not billing-blocked. Drain runs nightly, ~245 items/day |
+| T2 AB adapter | ✅ done — **1 → 258 offers**; recovers its own rotating API hash now |
+| T3 Watchdog | ✅ done — answers **503** so a dead feed turns CI red and emails the owner |
+| T4 Variant guard | ✅ done — suite green (**253**) for the first time since 08-23 |
+| T5 Sklavenitis | ⛔ **owner** — needs a residential proxy + `PROXY_URL`. Only red alarm on the site |
+| T6 Shelf prices | ⛔ **Fable** — the question CHANGED, see the red note under T6 before answering |
+| T7 Price history | ✅ done (out of order) — scoped per chain; badges recomputed live 2026-09-03 |
+| T8 Analytics | ✅ done — cookieless, already enabled in Vercel, no action needed |
+| T9 Email alerts | ⛔ **owner** — `RESEND_API_KEY` + verified sending domain |
+| T10 Phone pass | ⛔ **owner** — supermarket pages never signed off after July's refactor |
+
+**Nothing is half-finished.** Working tree clean, everything pushed to `origin/main`, 253 tests passing, production serving. The nightly GitHub Actions jobs are the only things running, and they need no attention.
+
+**If you are a fresh session:** do not start T5/T6/T9/T10 — they are blocked on a human, not on effort. Read the owner list, then the per-task addenda (`##### … addendum`) which record what was measured and what turned out to be wrong. Several of this project's older notes state things that measurement disproved; the addenda say which.
+
+---
+
+### Original direction block (2026-09-02 — Fable review; execute tasks IN ORDER, one at a time)
 
 **Owner returned after 7 weeks. A Fable session read the docs, then verified against the live DB, CI logs and code. Several claims in the 08-23 block below are wrong (listed under "Corrections"). This block is the single source of truth for the next 6 weeks. Work the tasks in order; do not start T(n+1) until T(n)'s acceptance line passes. Report each task's outcome as a dated addendum under it.**
 
@@ -76,6 +99,12 @@ The audit found only **31% of products carry a barcode** and **65% of rendered c
 #### Also worth a look when you're back
 - **The supermarket pages were never signed off** after July's refactor (T10). A click-through on a real phone is the last launch-hygiene item.
 - **The watchdog will be red every morning until item 2 is done.** Once the proxy lands it should go green; if it does not, something else is wrong and worth telling me.
+
+#### What should happen overnight (2026-09-03) — check these before assuming something broke
+- **~00:00–03:30 UTC** each chain's offers adapter runs. These now also **stamp `matchedVia`** on the mappings they re-bind, so `audit-comparison-truth.mjs` should start moving off `UNKNOWN` (4 of 61,064 stamped as of this handoff).
+- **04:00 UTC** the combined resolver runs with the slimmed prompt (815 tok/call) and the new `LIMIT=150` per chain, so **every** chain gets a share instead of masoutis eating the budget. Expect a few hundred rows resolved, then a clean stop when the daily Groq allowance is spent — that stop is normal and exits 0.
+- **08:00 UTC** the watchdog runs. It **will be RED**, correctly, naming `sklavenitis/web`. That stops once the proxy lands. If it goes red naming anything else, that is new and worth reading.
+- **Sklavenitis will NOT run tonight** — its task lives on this laptop and the laptop is being shut down. It was already failing most nights; the proxy (owner item 2) is the real fix.
 
 #### Running on its own, nothing needed from you
 - The resolver backlog drains nightly, now ~245 items/day and capped per chain so no single chain starves the rest.
