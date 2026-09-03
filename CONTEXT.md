@@ -104,7 +104,7 @@ The audit found only **31% of products carry a barcode** and **65% of rendered c
 - **~00:00–03:30 UTC** each chain's offers adapter runs. These now also **stamp `matchedVia`** on the mappings they re-bind, so `audit-comparison-truth.mjs` should start moving off `UNKNOWN` (4 of 61,064 stamped as of this handoff).
 - **04:00 UTC** the combined resolver runs with the slimmed prompt (815 tok/call) and the new `LIMIT=150` per chain, so **every** chain gets a share instead of masoutis eating the budget. Expect a few hundred rows resolved, then a clean stop when the daily Groq allowance is spent — that stop is normal and exits 0.
 - **08:00 UTC** the watchdog runs. It **will be RED**, correctly, naming `sklavenitis/web`. That stops once the proxy lands. If it goes red naming anything else, that is new and worth reading.
-- **Sklavenitis will NOT run tonight** — its task lives on this laptop and the laptop is being shut down. It was already failing most nights; the proxy (owner item 2) is the real fix.
+- **Sklavenitis** runs from a Windows task on the owner's laptop, next scheduled **2026-09-04 02:30 local** (catalog: 09-06 04:00). The laptop was shut down on the night of 09-03, which costs nothing — that day's run had already happened. If the laptop is off at 02:30 the task is `StartWhenAvailable`, so it catches up on the next boot. It has failed most nights regardless; the proxy (owner item 2) is the real fix.
 
 #### Running on its own, nothing needed from you
 - The resolver backlog drains nightly, now ~245 items/day and capped per chain so no single chain starves the rest.
