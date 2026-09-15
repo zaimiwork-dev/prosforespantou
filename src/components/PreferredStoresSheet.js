@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useShoppingListStore } from '@/lib/store';
 import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from './CategoryIcon';
+import { getTextSize, setTextSize } from '@/lib/text-size';
 
 // User preferences: which stores they shop at AND which departments they
 // usually buy ("Τι αγοράζεις συνήθως;"). Opened from the header gear, and —
@@ -25,6 +26,10 @@ function PreferredStoresSheetInner({ onClose, intro }) {
   const { preferredStores, togglePreferred, preferredCategories, togglePreferredCategory } = useShoppingListStore();
   const [local, setLocal] = useState(preferredStores);
   const [localCats, setLocalCats] = useState(preferredCategories);
+  // Text size applies IMMEDIATELY (not on save) so the reader sees the effect
+  // while choosing — the whole point for someone who can't read the small one.
+  const [textSize, setTextSizeState] = useState(() => getTextSize());
+  const chooseTextSize = (size) => { setTextSize(size); setTextSizeState(size); };
 
   const toggle = (id) =>
     setLocal((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -111,6 +116,38 @@ function PreferredStoresSheetInner({ onClose, intro }) {
               ? 'Χιλιάδες προσφορές κάθε μέρα — πες μας τι ψωνίζεις και θα σου δείχνουμε πρώτα ό,τι σε ενδιαφέρει. Τα αλλάζεις όποτε θες από το ⚙️ πάνω δεξιά.'
               : 'Διάλεξε καταστήματα και κατηγορίες. Θα προτεραιοποιούμε προσφορές από αυτά.'}
           </p>
+
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#8b929c', marginBottom: 10 }}>
+            Μέγεθος γραμμάτων
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 26 }} role="radiogroup" aria-label="Μέγεθος γραμμάτων">
+            {[
+              { id: 'normal', label: 'Κανονικά', sample: 'Αα' , size: 16 },
+              { id: 'large', label: 'Μεγάλα', sample: 'Αα', size: 22 },
+            ].map((opt) => {
+              const isSelected = textSize === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => chooseTextSize(opt.id)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                    minHeight: 56, padding: "12px", borderRadius: 16, cursor: "pointer",
+                    background: isSelected ? "#e7f6ee" : "#fff",
+                    border: isSelected ? "2px solid #2d6a4f" : "1px solid #ececf0",
+                    color: "#1c1e24", fontWeight: 700, fontSize: 15,
+                  }}
+                >
+                  <span style={{ fontSize: opt.size, fontWeight: 900, lineHeight: 1 }}>{opt.sample}</span>
+                  {opt.label}
+                  {isSelected && <span style={{ color: "#2d6a4f", fontWeight: 900 }}>✓</span>}
+                </button>
+              );
+            })}
+          </div>
 
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#8b929c', marginBottom: 10 }}>
             Τα καταστήματά μου

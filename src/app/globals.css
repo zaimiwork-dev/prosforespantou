@@ -94,6 +94,11 @@
 [data-density="comfortable"]  { --card-pad: 14px; --grid-gap: 18px; --card-img-pad: 16px; }
 [data-density="roomy"]        { --card-pad: 18px; --grid-gap: 24px; --card-img-pad: 22px; }
 
+/* «Μεγάλα γράμματα» (lib/text-size.js): scale everything — text, images and
+   tap targets alike — for readers who need it. zoom (not font-size) because
+   most sizes here are px and a 44px button must grow with the text. */
+html[data-text-size="large"] body { zoom: 1.18; }
+
 /* =========================================================
    Base
    ========================================================= */

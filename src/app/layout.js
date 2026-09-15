@@ -50,6 +50,7 @@ import { PushRegistrar } from "@/components/PushRegistrar";
 import { CookieConsent } from "@/components/CookieConsent";
 import { PageViewTracker } from "@/components/PageViewTracker";
 import SiteAnalytics from "@/components/SiteAnalytics";
+import { TEXT_SIZE_BOOTSTRAP } from "@/lib/text-size";
 
 export default function RootLayout({ children }) {
   return (
@@ -60,6 +61,11 @@ export default function RootLayout({ children }) {
       className={`${inter.variable} ${dmSerif.variable} ${outfit.variable}`}
     >
       <body>
+        {/* «Μεγάλα γράμματα» preference, applied before hydration so a
+            returning large-text user never sees a flash of the small layout.
+            The attribute is set on <html> by this script only (never during
+            render), so server and client markup stay identical. */}
+        <script dangerouslySetInnerHTML={{ __html: TEXT_SIZE_BOOTSTRAP }} />
         {children}
         <BottomNav />
         {/* Native-only push registration (no-op on web). */}
