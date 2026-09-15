@@ -140,7 +140,7 @@ export function AdminPanel({ onBack }) {
       showMsg("Failed to load: " + (e?.message || "unknown"), "error");
     }
     setListLoading(false);
-  }, [discountOffset, search]);
+  }, [discountOffset, search, filterFeatured]);
 
   const loadLibrary = async (reset = false) => {
     setLibLoading(true);
@@ -157,8 +157,13 @@ export function AdminPanel({ onBack }) {
     setLibLoading(false);
   };
 
+  // Loaders set their own loading flags, so they run from a timer rather than
+  // synchronously inside the effect (react-hooks/set-state-in-effect). The
+  // short delay also debounces typing in the library search.
   useEffect(() => {
-    if (tab === "lib") loadLibrary(true);
+    if (tab !== "lib") return;
+    const t = setTimeout(() => loadLibrary(true), 200);
+    return () => clearTimeout(t);
   }, [tab, libSearch, libSM]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadLeaflets = async () => {
@@ -282,15 +287,20 @@ export function AdminPanel({ onBack }) {
   };
 
   useEffect(() => {
-    if (tab === "leaf") loadLeaflets();
-    if (tab === "stats") loadStats();
-    if (tab === "subs") loadSubscribers();
-    if (tab === "review") loadPending();
-    if (tab === "health") loadHealth();
-  }, [tab]);
+    const t = setTimeout(() => {
+      if (tab === "leaf") loadLeaflets();
+      if (tab === "stats") loadStats();
+      if (tab === "subs") loadSubscribers();
+      if (tab === "review") loadPending();
+      if (tab === "health") loadHealth();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (tab === "review") loadPending();
+    if (tab !== "review") return;
+    const t = setTimeout(() => loadPending(), 0);
+    return () => clearTimeout(t);
   }, [pendingFilterSM]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveLeaflet = async () => {
@@ -326,8 +336,9 @@ export function AdminPanel({ onBack }) {
   };
 
   useEffect(() => {
-    loadList(true);
-  }, [filterFeatured]);
+    const t = setTimeout(() => loadList(true), 0);
+    return () => clearTimeout(t);
+  }, [filterFeatured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const t = setTimeout(() => loadList(true), 250);

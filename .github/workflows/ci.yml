@@ -35,13 +35,9 @@ jobs:
       - name: Tests
         run: npm run test:run
 
-      # NOT blocking, deliberately: `npm run lint` exits 1 today on 5
-      # pre-existing react-hooks/set-state-in-effect errors in the admin page
-      # (plus 6 warnings). Making it blocking now would mean every PR starts
-      # red, which trains people to ignore the whole workflow. Fix the admin
-      # page, then delete this line and the step becomes a real gate.
-      - name: Lint (non-blocking until the admin-page errors are fixed)
-        continue-on-error: true
+      # Blocking since 2026-09-16 (the 5 admin-page errors are fixed). Warnings
+      # do not fail the step; errors do.
+      - name: Lint
         run: npm run lint
 
       - name: Build
