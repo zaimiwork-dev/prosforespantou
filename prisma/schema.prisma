@@ -358,7 +358,10 @@ model ChainProductMapping {
 model IngestRun {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   chain        String   // chain slug — 'masoutis', 'ab', ...
-  source       String   // 'web' | 'leaflet' | 'catalog' | 'baseline'
+  source       String   // 'web' | 'leaflet' | 'catalog' | 'baseline' | 'wolt'
+               // 'catalog' = the chain's own full-catalog walk; 'wolt' = the
+               // supplemental Wolt GTIN enrichment. Kept apart because their
+               // item counts differ by ~3x and a shared series reads as a collapse.
   startedAt    DateTime @map("started_at")
   finishedAt   DateTime @default(now()) @map("finished_at")
   scrapedItems Int      @default(0) @map("scraped_items")

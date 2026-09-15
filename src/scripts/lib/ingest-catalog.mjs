@@ -31,13 +31,13 @@
 
 import { SM_MAPPING, normalizeBarcode, withDbRetry } from './ingest-offers.mjs';
 
-async function recordCatalogRun(prisma, chain, runStart, out, dryRun) {
+async function recordCatalogRun(prisma, chain, runStart, out, dryRun, sourceLabel) {
   if (dryRun) return;
   try {
     await prisma.ingestRun.create({
       data: {
         chain,
-        source: 'catalog',
+        source: sourceLabel,
         startedAt: runStart,
         scrapedItems: out.total,
         matched: out.existing + out.mapped,
@@ -62,6 +62,11 @@ export async function ingestCatalog({
   extraWarnings = [],
   writeMappings = true,
   requireBarcode = false,
+  // Which IngestRun series this run belongs to. A chain's own catalog walk and
+  // a supplemental Wolt enrichment cover different item counts (ab: ~11.7k vs
+  // ~4.1k), so filing both under 'catalog' makes the series meaningless and
+  // would read as a volume collapse to anything comparing consecutive runs.
+  sourceLabel = 'catalog',
 } = {}) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
@@ -93,7 +98,7 @@ export async function ingestCatalog({
     console.log(`   🗂️ catalog [${chain}]: no valid items — skipping (nothing deleted)`);
     if (!dryRun) {
       const { default: prisma } = await import('../../lib/prisma.ts');
-      await recordCatalogRun(prisma, chain, runStart, out, dryRun);
+      await recordCatalogRun(prisma, chain, runStart, out, dryRun, sourceLabel);
       await prisma.$disconnect();
     }
     return out;
@@ -119,9 +124,18 @@ export async function ingestCatalog({
 
   if (dryRun) {
     let create = 0;
+    // The real write loop registers each new barcode as it goes, so two batch
+    // items sharing a barcode create ONE product. Mirror that here or the dry
+    // run overstates its own yield — which matters now that multi-venue Wolt
+    // runs legitimately carry the same product several times.
+    const wouldCreate = new Set();
     for (const it of valid) {
       const bc = normalizeBarcode(it.barcode);
       if (skuToPid.has(String(it.chainItemcode)) || (bc && barcodeToPid.has(bc))) continue;
+      if (bc) {
+        if (wouldCreate.has(bc)) continue;
+        wouldCreate.add(bc);
+      }
       create++;
     }
     console.log(`   🗂️ catalog [${chain}] (dry): ${valid.length} valid → ~${create} new Products, ${valid.length - create} existing`);
@@ -219,6 +233,6 @@ export async function ingestCatalog({
   }
 
   console.log(`   🗂️ catalog [${chain}]: ${out.created} created, ${out.existing} existing (+${out.mapped} newly mapped), ${out.snapshots} snapshots, ${out.unchanged} unchanged, ${out.errors} err (of ${out.total})`);
-  await recordCatalogRun(prisma, chain, runStart, out, dryRun);
+  await recordCatalogRun(prisma, chain, runStart, out, dryRun, sourceLabel);
   return out;
 }

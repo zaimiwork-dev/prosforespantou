@@ -66,6 +66,8 @@ on:
     - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis Wolt barcode enrichment
     - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market Wolt barcode enrichment
+    - cron: '30 8 * * 0'  # weekly Sun 08:30 UTC — Masoutis Wolt barcode enrichment
+    - cron: '0 9 * * 0'   # weekly Sun 09:00 UTC — AB Wolt barcode enrichment
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
     - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
     - cron: '0 7 * * 0'   # weekly Sun 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL)
@@ -102,6 +104,8 @@ on:
           - lidl-resolver-only
           - mymarket-canonical
           - sklavenitis-canonical
+          - masoutis-canonical
+          - ab-canonical
           - kritikos-canonical
           - masoutis-catalog
           - sklavenitis-catalog
@@ -838,7 +842,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx prisma generate
-      - run: node src/scripts/wolt-canonical-scraper.mjs my-market mymarket
+      - run: node src/scripts/wolt-canonical-scraper.mjs my-market,my-market-agia-paraskevi,my-market-evosmos,my-market-akti-dimeon mymarket
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
@@ -871,7 +875,77 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx prisma generate
-      - run: node src/scripts/wolt-canonical-scraper.mjs sklavenitis-gerakas sklavenitis
+      # MIN_GTIN_RATE is deliberately 0 for Sklavenitis ONLY. Wolt stopped
+      # exposing barcode_gtin for this chain some time before 2026-08-23:
+      # measured 2026-09-03, both Sklavenitis venues return ~5% (34 GTINs out of
+      # 3,516 items), against 97-100% for Masoutis and AB. That is a real,
+      # already-happened loss with no action available to us, so failing here
+      # every Sunday would be a permanent red alarm nobody can clear — the
+      # alarm-fatigue trap T3 was created to avoid. The run still PRINTS its
+      # rate, so a recovery is visible; Sklavenitis identity is meanwhile
+      # carried by name-matching (see CONTEXT.md T6 P3). Raise this back to 0.5
+      # the moment the printed rate recovers.
+      - run: node src/scripts/wolt-canonical-scraper.mjs sklavenitis-gerakas,sklavenitis-kato-patisia sklavenitis
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '1000'
+          JITTER_MS: '500'
+          WOLT_BASELINE: '0'
+          MIN_GTIN_RATE: '0'
+
+  # Masoutis and AB expose NO barcode on their own feeds (see each adapter's
+  # header), so Wolt is their only GTIN source — and neither had a scheduled
+  # enrichment job: both were walked once by hand in May 2026 and never again.
+  # That, not any data limitation, is why masoutis offers sat at 0.8% GTIN
+  # coverage and AB at 27% on 2026-09-03.
+  #
+  # Several venues per chain, unioned by GTIN: one Wolt venue is one STORE, not
+  # the chain. Measured 2026-09-03 in DRY_RUN — Masoutis Makedonias returned
+  # 3,636 items (100% barcode-backed, 419 products new to us) and Grand Masoutis
+  # Kavala 3,837 (100%, 1,573 new): only ~60% overlap, so the second venue
+  # roughly quadrupled the yield of the first. Venues are picked for regional
+  # spread and large format for the same reason.
+  masoutis-canonical:
+    if: github.event.schedule == '30 8 * * 0' || github.event.inputs.chain == 'masoutis-canonical'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      # Three venues, not four, and the count is measured rather than guessed:
+      # marginal yield on 2026-09-03 was makedonias +3,611 unique GTINs, kavala
+      # +2,504, kerkyra +54, xalkida +7. Two venues capture ~99% of the chain;
+      # kerkyra is kept purely as redundancy if one of the first two goes dark.
+      - run: node src/scripts/wolt-canonical-scraper.mjs masoutis-makedonias,grand-masoutis-kavala,masoutis-kerkyra masoutis
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          PACE_MS: '1000'
+          JITTER_MS: '500'
+          WOLT_BASELINE: '0'
+
+  ab-canonical:
+    if: github.event.schedule == '0 9 * * 0' || github.event.inputs.chain == 'ab-canonical'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      # ab.gr itself 403s GitHub's IP ranges, but this reads Wolt's consumer API,
+      # not ab.gr — no proxy needed. Verified 2026-09-03: ab-vassilopoulos-mets
+      # returned 4,149 items, 100% barcode-backed, 693 new to the catalog.
+      - run: node src/scripts/wolt-canonical-scraper.mjs ab-vassilopoulos-mets,ab-chania,ab-larisa,ab-patra ab
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}

@@ -4,7 +4,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
-## ⚡ Pick up here (updated 2026-09-03 — 7 of 10 tasks done; everything left is waiting on the owner or Fable)
+## ⚡ Pick up here (updated 2026-09-03 — 7 of 10 tasks done, plus T11 opened on the owner's GTIN question)
 
 ### STATUS AT A GLANCE — read this, then the ⛔ OWNER TO-DO below
 
@@ -20,6 +20,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 | T8 Analytics | ✅ done — cookieless, already enabled in Vercel, no action needed |
 | T9 Email alerts | ⛔ **owner** — `RESEND_API_KEY` + verified sending domain |
 | T10 Phone pass | ⛔ **owner** — supermarket pages never signed off after July's refactor |
+| T11 GTIN coverage | 🟡 **in flight** — P1 shipped (Wolt multi-venue + coverage gate). P2 (the name bridge) needs two owner/Fable calls, see T11 |
 
 **Nothing is half-finished.** Working tree clean, everything pushed to `origin/main`, 253 tests passing, production serving. The nightly GitHub Actions jobs are the only things running, and they need no attention.
 
@@ -90,7 +91,13 @@ Until then the watchdog emails you a failure every morning. That is correct beha
 #### 4. Resend key + verified domain  ·  free tier  ·  unblocks T9
 `RESEND_API_KEY` into Vercel and `.env.local`, verify `prosforespantou.gr` in Resend, set `EMAIL_FROM`. Without the verified domain, Resend only delivers to your own address. This unblocks the watch-list alert emails that have been coded since June — the retention hook.
 
-#### 5. A decision on the shelf-price layer (Fable)  ·  free  ·  unblocks T6
+#### 5. Two decisions on comparison identity (Fable/owner)  ·  free  ·  unblocks T6 + T11 P2
+
+**NEW 2026-09-03, from the owner's "only 31% carry a GTIN" question.** That number turned out to be mostly a plumbing failure, not a data wall — full write-up under **T11**. P1 (multi-venue Wolt enrichment for all four barcode-less chains, plus a coverage gate) is shipped. P2, the name bridge that actually converts the backlog, needs two calls:
+- **(a) Auto-merge name matches at ≥0.90 similarity?** Recommended yes, with the existing variant/quantity guards; below that goes to the Review Queue.
+- **(b) Sklavenitis — hedged or hidden?** Wolt has stopped exposing barcodes for Sklavenitis entirely (~5%, verified live), so its comparison rows will be name-matched for the foreseeable future. Show with a visible hedge, or hide until proven? This is the same question as T6, from the other side.
+
+#### 5b. The original shelf-price-layer decision (Fable)  ·  free  ·  unblocks T6
 **The question changed on 2026-09-03.** It is no longer "should we tighten shelf rows to barcode-proven ones" but "**do we want a shelf-price layer at all, and gated how?**" — because those rows already render for only **83 offers out of 13,991**. A stale-window bug suppresses ~96% of the shelf prices we already hold (snapshots are written only on price change; the reader demands one from the last 14 days). Widening only that window gives 85 → 2,032 rows. Left unfixed deliberately so it informs the decision instead of pre-empting it. Full write-up under T6 below.
 The audit found only **31% of products carry a barcode** and **65% of rendered comparison rows are unprovable**. The plan says to gate shelf-price rows on barcode provenance, but on these numbers that deletes most of them rather than tightening them. Three options are written up in CONTEXT.md under T6. It is a product call about coverage versus provability, so it was raised rather than decided.
 
@@ -307,6 +314,88 @@ It also **deletes a failure class rather than detecting one**: a hallucinated UU
 
 > **❓ OPEN QUESTION FOR FABLE, raised 2026-09-02 by the T4 baseline audit.** T6 says to gate «Κανονική τιμή» shelf rows on `matchedVia='barcode'`. The audit now shows only **19,640 of 63,909 products (31%) carry a GTIN at all**, and **65% of currently rendered comparison rows are UNPROVABLE** — no barcode exists on either side to check against. So strict barcode gating would not tighten the shelf rows so much as delete most of them, and would shrink the comparison layer that is the product's headline promise, at a moment when the measured alternative is "we cannot prove these are the same item". Three readings, and the choice is a product call rather than an engineering one: (a) gate strictly anyway — correctness over coverage, accept a much smaller comparison surface; (b) gate strictly but only for the shelf rows, leaving offer-vs-offer rows on the existing name guards, which is the narrow reading of the plan's words; (c) add a middle tier — barcode-proven rows shown plainly, name-matched rows shown with a visible hedge. Recommend deciding before T6 starts, since (a) and (c) imply different UI work. Note the PROVEN/NAME-MATCH split reads 0%/0% today only because stamping shipped in `0df6838` and nothing has re-run yet; re-run the audit after one nightly cycle before judging.
 
+
+#### T11 — GTIN coverage: why only 31% of products carry a barcode (opened 2026-09-03)
+
+**Owner's framing:** "price comparison is our most important thing besides the offers — if only 31% have a GTIN we are fucked." Correct instinct, wrong villain. Measured today: this is mostly a **plumbing failure**, not a data-availability wall. Three causes, all fixable, all €0.
+
+**Where the loss actually is.** Product-level coverage (31%) is the wrong denominator — 44k of the 63,909 rows are SKU-keyed catalog rows. The number that decides whether comparison works is **active offers whose product carries a GTIN**:
+
+| Chain | Active offers | GTIN-backed | Why |
+|---|---|---|---|
+| kritikos | 2,982 | **99.8%** | chain's own API returns `barcodes[]` |
+| bazaar | 99 | **91%** | GTIN embedded in the image filename |
+| mymarket | 5,276 | 27% | Wolt job exists but walks ONE store |
+| sklavenitis | 3,094 | 24% | **Wolt stopped exposing GTINs for this chain** |
+| ab | 263 | 27% | **no scheduled Wolt job** — walked once by hand in May |
+| masoutis | 3,586 | **0.8%** | **no scheduled Wolt job** — walked once by hand in May |
+| lidl | 192 | 0% | not on Wolt; own-brand, so no cross-chain twin exists anyway |
+
+**Cause 1 — the chains' own feeds have no GTIN, and never will.** masoutis, ab, mymarket and sklavenitis all expose SKU-only feeds; each adapter header already says so, and `probe-masoutis-barcode-bridge.mjs` / `probe-openfoodfacts.mjs` were the earlier attempts. Wolt is the only source, and it still carries `barcode_gtin` on **97-100%** of Masoutis and AB items as of 2026-09-03.
+
+**Cause 2 — nobody scheduled it.** Only `sklavenitis-canonical` and `mymarket-canonical` had weekly Wolt jobs. Masoutis and AB had none.
+
+**Cause 3 — one venue is one STORE, not the chain.** Measured in DRY_RUN: masoutis-makedonias 3,636 items / 100% GTIN / 419 products new to us; grand-masoutis-kavala 3,837 / 100% / **1,573 new**. Only ~60% overlap. Walking one venue per chain was leaving most of the catalog on the table.
+
+**Cause 4 (the one nobody could have guessed) — Wolt silently dropped Sklavenitis barcodes.** Both Sklavenitis venues now return ~5% GTIN (34 of 3,516 items on 2026-08-23; reproduced live today). The weekly job reported success throughout. There was no gate on coverage, only on "did the scrape run".
+
+##### T11 P1 — shipped 2026-09-03 (multi-venue Wolt enrichment + a coverage gate)
+
+- [wolt-canonical-scraper.mjs](src/scripts/wolt-canonical-scraper.mjs) now takes a **comma-separated venue list**, unions items **keyed by GTIN** (so a product carried by five stores is ingested once), and reports per-venue `items seen / with GTIN / new to this run`. A venue that fails no longer loses the other venues' items.
+- **New coverage gate.** [gtin-coverage.ts](src/lib/gtin-coverage.ts) (`evaluateGtinRate`, 8 tests) — below `MIN_GTIN_RATE` (default 0.5) the run emits a `::error::` annotation and exits non-zero. Verified both ways against live Sklavenitis: floor 0.5 → exit 1, floor 0 → exit 0 with the rate still printed. An empty scrape returns `unknown`, not `below-floor`, so a dead scrape does not get misreported as a barcode-source regression.
+- **`WOLT_BASELINE=1` is now refused for multi-venue runs** — Wolt prices are per-store, so a union would file one store's price as the whole chain's shelf baseline.
+- **New `ab-canonical` + `masoutis-canonical` weekly jobs** (Sun 09:00 / 08:30 UTC), 4 regionally-spread large-format venues each. `mymarket-canonical` and `sklavenitis-canonical` upgraded to 4 and 2 venues.
+- **IngestRun source split: `'wolt'` vs `'catalog'`.** A chain's own catalog walk and its Wolt enrichment differ ~3x in item count (ab: 11.7k vs 4.1k); sharing one series would read as a volume collapse to anything comparing consecutive runs. `ingestCatalog` takes `sourceLabel` (default unchanged). Comment-only schema change, no DDL. **Note:** `EXPECTED_FEEDS` covers only `web`/`leaflet` today, so no watchdog behaviour changes — this closes the trap before someone adds catalog feeds to it.
+
+**Two bugs found by measuring rather than assuming — both would have quietly understated or overstated the work:**
+1. **GTIN formats differ BETWEEN VENUES OF THE SAME CHAIN.** `masoutis-makedonias` returns GTIN-13, every other Masoutis venue returns GTIN-14 with a leading zero — **0/70 raw overlap on a sample**. The first cut of the dedupe key used the raw `barcode_gtin`, which made two stores of one chain look completely disjoint and inflated the union by ~1,300 items. The key now normalises first (`normalizeBarcode`), the same function `ingestCatalog` already applies on write.
+2. **`ingestCatalog`'s DRY_RUN counter double-counted within-batch duplicates** — it checked the preloaded barcode index but, unlike the real write loop, never registered barcodes as it went. Harmless for single-venue runs (few duplicates), materially wrong for a multi-venue union. Fixed to mirror the write path, so a dry run no longer overstates its own yield.
+
+**Measured marginal yield (DRY_RUN, 2026-09-03) — this is what decided the venue counts:**
+
+| Masoutis venue | new unique GTINs |
+|---|---|
+| masoutis-makedonias | +3,611 |
+| grand-masoutis-kavala | +2,504 |
+| masoutis-kerkyra | +54 |
+| masoutis-xalkida | +7 |
+
+Two venues capture ~99% of the chain, so the job runs **three** (the third purely as redundancy if one goes dark), not four. AB and My Market were measured the same way and both keep all four — their venues 2-4 still add ~1,050 and ~4,590 unique GTINs respectively:
+
+| Chain | venues | unique items | GTIN rate | **new Products** | today's offer GTIN coverage |
+|---|---|---|---|---|---|
+| masoutis | 3 (of 4 tested) | 6,176 | **99.8%** | **~1,874** | 0.8% |
+| ab | 4 | 5,198 | **99.8%** | **~1,118** | 27% |
+| mymarket | 4 | 7,391 | **97.3%** | **~2,401** | 27% |
+
+**~5,393 new GTIN-carrying Products, growing the canonical pool 19,640 → ~25,033 (+27%)** — and that pool is exactly what T11 P2's bridge matches barcode-less offers against, so P2's yield should rise well above the numbers measured below.
+
+AB's venues all share one GTIN format, so the normalisation bug never affected it — its figures are identical across both runs. My Market runs 94.9-98.3% per venue: genuinely a few percent short, not a collapse.
+
+**⚠️ Judgement call taken, flag for review:** `sklavenitis-canonical` is pinned to `MIN_GTIN_RATE=0`. The loss is real and already happened, and no action available to us fixes it — so failing every Sunday would be a permanent red alarm nobody can clear, which is precisely the alarm-fatigue trap T3 exists to avoid. The rate is still printed every run, so a recovery is visible. Raise it back to 0.5 the moment it recovers.
+
+##### T11 P2 — the name bridge (NOT started; blocked on two decisions)
+
+Two parallel universes exist and nothing joins them: the Wolt scraper writes GTIN products with `writeMappings:false` (correct — a Wolt id is not a chain SKU), while the chain catalog scrapers write SKU-keyed barcode-less products. "Masoutis SKU 2673101 Fairy 900ml" and "Wolt GTIN 5201… Fairy 900ml" sit side by side forever.
+
+Measured with the project's own `nameSimilarity` + `salientTokens` blocking, against today's (small) GTIN pool — active offers lacking a GTIN that have a clean twin:
+
+| Chain | offers w/o GTIN | ≥0.90 clean | 0.80-0.89 clean | guard-blocked ≥0.8 |
+|---|---|---|---|---|
+| masoutis | 3,556 | 443 | 369 | 35 |
+| mymarket | 3,828 | 286 | 269 | 23 |
+| sklavenitis | 2,355 | 149 | 146 | 22 |
+| ab | 193 | 32 | 21 | 1 |
+
+Design: nightly deterministic pass; ≥0.90 + brand agreement + no `variantConflict`/`quantityConflict` → merge onto the GTIN product and stamp **`matchedVia='bridge'`** (a fourth provenance tier — a name bridge must never be able to impersonate a barcode proof); 0.70-0.89 → `PendingMatch` for the existing LLM resolver. Expect these numbers to grow substantially once P1's multi-venue jobs have run, since the pool they match against roughly triples.
+
+**⛔ Two decisions needed before P2 starts:**
+1. **Auto-merge at ≥0.90?** Recommendation: yes, with the variant/quantity guards; everything below goes to the Review Queue. This is a merge of two rows we already believe are the same product, but it is not reversible by a soft delete, so it is the owner's call.
+2. **Sklavenitis: hedged or hidden?** It has no GTIN source at all now, so its comparison rows will be name-matched for the foreseeable future. Show them with a visible hedge (T6 option c), or hide them until proven? This IS the T6 question, arriving from the other direction.
+
+##### T11 P3/P4 — not started
+- **P3 Sklavenitis:** name-bridge only (P2), plus one JSON-LD `gtin13` re-probe of its product detail pages once `PROXY_URL` lands. Cheap, may find nothing.
+- **P4 Lidl:** detail pages carry ~426 real GTINs but omit price (per the catalog note above). Smallest chain, own-brand heavy — last.
 
 Run the truth audit after one nightly cycle post-T4 (UNKNOWN should be draining). Then gate «Κανονική τιμή» shelf rows in [get-price-comparison.ts](src/actions/get-price-comparison.ts) AND its twin [comparison-count.ts](src/lib/comparison-count.ts) on `matchedVia='barcode'` for the snapshot's (chain, product) — the comment claims GTIN gating, the code only checks that the source product has a barcode. Keep the two in lockstep (otherwise the chip lies). Re-run `recompute-comparison-counts.mjs`.
 #### T7 — price history stops blending chains and price kinds
