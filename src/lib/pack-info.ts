@@ -134,3 +134,25 @@ export function unitPrice(name: string | null | undefined, price: number | null 
 function round2(v: number): number {
   return Math.round(v * 100) / 100;
 }
+
+// ===== Title / size split for cards =====
+// A 2-line title clamp routinely ate the pack size («… Οικογενειακό Γάλα 1,5…»),
+// and the size is what a shopper compares. Peel a TRAILING size token off the
+// name so the card can print it on its own line. Conservative: only a token
+// at the very end splits (never mid-name, never a diaper weight range like
+// «Νο4 (9-14kg)» — the lookbehind refuses a token glued to a range dash).
+const TRAILING_SIZE_RE =
+  /(?<![\d\-–])\s*\(?\s*((?:\d{1,3}\s*[x*×χ]\s*)?\d+(?:[.,]\d+)?\s*(?:ml|lt|l|gr|g|γρ|kg|κιλ)\.?)\s*\)?\s*[.,]?\s*$/i;
+
+export type NameParts = { title: string; size: string | null };
+
+export function splitNameAndSize(name: string | null | undefined): NameParts {
+  if (!name) return { title: name ?? '', size: null };
+  const m = name.match(TRAILING_SIZE_RE);
+  if (!m || m.index === undefined) return { title: name, size: null };
+  const title = name.slice(0, m.index).replace(/[\s,.\-–(]+$/, '').trim();
+  // «Γάλα 1lt» — a one-word title is worse than the clamp; keep it whole.
+  if (title.split(/\s+/).filter(Boolean).length < 2) return { title: name, size: null };
+  const size = m[1].replace(/\s+/g, '').replace(/\.$/, '');
+  return { title, size };
+}

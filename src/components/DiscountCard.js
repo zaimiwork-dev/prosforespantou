@@ -9,6 +9,7 @@ import { track } from '@/lib/track';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { displayCategoryForProduct } from '@/lib/display-category';
 import { expiryInfo } from '@/lib/expiry-label';
+import { splitNameAndSize, unitPrice } from '@/lib/pack-info';
 
 // Honest "good deal" labels — only positive verdicts ever reach the card
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
@@ -50,6 +51,11 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   // the canonical product.name can be a single-unit variant.
   const displayName = d.productName || d.product_name || d.product?.name;
   const category = displayCategoryForProduct(displayName, d.category);
+  // Pack size on its own line (the 2-line clamp used to eat it) and the
+  // shelf-label unit price a Greek shopper actually compares (€/κιλό, €/λίτρο).
+  const nameParts = splitNameAndSize(displayName);
+  const unit = unitPrice(displayName, discountedPrice)
+    || (d.product?.unitInfo ? unitPrice(`${displayName} ${d.product.unitInfo}`, discountedPrice) : null);
   // Offer's OWN image first, for the same reason: it comes from the chain
   // currently selling the deal, so it's alive and shows the right pack. The
   // catalog product's image is whichever chain's CDN we saw FIRST — masoutis
@@ -162,9 +168,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
       </div>
 
       <div className="card-body">
-        <h3 className="card-title" title={displayName}>{displayName}</h3>
+        <h3 className="card-title" title={displayName}>{nameParts.title}</h3>
+        {nameParts.size && <div className="card-size">{nameParts.size}</div>}
 
-        {sources.length > 0 && (
+        {/* Source tags only when a product is genuinely in BOTH the weekly
+            web offers and the leaflet — on every card the tag was noise. */}
+        {sources.length >= 2 && (
           <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
             {sources.map((s) => (
               <span
@@ -201,6 +210,7 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
           <div className={originalPrice ? "has-discount" : undefined}>
             <div className="price">{discountedPrice?.toFixed(2)}€</div>
             {originalPrice && <div className="price-old">{originalPrice.toFixed(2)}€</div>}
+            {unit && <div className="price-unit">{unit.value.toFixed(2)}€/{unit.per}</div>}
           </div>
           <button
             type="button"
