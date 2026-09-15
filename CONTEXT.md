@@ -4,6 +4,112 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ---
 
+## ⚡ Pick up here (2026-09-15 — Fable full audit: where we are, what shipped today, what to do next)
+
+**The owner asked for an honest, end-to-end review against the end goal** (a personalized native app for elderly + 30-40+ Greek shoppers: categories, personal home feed, cross-chain comparison, later a vertical "reels" feed). This block supersedes the 09-03 block below. Everything here was **measured on 2026-09-15** against the live DB, CI history, production screenshots at 390px, and the code — not read from older notes. Several older notes were wrong; the corrections are inline.
+
+### Status in one table (2026-09-15)
+
+| Signal | Value |
+|---|---|
+| Active offers / chains | **15,973** / 7 — every feed healthy today (sklavenitis came back on its own via the laptop task, 3,399 items) |
+| Traffic | **~0**: 506 click events since April, last one 09-03; 4 sessions/30d; 0 users; 1 subscriber, unconfirmed |
+| Offers with a % badge | **6%** (993 strikethrough). 14,980 are ΜΟΝΟ-style: a price and nothing else |
+| Offers with a real end date | **3%** (AB 341 + Lidl 130). Everything else is the +14d bookkeeping default; the card correctly shows no date |
+| Comparison chip / positive verdict | 4,287 (27%) / 3,664 (23%) |
+| Products with GTIN | 19,687 / 64,811 (30%) — **unchanged since 09-03** because T11 P1 was never pushed (fixed today, see below) |
+| Pending matches | 2,704, of which only **504** back a live productless offer (the resolver was re-judging the other 2,200 nightly — fixed today) |
+| Tests / build | 261 green / green |
+
+### Shipped today (all on `origin/main`, deploy verified live)
+
+| # | Commit | What | How to verify |
+|---|---|---|---|
+| 1 | `93a31de` | **T11 P1 finally committed + pushed** (was sitting uncommitted 12 days; the 09-13 Sunday run used the old code and reported 29 barcodes as success) | Sunday 09-20: `masoutis-canonical` 08:30, `ab-canonical` 09:00, `mymarket-canonical` 05:30, `sklavenitis-canonical` 05:00 UTC all run. Monday: `select count(barcode) from products` should be ~25k (was 19,687) |
+| 2 | `4c4e315` | **Resolver treadmill fixed.** `pending_matches.judged_at` added (DDL applied over 6543). Nightly order = rows backing a live productless offer → never-judged → oldest-judged; dead rows judged <14d ago skipped | Tonight's `resolvers` log prints `pending rows to process: N (M back a live productless offer)` with M>0 for masoutis/lidl/mymarket. Smoke run `34986174397` |
+| 3 | `4c4e315` | The 3 nightly recompute steps (verdicts, hotScore, comparison counts) now **fail the workflow** — they were `continue-on-error` and outside the gate | Gate step lists 10 outcomes |
+| 4 | `673d3c5` | **ΜΟΝΟ badge had no background** — `var(--red-6)` is defined nowhere, so 94% of cards showed white bold text on the photo. Now `var(--accent)` | `/deals` at 390px: red sticker on every ΜΟΝΟ card |
+| 5 | `673d3c5` | **Search tab** opened on «Δεν βρέθηκαν προϊόντα για ""». Now 12 large tappable staples | `/search` with no query |
+| 6 | `30c2d7d` | `withDbRetry` now retries the pooler errors that actually killed 5 jobs on 09-09 (`EAUTHQUERY`, `auth_query`, `statement timeout`); watch-alerts skip when `RESEND_API_KEY` is absent instead of burning cooldowns on unsent mail | — |
+| 7 | (this commit) | **Sentry was dead**: `sentry.*.config.js` existed but nothing imported them (Next 15+/Sentry v8+ need `src/instrumentation.ts` + `src/instrumentation-client.ts`). Added. Every `captureException` in `src/actions` and the watchdog had been a no-op | Owner: confirm `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` exist in Vercel env; throw a test error |
+| 8 | (this commit) | `.env.example` documents the 8 env vars CI actually uses (`PROXY_URL`, `R2_*`, `SUPABASE_*`); the dead "Llama-4 Scout / scrape-lidl" note on `GROQ_API_KEY` is gone | — |
+
+### What is actually wrong — ranked by what a shopper feels (the audit)
+
+**A. The first screen is a legal dialog, then a second dialog.** On first visit the consent sheet covers ~35% of every page (screenshot-verified), and the onboarding sheet opens 700 ms after it is answered. Two modals before a single price. For this audience that is the whole first impression.
+
+**B. "Κορυφαίες προσφορές" leads with floor wipes and three chewing gums.** Live top-10 by `hotScore`: Rispet wipes (−65%), Έλμα gum ×3 (−50% + "1+1"), coconut milk, alcohol-free beer, Coca-Cola ×3, Nivea; 6 of 10 from mymarket. Not clicks (all `click_count` 0) — the formula in `lib/hotness.ts` rewards % and "1+1/δώρο/super" on anything, has no department prior (food staples vs cosmetics), and collapses only exact duplicates, not product families. 32% of all active offers are Προσωπική Φροντίδα (real — chains push cosmetics), so without a prior the feed reads like a pharmacy.
+
+**C. For 94% of offers the card gives no reason to believe it is a deal.** No %, no "κανονικά ~X€", no €/kg. Yet **~5,000 of those ΜΟΝΟ offers already have a same-chain shelf price** (`PriceSnapshot kind='normal'`, last 90 days) that the card never uses; the verdict pill covers only 23%. This is the single biggest untapped honest-savings signal in the system.
+
+**D. Validity dates.** The product rule says "always visible"; the data says only AB and Lidl publish them. The UI handles it honestly (no fabricated chip), but «Τελειώνουν σύντομα» is honest only because only AB/Lidl rows ever fall inside 7 days. Accept the limitation and say it plainly in the UI ("ελέγχθηκε σήμερα" prominently, not as a footnote), or get dates from the chains that have them (Kritikos' API and Masoutis' leaflet know their windows).
+
+**E. Comparison is invisible on 73% of offers and unhedged on the rest.** `PriceComparison` renders nothing (no empty state) when there are no rows. Barcode-proven and name-matched rows look identical. The shelf-price layer («Κανονική τιμή» rows) renders for **83 of ~14,000** offers because `shelf-comparison.ts` demands a snapshot <14 days old while `ingest-catalog` writes one only on price change; the right gate is *feed freshness* (did the chain's catalog run recently?), which restores ~2,000 rows at zero honesty cost. `matched_via` is null on 98% of mappings because stamping only happens on NEW binds, so the T6 "gate on barcode" decision is unmeasurable until a backfill stamps existing rows.
+
+**F. Measurement is blind by design.** `lib/track.js` refuses to fire without consent and `session-id.js` will not even mint an id, so 5 months produced 506 events. Only 4 of the 9 declared event types fire anywhere (`search`, `filter`, `store_select`, `favorite`, `outbound_click` have zero call sites). **Search queries are never logged** (Vercel Analytics strips `?q=`). No impressions, no positions, no removals. The profile is `localStorage['pp-interests-v1']` and the feed caches have no user dimension. You cannot learn what users want with this instrument, and the weeks-4–6 distribution experiment would run blind.
+
+**G. Elderly-unfriendly details, all measured in `globals.css`:** add-to-list button 34 px (30 px in the two-row rail; guideline 44), list qty steppers 24 px, verdict/compare pills 10 px, source tags 9 px on every card, secondary text `--ink-3` at 3.5:1 contrast, placeholders 2.2:1, inputs at 14–15 px (iOS auto-zooms on focus), no text-size control although `data-density="comfortable|roomy"` CSS already exists and is unreachable, DM Serif Display loaded without a Greek subset so every section heading falls back to a system serif, native `alert()`/`confirm()` in the main flow, the gear icon is the only way into preferences.
+
+**H. Three dead ends.** `/alerts` is reachable only from emails that cannot be sent; login has zero providers (`auth.ts` builds `[]` — no Google/Apple/Resend env); push cannot register without a session; the newsletter box admits "we'll tell you when it starts".
+
+**I. Ops.** Sklavenitis runs on the owner's laptop; the CI `sklavenitis-*` jobs are permanent green **no-ops** (no `PROXY_URL`) — decoy checkmarks. The laptop task runs without R2 env, so Sklavenitis images are hotlinked, not mirrored. Catalog feeds have no freshness/volume alarm: the 09-13 Sklavenitis catalog task was killed (exit 0xC000013A) and its 29-item run was recorded `health_ok=true`. `kritikos-canonical-scraper.mjs` bypasses `ingestCatalog` entirely (no IngestRun, no rails). No test/lint/build workflow runs on push. Two live search queries (`search-deals.ts`, `get-catalog-products.ts`) do leading-wildcard `LIKE` seq scans; the GIN trigram index from `enable-pg-trgm.mjs` cannot match because the query uses `unaccent()` not `f_unaccent()` (the script's own last line says to change that; never done). Cold homepage TTFB 5.7 s; `page.tsx` awaits `isAdminAuthenticated()` which forces `no-store` on the most-visited page.
+
+**J. Stale notes to stop trusting:** `hotness.ts` says the category field is "348 values, ~34% Άλλο" — today Άλλο is **3.7%** (595 rows) across 17 departments. The 09-03 block says "tree clean, everything pushed" — it was not. `EXPECTED_FEEDS` and the workflow disagree about who runs Sklavenitis.
+
+### The plan — five workstreams, in order; each step ships on its own
+
+**W1 — Unstick the machine** (mostly done today; remaining ≈ 1.5 days)
+- 1c `matchedVia` backfill, offline, no LLM: mapping whose Product has a barcode AND whose chain item carried a GTIN at ingest (kritikos `barcodes[]`, bazaar filename, Wolt-enriched) → `'barcode'`; Product created from that chain's own catalog SKU → `'catalog'`; rest stay null. Then re-run `audit-comparison-truth.mjs` so T6 has numbers.
+- 1d Shelf rows: replace the 14-day snapshot-age gate with **feed freshness** — latest `IngestRun` for `(chain,'catalog')` healthy within 10 days ⇒ that chain's latest `normal` snapshot is current. Touch `lib/shelf-comparison.ts`, `actions/get-price-comparison.ts`, `lib/comparison-count.ts` (lockstep!), then `recompute-comparison-counts.mjs`. Keep barcode-backed-only for now. Expected 83 → ~2,000 rows.
+- 1e Watchdog: add the catalog feeds to `EXPECTED_FEEDS` (weekly windows; `evaluateVolume` already exists → a 29-item run alarms). Route `kritikos-canonical-scraper.mjs` through `ingestCatalog`. Give the laptop task the R2 env (`scripts/windows/run-sklavenitis.ps1`). Add a `ci.yml` that runs `test:run` + `lint` + `build` on push.
+
+**W2 — Honest savings on every card** (≈ 2 days)
+- 2a For ΜΟΝΟ offers with a same-chain `normal` snapshot under the 1d freshness rule: persist `Discount.baselinePrice` + `baselineAt` in `recompute-price-verdicts.mjs` (already keyed by product+chain) and render **"−X% · κανονικά ~Y€"** on the card in a visibly different style from a chain-published strikethrough (it is *our* inference, never the chain's claim). ⚠️ Owner check on wording — the June call declined a literal «κανονική τιμή» line on the detail view; this is a different element with a different claim.
+- 2b Unit price (€/kg, €/L) under the price: `Product.unitInfo` covers 43%; `lib/pack-info.ts` parses the rest from the name.
+- 2c Card: drop the source tag unless a product has both web+leaflet rows (`group-deals.js` already attaches `sources`); price larger; pack size on its own line instead of truncated inside the name; add button ≥44 px; pills ≥12 px.
+
+**W3 — A feed that looks like a Greek shopper's week** (≈ 4 days)
+- 3a `computeHotScore`: add a **department prior** (γαλακτοκομικά/λάδι/καφές/ζυμαρικά/απορρυπαντικά/χαρτικά/βρεφικά high; cosmetics/gum/impulse low), scale % and mechanic boosts by KVI-ness, add a strong boost for "cheapest of all chains today" (`comparisonCount>0` and this row is the min), and collapse **product families** (brand + type + pack) in the top rail, not just exact duplicates. Keep it a pure function (imported by `.mjs`).
+- 3b Homepage: first rail = **«Τα βασικά της εβδομάδας»** (the KVI staples, cheapest-per-item across chains, one card each); then favorites/για σένα; category grid cut to 8 big tiles + «Περισσότερα»; chains as one horizontal strip; newsletter out of the first scroll; larger base type; a **text-size toggle** wired to the existing density CSS; `alert()`/`confirm()` → inline confirmations.
+- 3c **Consent redesign (owner decision #1).** Vercel analytics is already consent-free on the "no storage on the device, aggregate only" basis. Make the first-party tracker consent-free *by construction*: no persistent identifier (session id in `sessionStorage`, dies with the tab), no user-agent storage, events limited to ranking/personalization aggregates, documented on `/cookies`. Then the banner becomes a one-line notice. Code it behind one env flag so it reverts in a minute if the owner's counsel disagrees.
+- 3d Events that a ranking model can learn from: `search` (query, result count, first-clicked position), `filter`/`store_select`, `favorite`/unfavorite, `list_remove`, **impressions** (≥50% visible ≥1 s, batched every 5 s), `outbound_click` (leaflet/site links). `ClickEvent` gains `position`, `page`, `query`, nullable `userId`, an index on `sessionId`; dedup moves to a DB unique on (sessionId, eventType, target, minute) — the in-memory limiter is per-lambda and does nothing on Vercel.
+
+**W4 — Personalization that survives a device** (≈ 5 days)
+- 4a A server-side anonymous **Profile** keyed by a client-generated `profileId` (declared stores/categories, favorites, list items, learned weights), synced from the Zustand store with a debounced, Zod-validated, rate-limited action; merged into `User` on first login (Auth.js `signIn` callback). Nothing changes for the anonymous UX; it just stops evaporating.
+- 4b `getPersonalFeed(profileId)`: favorites' live hits → cheapest-across-chains within the user's categories → **preferred stores as a boost, not a filter** (today `where.supermarket in (...)` hides a cheaper price elsewhere — the opposite of the product's promise) → 2 exploration slots per 20 → family collapse. Global rails stay `unstable_cache`d; the personal rail is one cheap uncached query.
+- 4c Onboarding in two screens, big tiles with logos, skippable; «Οι προτιμήσεις μου» as a visible bottom-nav entry (the gear is invisible to this audience).
+
+**W5 — The vertical "reels" feed** (design only until W3d + W4 exist). It is 4b paginated by cursor with **one impression logged per card**, full-bleed image, price + "κανονικά ~Y€" + cheapest-chain line, swipe = next, add-to-list as the single action. Without impressions (3d) and a server profile (4a) it cannot learn, so it comes after them, not before.
+
+**Also, small and worth it:** search — switch both raw queries to `f_unaccent(lower(...))` so the existing GIN trigram index applies, add the same index on `products`, and use `similarity()` for a «μήπως εννοούσες» fallback; homepage — move `isAdminAuthenticated()` out of `page.tsx` so `/` can be cached; alerts — a daily dispatch step after ingest once `RESEND_API_KEY` exists; T11 P2 name bridge (auto-merge ≥0.90 with guards, stamped `'bridge'`) once Sunday's runs have grown the pool.
+
+**Implementation notes from the 2026-09-15 planning pass** (estimates ≈ **54 h** total: W1 remaining ~14 h, W2 ~6 h, W3 ~17 h, W4 ~11 h, ~6 h cross-cutting):
+- The resolver had a **second defect** that the priority change would have amplified: the claim was scoped to the step's `SOURCE`, and a miss fell into a legacy path that **created** a Discount with a fabricated now+14d window (a phantom offer). Fixed today in the resolver follow-up commit: claim at any source; on a miss, cache the match and write nothing.
+- **Kritikos has no `catalog` feed** — `kritikos-canonical-scraper.mjs` bypasses `ingestCatalog` (no IngestRun, no mappings, no rails); its shelf baseline is the daily `source='baseline'` series from `kritikos-offers`. Route it through `ingestCatalog` in 1c/1e.
+- **The trigram index can never match today's query**: the index expression is `f_unaccent(lower(x))`, the query compares `translate(unaccent(lower(x)),'ς','σ')`. Define `f_search_norm(text)` IMMUTABLE with the ς-fold, index on it (on `discounts` and `products`), use it on both sides. Expect «γάλα» 0.8–1.7 s → <150 ms.
+- **Homepage caching**: delete the `cookies()` read (`isAdminAuthenticated()`) from `page.tsx`, call it lazily on the hidden double-click, add `export const revalidate = 300`; `revalidateTag('deals:default')` still purges it. Do not reach for `connection()` (forces dynamic) or `cacheComponents` (whole-app migration).
+- **Sklavenitis catalog** dies at the scheduled task's 3 h `-ExecutionTimeLimit` (7.5k products at 1.5 s pace) — raise to 6 h in `scripts/windows/register-sklavenitis-tasks.ps1`, and add the missing volume guard to `ingestCatalog` (twin of `ingestOffers` SAFETY 2) so a truncated run is not recorded healthy.
+- Add `.gitattributes` (`* text=auto eol=lf`) in its own commit — every file warns LF→CRLF on this Windows machine.
+- Alerts, once the key lands: a daily **digest** step (`dispatch-alerts.mjs`, one email per subscriber, cooldown stamped on success) instead of per-run sends.
+- The prune-vs-prioritize choice: pruning dead `pending_matches` would discard the LLM's stored suggestions; prioritizing (shipped) keeps them and still ends the treadmill.
+
+### ⛔ Owner decisions (the only things blocking the plan)
+1. **Consent-free first-party measurement (3c)** — same legal basis as T8's cookieless analytics. Yes/no.
+2. **"−X% · κανονικά ~Y€" on cards for ΜΟΝΟ offers (2a)** — wording and whether to show it at all.
+3. **Comparison rows that are name-matched (T6 / T11 P2):** my recommendation is **hedge, never hide** — a small «ίδιο προϊόν κατά όνομα» label on unproven rows, plain rows for barcode-proven ones; auto-merge ≥0.90 with the existing guards, stamped `matchedVia='bridge'`.
+4. `RESEND_API_KEY` + verified domain (unchanged since June). Until then alerts, confirmation emails and `/alerts` are dead.
+5. `PROXY_URL` — or accept the laptop dependency and at least give the task the R2 env.
+6. Confirm the Sentry DSNs exist in Vercel (the fix shipped today is inert without them).
+
+### ⛔ Do NOT (in addition to every invariant in PHASES.md)
+- Do not widen `SHELF_PRICE_MAX_AGE_DAYS` as "the fix" for shelf rows — replace the gate with feed freshness (1d).
+- Do not delete `pending_matches` rows to shrink the backlog — they regenerate on the next ingest and you lose the LLM's stored suggestion. The priority order already ends the treadmill.
+- Do not remove the cooldown-before-send stamping in `fireWatchAlerts` — it is the anti-spam rail; the fix is the key, not the order.
+- Do not personalize «Κορυφαίες προσφορές» or the verdicts; personalization is its own rail (PHASES Phase 10 rule stands).
+- Do not start W5 before 3d + 4a exist.
+
+---
+
 ## ⚡ Pick up here (updated 2026-09-03 — 7 of 10 tasks done, plus T11 opened on the owner's GTIN question)
 
 ### STATUS AT A GLANCE — read this, then the ⛔ OWNER TO-DO below
