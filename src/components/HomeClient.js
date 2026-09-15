@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useShoppingListStore } from "@/lib/store";
 import { getActiveDeals } from "@/actions/get-active-deals";
+import { isAdminAuthenticated } from "@/actions/admin-session";
 import { dedupeDeals } from "@/lib/dedupe-deals";
 import { loadProfile, decayProfile, topCategories, scoreOffer } from "@/lib/interest-profile";
 import { getConsent, onConsentChange } from "@/lib/consent";
@@ -218,26 +219,32 @@ function PublicSite({ initial, onAdmin }) {
   );
 }
 
-export default function HomeClient({ initial, initiallyAdmin }) {
+export default function HomeClient({ initial, initiallyAdmin = false }) {
   const [screen, setScreen] = useState("public");
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(initiallyAdmin);
+  const [adminOk, setAdminOk] = useState(initiallyAdmin);
   const [showLogin, setShowLogin] = useState(false);
+
+  // The admin session is checked ONLY when the hidden trigger fires, so the
+  // homepage itself carries no cookie read and can be cached (see page.tsx).
+  const onAdmin = async () => {
+    if (adminOk) { setScreen("admin"); return; }
+    let ok = false;
+    try { ok = await isAdminAuthenticated(); } catch { ok = false; }
+    if (ok) { setAdminOk(true); setScreen("admin"); } else { setShowLogin(true); }
+  };
 
   return (
     <>
       {screen === "public" ? (
-        <PublicSite
-          initial={initial}
-          onAdmin={() => (isAdminAuthenticated ? setScreen("admin") : setShowLogin(true))}
-        />
+        <PublicSite initial={initial} onAdmin={onAdmin} />
       ) : (
-        <AdminPanel onBack={() => { setScreen("public"); setIsAdminAuthenticated(false); }} />
+        <AdminPanel onBack={() => { setScreen("public"); setAdminOk(false); }} />
       )}
       {showLogin && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} onClick={() => setShowLogin(false)} />
           <div style={{ position: "relative" }}>
-            <AdminAuth onAuth={() => { setIsAdminAuthenticated(true); setShowLogin(false); setScreen("admin"); }} />
+            <AdminAuth onAuth={() => { setAdminOk(true); setShowLogin(false); setScreen("admin"); }} />
           </div>
         </div>
       )}
