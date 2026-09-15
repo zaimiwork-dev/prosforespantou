@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
 import { dedupeDeals } from '@/lib/dedupe-deals';
+import { capPerFamily } from '@/lib/deal-family';
 import { activePublicDealWhere, withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 const getDefaultDeals = unstable_cache(
@@ -155,7 +156,9 @@ const getTopDealsCached = unstable_cache(
     // "Λήγει σήμερα" sells urgency but dies on the user the same evening.
     // Siblings append AFTER the pool so slot positions follow hotScore rank.
     const dayAway = now.getTime() + 24 * 3600_000;
-    const deduped = dedupeDeals([...pool, ...siblings], { crossChain: true });
+    // Family cap (lib/deal-family): one Έλμα gum, one Coca-Cola pack — a
+    // 20-slot showcase must show breadth, not three sizes of one thing.
+    const deduped = capPerFamily(dedupeDeals([...pool, ...siblings], { crossChain: true }));
     const ordered = [
       ...deduped.filter((d) => d.validUntil.getTime() > dayAway),
       ...deduped.filter((d) => d.validUntil.getTime() <= dayAway),

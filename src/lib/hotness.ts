@@ -19,6 +19,8 @@
 export type HotInput = {
   productName?: string | null;
   description?: string | null;
+  // Department (lib/categories DEPARTMENTS). Drives the prior below.
+  category?: string | null;
   discountPercent?: number | null;
   createdAt?: Date | string | null;
   // Click signal. At write time this is 0; the daily recompute passes a
@@ -85,6 +87,39 @@ const BRAND_TERMS: string[] = [
   'μινερβα', 'amstel', 'μυθος', 'heineken',
 ];
 
+// Department prior (2026-09-15). Before this, the top rail was floor wipes and
+// three chewing gums: % and "1+1" counted the same on anything, and 32% of all
+// offers are personal care, so the feed read like a pharmacy. A Greek
+// household's week is staples first — that is what the front page of a
+// φυλλάδιο sells — and impulse/cosmetics belong further down, not gone.
+// Keys are lib/categories DEPARTMENTS verbatim. Unknown/null → 0.
+export const DEPT_PRIOR: Record<string, number> = {
+  'Γαλακτοκομικά & Είδη Ψυγείου': 4,
+  'Είδη Παντοπωλείου': 3,
+  'Πρωινό & Ροφήματα': 3,
+  'Είδη Καθαρισμού & Σπιτιού': 3,
+  'Βρεφικά Είδη': 3,
+  'Κρέας & Ψάρι': 2,
+  'Τυριά & Αλλαντικά': 2,
+  'Φρούτα & Λαχανικά': 2,
+  'Αρτοποιία': 1,
+  'Κατεψυγμένα': 1,
+  'Κονσέρβες': 1,
+  'Σαλάτες & Αλοιφές': 0,
+  'Κάβα': -2,
+  'Άλλο': -2,
+  'Σνακ & Γλυκά': -3,
+  'Είδη Κατοικιδίων': -3,
+  'Προσωπική Φροντίδα': -5,
+};
+
+// A big % or a "1+1" on a non-staple is worth half of the same mechanic on a
+// staple: -50% on chewing gum is not front-page news, -50% on olive oil is.
+const NON_KVI_SCALE = 0.5;
+// Stacked mechanics ("1+1" + "δώρο" + "super") used to reach +19 on one row —
+// more than a tier-1 KVI and a headline brand together. Cap the stack.
+const MECHANIC_CAP = 8;
+
 // Deal-mechanic hooks — the leaflet magnet. Scored off name + description.
 function mechanicBoost(text: string): number {
   let b = 0;
@@ -95,9 +130,16 @@ function mechanicBoost(text: string): number {
   return b;
 }
 
+// «Χωρίς Ζάχαρη» (sugar-free) is not sugar, «χωρίς λακτόζη» is not milk in
+// the KVI sense — drop negated phrases before keyword matching. Found by a
+// test on 2026-09-15: three sugar-free chewing gums scored as a tier-2 staple.
+// normalize() keeps the final sigma, so match both «χωρις» and «χωρισ».
+const NEGATED_RE = /χωρι[σς]\s+\S+/g;
+
 function kviBoost(name: string): number {
+  const positive = name.replace(NEGATED_RE, ' ');
   for (const tier of KVI_TIERS) {
-    if (tier.terms.some((t) => name.includes(t))) return tier.weight;
+    if (tier.terms.some((t) => positive.includes(t))) return tier.weight;
   }
   return 0;
 }
@@ -146,12 +188,15 @@ export function computeHotScore(input: HotInput): number {
   const name = normalize(input.productName);
   const text = `${name} ${normalize(input.description)}`;
   const pct = input.discountPercent ?? 0;
+  const kvi = kviBoost(name);
+  const scale = kvi > 0 ? 1 : NON_KVI_SCALE;
 
   const score =
-    kviBoost(name) +
+    kvi +
     brandBoost(name) +
-    mechanicBoost(text) +
-    pct * 0.2 +
+    (DEPT_PRIOR[input.category ?? ''] ?? 0) +
+    Math.min(mechanicBoost(text), MECHANIC_CAP) * scale +
+    pct * 0.2 * scale +
     popularityBoost(input.clicks ?? 0, input.listAdds ?? 0) +
     (VERDICT_BOOST[input.priceVerdict ?? ''] ?? 0) +
     recencyBoost(input.createdAt) +
