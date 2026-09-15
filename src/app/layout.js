@@ -1,4 +1,4 @@
-import { Inter, DM_Serif_Display, Outfit } from "next/font/google";
+import { Inter, DM_Serif_Display, Noto_Serif_Display, Outfit } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,6 +7,11 @@ const inter = Inter({
   display: "swap",
 });
 
+// DM Serif Display has no Greek glyphs (Google ships latin/latin-ext only), so
+// every Greek heading rendered in Times New Roman (measured 2026-09-16 with
+// CSS.getPlatformFontsForNode: 3 DM glyphs, 20 Times glyphs in «Τα βασικά της
+// εβδομάδας»). Greek now comes from Noto Serif Display, a similar
+// high-contrast serif, loaded for the Greek subset only.
 const dmSerif = DM_Serif_Display({
   variable: "--font-serif",
   weight: "400",
@@ -14,6 +19,24 @@ const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
   display: "swap",
 });
+
+const greekSerif = Noto_Serif_Display({
+  variable: "--font-serif-greek",
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["greek"],
+  display: "swap",
+});
+
+// The heading stack must put the Greek face BEFORE DM's metric fallback face
+// (a local Times New Roman covering every glyph), or that fallback swallows
+// Greek first. `var(--font-serif)` bundles DM with its fallback, and Turbopack
+// ignores adjustFontFallback: false, so the stack is assembled here from the
+// real family names and set on <html> as --font-display.
+const families = (font) => font.style.fontFamily.split(",").map((f) => f.trim()).filter(Boolean);
+const [dmPrimary, ...dmFallbacks] = families(dmSerif);
+const [greekPrimary, ...greekFallbacks] = families(greekSerif);
+const DISPLAY_STACK = [dmPrimary, greekPrimary, ...dmFallbacks, ...greekFallbacks, "Georgia", "serif"].join(", ");
 
 // Loaded once here (was injected as a render-blocking <link> on several pages —
 // see no-page-custom-font). Greek subset included; exposed as --font-outfit.
@@ -59,7 +82,8 @@ export default function RootLayout({ children }) {
       lang="el"
       data-theme="fresh"
       data-density="compact"
-      className={`${inter.variable} ${dmSerif.variable} ${outfit.variable}`}
+      className={`${inter.variable} ${dmSerif.variable} ${greekSerif.variable} ${outfit.variable}`}
+      style={{ "--font-display": DISPLAY_STACK }}
     >
       <body>
         {/* «Μεγάλα γράμματα» preference, applied before hydration so a

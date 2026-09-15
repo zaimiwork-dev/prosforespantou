@@ -6,6 +6,11 @@
    ========================================================= */
 
 :root {
+  /* Display headings. The real stack (DM Serif Display for Latin, Noto Serif
+     Display for Greek, then fallbacks) is set inline on <html> by layout.js;
+     this is only the no-JS/no-font default. */
+  --font-display: Georgia, serif;
+
   /* Surfaces */
   --bg: #FAF6EF;
   --bg-soft: #F3EEE2;
@@ -148,7 +153,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 .section-head > div:first-child { min-width: 0; flex: 1; }
 .section-head h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-weight: 400;
   font-size: clamp(22px, 2.6vw, 28px);
   line-height: 1.15;
@@ -210,7 +215,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .topbar-inner { display: flex; align-items: center; gap: 20px; height: 64px; }
 .logo {
   display: flex; align-items: center; gap: 10px;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 20px; letter-spacing: -0.01em;
   color: var(--brand); font-weight: 400;
   white-space: nowrap; flex-shrink: 0;
@@ -300,7 +305,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .hero-compact-head h1 { flex: 1 1 320px; min-width: 0; }
 .hero-compact-head .hero-meta { flex: 0 1 auto; min-width: 0; } /* allow shrink so stats wrap, not clip */
 .hero h1 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-weight: 400;
   font-size: clamp(28px, 3.4vw, 40px);
   line-height: 1.1;
@@ -1390,7 +1395,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .promo > * { position: relative; }
 .promo .eyebrow { color: var(--gold); }
 .promo h3 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: clamp(22px, 2.6vw, 28px);
   font-weight: 400;
   margin: 6px 0 4px;
@@ -1483,7 +1488,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 
 .listing-head { padding: 20px 0 24px; }
 .listing-head h1 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: clamp(28px, 3.4vw, 40px);
   line-height: 1.1;
   margin: 0 0 6px;
@@ -1678,7 +1683,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   display: grid; place-items: center; color: var(--ink-3);
 }
 .empty-state h4 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 20px; margin: 0 0 6px;
   font-weight: 400;
 }
@@ -1770,7 +1775,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   border-bottom: 1px solid var(--line);
 }
 .drawer-head h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 22px; font-weight: 400;
   margin: 0; letter-spacing: -0.01em;
 }
@@ -1863,7 +1868,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 .drawer-totals .lbl { font-size: 14px; color: var(--ink-2); }
 .drawer-totals .val {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 26px; font-weight: 400;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
