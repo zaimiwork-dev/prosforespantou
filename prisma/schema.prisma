@@ -392,6 +392,10 @@ model PendingMatch {
   aiConfidence       Float?   @map("ai_confidence") // 0.0 to 100.0
   suggestedProductId String?  @db.Uuid @map("suggested_product_id")
   imageUrl           String?  @map("image_url")
+  // When the LLM resolver last judged this row (null = never). The nightly
+  // drain orders by this so re-judging ROTATES through the queue instead of
+  // re-asking the same oldest rows every night (2026-09-15).
+  judgedAt           DateTime? @map("judged_at")
   createdAt          DateTime @default(now()) @map("created_at")
   product            Product? @relation(fields: [suggestedProductId], references: [id], onDelete: SetNull)
 

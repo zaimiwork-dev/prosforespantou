@@ -296,15 +296,50 @@ async function run() {
 
   const { default: prisma } = await import('../lib/prisma.ts');
 
-  const pending = await withDbRetry('load pending', () =>
-    prisma.pendingMatch.findMany({
-      where: { supermarket: CHAIN },
-      orderBy: { createdAt: 'asc' },
-      take: Number.isFinite(LIMIT) ? LIMIT : undefined,
-    })
+  // WHICH rows get the nightly budget (2026-09-15). The queue used to be read
+  // oldest-first with a per-chain LIMIT, and a "no match" verdict never
+  // removed a row — so the same 150 oldest rows were re-judged every night
+  // while only ~1 in 5 pending rows still backed a LIVE productless offer.
+  // Order now: (1) rows whose offer is active and productless today — the
+  // only ones a shopper can see — (2) never-judged rows, (3) everything else
+  // by judgedAt ascending so re-judging rotates instead of repeating. Rows
+  // whose offer is gone AND were judged in the last 14 days are skipped
+  // outright: the answer will not change until the product pool grows, and
+  // the ingest re-queues them the day the offer reappears.
+  const DEAD_REJUDGE_DAYS = 14;
+  const prioritized = await withDbRetry('load pending', () =>
+    prisma.$queryRaw`
+      SELECT pm.id, pm.live
+      FROM (
+        SELECT pm.id, pm.judged_at, pm.created_at,
+               EXISTS (
+                 SELECT 1 FROM discounts d
+                 WHERE d.supermarket = pm.supermarket
+                   AND d.product_name = pm.raw_name
+                   AND d.is_active AND d.valid_until > now()
+                   AND d.product_id IS NULL
+               ) AS live
+        FROM pending_matches pm
+        WHERE pm.supermarket = ${CHAIN}
+      ) pm
+      WHERE pm.live
+         OR pm.judged_at IS NULL
+         OR pm.judged_at < now() - make_interval(days => ${DEAD_REJUDGE_DAYS})
+      ORDER BY pm.live DESC, pm.judged_at ASC NULLS FIRST, pm.created_at ASC
+      LIMIT ${Number.isFinite(LIMIT) ? LIMIT : 1_000_000}
+    `
   );
+  const orderedIds = prioritized.map((r) => r.id);
+  const liveCount = prioritized.filter((r) => r.live).length;
+  const rows = orderedIds.length
+    ? await withDbRetry('load pending rows', () =>
+        prisma.pendingMatch.findMany({ where: { id: { in: orderedIds } } })
+      )
+    : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const pending = orderedIds.map((id) => byId.get(id)).filter(Boolean);
   console.log(`🤖 LLM resolver: chain="${CHAIN}" source="${SOURCE}" ${DRY_RUN ? '(DRY_RUN)' : ''}`);
-  console.log(`   pending rows to process: ${pending.length}`);
+  console.log(`   pending rows to process: ${pending.length} (${liveCount} back a live productless offer)`);
   if (pending.length === 0) { await prisma.$disconnect(); return; }
 
   // Use ALL canonical Products as the candidate pool. Cross-chain products
@@ -412,6 +447,7 @@ async function run() {
                 // to the real id here — the Review tab still gets the LLM's
                 // best guess even when a guard rejected it.
                 suggestedProductId: inRange ? top[matchIdx - 1].id : null,
+                judgedAt: new Date(),
               },
             })
           );
