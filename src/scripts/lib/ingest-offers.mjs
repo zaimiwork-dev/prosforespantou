@@ -52,7 +52,10 @@ export async function withDbRetry(label, fn) {
     try {
       return await fn();
     } catch (e) {
-      const transient = /EAUTHTIMEOUT|ECONNREFUSED|ETIMEDOUT|Connection terminated/i.test(e.message || '');
+      // 2026-09-09: five nightly jobs died on one Supabase pooler blip whose
+      // errors (EAUTHQUERY, "auth_query secret check timed out", "canceling
+      // statement due to statement timeout") matched none of the old patterns.
+      const transient = /EAUTHTIMEOUT|EAUTHQUERY|ECONNREFUSED|ECONNRESET|ETIMEDOUT|Connection terminated|auth_query|statement timeout|08006|57014/i.test(e.message || '');
       if (!transient || attempt >= RETRY_DELAYS.length) throw e;
       const delay = RETRY_DELAYS[attempt];
       console.log(`   ⏳ DB hiccup on ${label} — retry ${attempt + 1} in ${delay / 1000}s`);
@@ -440,6 +443,14 @@ export async function ingestBaseline({ chain, items, dryRun = false }) {
 // confirmed subscribers, and a silent console log without RESEND_API_KEY (see
 // lib/email.ts). Caller wraps it so it can never fail the ingest.
 async function fireWatchAlerts(prisma, alertable) {
+  // Without a mail key every send is a console.log that returns ok:false —
+  // but the cooldown below is stamped BEFORE the send, so an unconfigured
+  // runner would silently consume each alert's 6h window on emails nobody
+  // received. Skip the whole pass instead and say so once per run.
+  if (!process.env.RESEND_API_KEY) {
+    console.log('   ✉️  watch-alerts skipped — RESEND_API_KEY not set in this runner');
+    return { matchedAlerts: 0, sent: 0, skipped: 'no-api-key' };
+  }
   const alerts = await prisma.alert.findMany({
     where: { isActive: true, subscriber: { confirmedAt: { not: null }, unsubscribedAt: null } },
     include: { subscriber: true },
