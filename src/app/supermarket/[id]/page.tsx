@@ -3,7 +3,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { SUPERMARKETS } from "@/lib/constants";
 import SupermarketClient from "@/components/SupermarketClient";
-import { pruneExpiredDatelessLeaflets } from "@/actions/admin/leaflet-actions";
+import { isExpiredDatelessLeaflet } from "@/lib/leaflet-prune";
 import { activePublicDealWhere } from "@/lib/public-deal-filters";
 import { representativeCatalogCount } from "@/lib/catalog-run-count";
 import { buildSupermarketCategoryTree } from "@/lib/supermarket-category-browser";
@@ -28,8 +28,8 @@ export default async function SupermarketPage({ params }) {
   const sm = SUPERMARKETS.find((s) => s.id === id);
   if (!sm) notFound();
 
-  await pruneExpiredDatelessLeaflets();
-
+  // No write on a page view: expired dateless leaflets are hidden here and
+  // deleted by the nightly prune (lib/leaflet-prune).
   const now = new Date();
   // Cap the initial server payload to the 500 hottest deals. Without a cap,
   // chains with thousands of active deals (Kritikos: 2,760) ship a
@@ -37,7 +37,7 @@ export default async function SupermarketPage({ params }) {
   // hotScore so the cap keeps the deals the page defaults to showing first; the
   // full catalog is reachable via the in-page search, which calls a paginated
   // server action (`searchDeals(query, supermarket)`) for queries ≥ 2 chars.
-  const [deals, totalCount, leaflet, catalogRuns, taxonomyDeals] = await Promise.all([
+  const [deals, totalCount, leafletCandidates, catalogRuns, taxonomyDeals] = await Promise.all([
     prisma.discount.findMany({
       where: activePublicDealWhere(now, { supermarket: id }),
       include: { store: true, leaflet: true, product: true },
@@ -47,12 +47,13 @@ export default async function SupermarketPage({ params }) {
     prisma.discount.count({
       where: activePublicDealWhere(now, { supermarket: id }),
     }),
-    prisma.leaflet.findFirst({
+    prisma.leaflet.findMany({
       where: {
         store: { name: sm.name },
         OR: [{ validUntil: null }, { validUntil: { gt: now } }],
       },
       orderBy: { validFrom: "desc" },
+      take: 5,
     }),
     prisma.ingestRun.findMany({
       where: {
@@ -76,6 +77,7 @@ export default async function SupermarketPage({ params }) {
       },
     }),
   ]);
+  const leaflet = leafletCandidates.find((l) => !isExpiredDatelessLeaflet(l, now.getTime())) ?? null;
   const catalogCount = representativeCatalogCount(catalogRuns);
   const categoryTree = buildSupermarketCategoryTree(taxonomyDeals);
 

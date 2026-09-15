@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/session';
 import { revalidateTag } from 'next/cache';
 import * as Sentry from "@sentry/nextjs";
 import { SUPERMARKETS } from '@/lib/constants';
+import { pruneExpiredDatelessLeaflets } from '@/lib/leaflet-prune';
 
 const leafletSchema = z.object({
   supermarket: z.string().min(1),
@@ -17,22 +18,10 @@ const leafletSchema = z.object({
   autoDeleteDays: z.number().int().positive().nullable().optional(),
 });
 
-export async function pruneExpiredDatelessLeaflets() {
-  const candidates = await prisma.leaflet.findMany({
-    where: {
-      validFrom: null,
-      autoDeleteDays: { not: null },
-    },
-    select: { id: true, createdAt: true, autoDeleteDays: true },
-  });
-  const now = Date.now();
-  const toDelete = candidates
-    .filter((l) => l.autoDeleteDays && l.createdAt.getTime() + l.autoDeleteDays * 86400000 < now)
-    .map((l) => l.id);
-  if (toDelete.length > 0) {
-    await prisma.leaflet.deleteMany({ where: { id: { in: toDelete } } });
-  }
-}
+// The dateless-leaflet prune used to be exported from here — every export of a
+// 'use server' file is a public endpoint, and this one had no admin check. It
+// now lives in lib/leaflet-prune and runs nightly (scripts/prune-leaflets.mjs)
+// and inside listLeaflets below, after requireAdmin().
 
 export async function createLeaflet(input) {
   return await Sentry.withServerActionInstrumentation('createLeaflet', { recordResponse: true }, async () => {
@@ -81,7 +70,7 @@ export async function listLeaflets() {
   return await Sentry.withServerActionInstrumentation('listLeaflets', { recordResponse: true }, async () => {
     try {
       await requireAdmin();
-      await pruneExpiredDatelessLeaflets();
+      await pruneExpiredDatelessLeaflets(prisma);
       const leaflets = await prisma.leaflet.findMany({
         orderBy: { createdAt: 'desc' },
         include: { store: { select: { name: true } } },

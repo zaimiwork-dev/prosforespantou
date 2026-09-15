@@ -512,6 +512,15 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Prune expired dateless leaflets
+        # Moved off the supermarket page view on 2026-09-16 (it was a write on
+        # every request and a public server action). See src/lib/leaflet-prune.ts.
+        id: prune_leaflets
+        continue-on-error: true
+        run: node src/scripts/prune-leaflets.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
       - name: Gate — fail the job if any resolver or recompute step failed
         # THE POINT: every resolver step above is continue-on-error so one
         # stuck chain can't block the others. That also meant the workflow
@@ -527,7 +536,7 @@ jobs:
         if: always()
         run: |
           failed=""
-          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"             "recompute-verdicts:${{ steps.rc_verdicts.outcome }}"             "recompute-hotness:${{ steps.rc_hotness.outcome }}"             "recompute-comparison:${{ steps.rc_compare.outcome }}"; do
+          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"             "recompute-verdicts:${{ steps.rc_verdicts.outcome }}"             "recompute-hotness:${{ steps.rc_hotness.outcome }}"             "recompute-comparison:${{ steps.rc_compare.outcome }}"             "prune-leaflets:${{ steps.prune_leaflets.outcome }}"; do
             name="${pair%%:*}"; outcome="${pair#*:}"
             echo "  $name -> $outcome"
             if [ "$outcome" = "failure" ]; then failed="$failed $name"; fi
