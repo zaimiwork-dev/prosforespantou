@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { familyKey, capPerFamily } from './deal-family';
+import { familyKey, capPerFamily, spreadFamilies } from './deal-family';
 
 describe('familyKey / capPerFamily', () => {
   it('three Έλμα gums share one family; COCA COLA and COCA-COLA too', () => {
@@ -39,5 +39,26 @@ describe('familyKey / capPerFamily', () => {
 
   it('rows without a usable name pass through', () => {
     expect(capPerFamily([{ productName: null }, { productName: 'ab' }])).toHaveLength(2);
+  });
+});
+
+describe('spreadFamilies', () => {
+  const row = (productName: string) => ({ productName });
+
+  it('moves a repeat until its family is `gap` rows back, keeping every row', () => {
+    const input = [row('Misko Φιογκάκι'), row('Misko Τριβελάκι'), row('Ariel Alpine'), row('Fairy Platinum'), row('Softex Χαρτί'), row('Misko Κοφτό')];
+    const out = spreadFamilies(input, 3);
+    expect(out.map((r) => r.productName)).toEqual(['Misko Φιογκάκι', 'Ariel Alpine', 'Fairy Platinum', 'Softex Χαρτί', 'Misko Τριβελάκι', 'Misko Κοφτό']);
+    expect(out).toHaveLength(input.length);
+  });
+
+  it('appends rows that never clear, in their original order', () => {
+    const input = [row('Ariel A'), row('Misko 1'), row('Misko 2'), row('Misko 3')];
+    expect(spreadFamilies(input, 3).map((r) => r.productName)).toEqual(['Ariel A', 'Misko 1', 'Misko 2', 'Misko 3']);
+  });
+
+  it('leaves an already varied list untouched', () => {
+    const input = [row('Ariel A'), row('Misko 1'), row('Fairy F'), row('Softex S')];
+    expect(spreadFamilies(input, 3)).toEqual(input);
   });
 });

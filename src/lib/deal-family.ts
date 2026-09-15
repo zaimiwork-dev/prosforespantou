@@ -45,3 +45,46 @@ export function capPerFamily<T extends { productName?: string | null }>(deals: T
   }
   return out;
 }
+
+// Space out same-family rows in a long list WITHOUT dropping any (2026-09-16).
+// /deals renders every loaded row, so capping would hide offers; instead a
+// row whose family already appears among the last `gap` placed rows waits in
+// a queue and is placed as soon as its family is clear again. Rows that never
+// clear (a list ending in five Misko pastas) are appended in their original
+// order. Rows without a family key are never held back.
+export function spreadFamilies<T extends { productName?: string | null }>(deals: T[], gap = 3): T[] {
+  if (!Array.isArray(deals) || deals.length < 3 || gap < 1) return deals;
+  const out: T[] = [];
+  const outKeys: (string | null)[] = [];
+  const waiting: { d: T; key: string }[] = [];
+  const clear = (key: string) => {
+    for (let i = Math.max(0, outKeys.length - gap); i < outKeys.length; i++) {
+      if (outKeys[i] === key) return false;
+    }
+    return true;
+  };
+  const place = (d: T, key: string | null) => { out.push(d); outKeys.push(key); };
+  const drainWaiting = () => {
+    let placed = true;
+    while (placed) {
+      placed = false;
+      for (let i = 0; i < waiting.length; i++) {
+        if (clear(waiting[i].key)) {
+          const [w] = waiting.splice(i, 1);
+          place(w.d, w.key);
+          placed = true;
+          break;
+        }
+      }
+    }
+  };
+  for (const d of deals) {
+    drainWaiting();
+    const key = familyKey(d.productName);
+    if (key && !clear(key)) { waiting.push({ d, key }); continue; }
+    place(d, key);
+  }
+  drainWaiting();
+  for (const w of waiting) place(w.d, w.key);
+  return out;
+}
