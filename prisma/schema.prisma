@@ -173,18 +173,25 @@ model Discount {
 
 model ClickEvent {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventType   String   // "deal_click" | "leaflet_click" | "list_add"
-  supermarket String   // slug e.g. "lidl", "ab", "sklavenitis"
+  eventType   String   // see the enum in src/actions/track-event.ts (deal_click, list_add, impression, search, …)
+  supermarket String   // slug e.g. "lidl", "ab", "sklavenitis"; "site" when not store-scoped
   discountId  String?  @db.Uuid
   leafletId   String?  @db.Uuid
   category    String?
   sessionId   String?  // anonymous client-generated UUID from localStorage
   userAgent   String?
   createdAt   DateTime @default(now())
+  // W3d (2026-09-15). Columns are camelCase like the rest of this table.
+  position    Int?     // slot index in the list the card was shown in
+  page        String?  // surface: "home:essentials", "deals", "search", "supermarket" …
+  query       String?  // search text / filter state
+  resultCount Int?     // results the user saw for that search / filter
+  dedupKey    String?  @unique // impressions: session:discount:page:day — replays are no-ops
 
   @@index([supermarket, createdAt])
   @@index([eventType, createdAt])
   @@index([createdAt])
+  @@index([sessionId, createdAt])
   @@map("click_events")
 }
 

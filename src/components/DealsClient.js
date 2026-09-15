@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { track } from "@/lib/track";
 import Link from "next/link";
 import { getActiveDeals } from "@/actions/get-active-deals";
 import { useShoppingListStore } from "@/lib/store";
@@ -63,6 +64,17 @@ export default function DealsClient({ initial }) {
           selectedSMs.length > 0 ? selectedSMs : preferredStores
         );
         setTotalCount(total);
+        // Only reset loads come from a filter/sort/store change (the initial
+        // server render never calls load).
+        if (reset) {
+          track({
+            eventType: 'filter',
+            page: 'deals',
+            category: activeCategory,
+            query: `sort=${sortBy}${selectedSMs.length ? `;stores=${selectedSMs.join(',')}` : ''}`,
+            resultCount: total,
+          });
+        }
         setHasMore(currentOffset + deals.length < total);
         setOffset(currentOffset + deals.length);
         setDiscounts(reset ? deals : (prev) => [...prev, ...deals]);
@@ -101,6 +113,7 @@ export default function DealsClient({ initial }) {
   };
 
   const toggleSM = (id) => {
+    track({ eventType: 'store_select', supermarket: id, page: 'deals', query: selectedSMs.includes(id) ? 'remove' : 'add' });
     setSelectedSMs((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );

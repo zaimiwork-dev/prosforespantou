@@ -32,6 +32,7 @@ export function DealGrid({
   emptyText,
   onClearFilters,
   showCompletionMessage = true,
+  list,
 }) {
   const cartItems = useShoppingListStore((s) => s.items);
   const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
@@ -81,8 +82,8 @@ export function DealGrid({
   return (
     <>
       <div className="products-grid">
-        {grouped.map((d) => (
-          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} />
+        {grouped.map((d, i) => (
+          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} list={list} position={i} />
         ))}
         {loading && Array(8).fill(0).map((_, i) => <Skeleton key={i} />)}
       </div>

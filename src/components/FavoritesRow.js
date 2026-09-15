@@ -36,6 +36,7 @@ export function FavoritesRow({ onAdd, onSelect }) {
       deals={dedupeDeals(deals)}
       onAdd={onAdd}
       onSelect={onSelect}
+      list="home:favorites"
     />
   );
 }

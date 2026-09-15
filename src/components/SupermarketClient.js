@@ -225,6 +225,26 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
   // Reset visible count when filters change
   useEffect(() => { setVisibleCount(60); }, [activeCategory, searchQuery, sortBy]);
 
+  // In-store search / department / sort, recorded once the shopper pauses
+  // (typing «γάλα» must not log «γ», «γα», «γαλ»). Skips the initial state.
+  const filterKey = `${activeCategory}|${sortBy}|${searchQuery.trim()}`;
+  useEffect(() => {
+    if (filterKey === 'all|discount|') return;
+    const t = setTimeout(() => {
+      const q = searchQuery.trim();
+      track({
+        eventType: q.length >= 2 ? 'search' : 'filter',
+        supermarket: sm.id,
+        page: 'supermarket',
+        category: activeCategory,
+        query: q.length >= 2 ? q.slice(0, 200) : `sort=${sortBy}`,
+        resultCount: filtered.length,
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, filtered.length]);
+
   const visibleDeals = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
   const initialPreviewCount = useMemo(() => dedupeDeals(initialDeals).length, [initialDeals]);
   const searching = searchQuery.trim().length >= 2;

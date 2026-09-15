@@ -5,6 +5,7 @@ import { useShoppingListStore } from '@/lib/store';
 import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from './CategoryIcon';
 import { getTextSize, setTextSize } from '@/lib/text-size';
+import { track } from '@/lib/track';
 
 // User preferences: which stores they shop at AND which departments they
 // usually buy ("Τι αγοράζεις συνήθως;"). Opened from the header gear, and —
@@ -38,11 +39,20 @@ function PreferredStoresSheetInner({ onClose, intro }) {
 
   const save = () => {
     // Sync local -> store by diffing
+    // Declared preferences are the strongest personalization signal we get
+    // (W4a will persist them server-side); log each change.
+    const page = intro ? 'onboarding' : 'preferences';
     for (const sm of SUPERMARKETS) {
-      if (local.includes(sm.id) !== preferredStores.includes(sm.id)) togglePreferred(sm.id);
+      if (local.includes(sm.id) !== preferredStores.includes(sm.id)) {
+        track({ eventType: 'store_select', supermarket: sm.id, page, query: local.includes(sm.id) ? 'add' : 'remove' });
+        togglePreferred(sm.id);
+      }
     }
     for (const c of PICKABLE) {
-      if (localCats.includes(c.id) !== preferredCategories.includes(c.id)) togglePreferredCategory(c.id);
+      if (localCats.includes(c.id) !== preferredCategories.includes(c.id)) {
+        track({ eventType: 'filter', page, category: c.id, query: localCats.includes(c.id) ? 'add' : 'remove' });
+        togglePreferredCategory(c.id);
+      }
     }
     onClose();
   };

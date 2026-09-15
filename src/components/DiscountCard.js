@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
 import { track } from '@/lib/track';
+import { observeImpression } from '@/lib/impressions';
+import { surfaceFromPath } from '@/lib/impression-queue';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { displayCategoryForProduct } from '@/lib/display-category';
 import { expiryInfo } from '@/lib/expiry-label';
@@ -15,8 +17,12 @@ import { splitNameAndSize, unitPrice } from '@/lib/pack-info';
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
 const VERDICT_LABEL = { lowest: '🔥 Χαμηλότερη τιμή', good: '✅ Καλή τιμή' };
 
-export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
+// `list` names the surface the card sits in ("home:essentials", "deals" …;
+// defaults to the route) and `position` its slot — both ride on impressions,
+// clicks and list adds so click-through can be read per rail and per slot.
+export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, position }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const cardRef = useRef(null);
   // Snapshot the clock once per mount: expiry labels don't need sub-mount
   // freshness, and an impure Date.now() in render defeats memoization.
   const [nowMs] = useState(() => Date.now());
@@ -85,8 +91,19 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
   const compareChains = (d.comparisonCount ?? d.comparison_count ?? 0) + 1;
   const showCompare = compareChains >= 2;
 
+  const page = () => list || surfaceFromPath(typeof window !== 'undefined' ? window.location.pathname : '/');
+  useEffect(() => {
+    return observeImpression(cardRef.current, {
+      discountId: d.id,
+      supermarket: supermarketId || undefined,
+      page: list || surfaceFromPath(window.location.pathname),
+      position,
+    });
+  }, [d.id, supermarketId, list, position]);
+
   return (
     <div
+      ref={cardRef}
       className="card"
       role="button"
       tabIndex={0}
@@ -96,6 +113,8 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
           supermarket: supermarketId,
           discountId: d.id,
           category: category,
+          page: page(),
+          position,
         });
         onSelect(d);
       }}
@@ -225,6 +244,8 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
                 supermarket: supermarketId,
                 discountId: d.id,
                 category: category,
+                page: page(),
+                position,
               });
               onAdd(d);
             }}

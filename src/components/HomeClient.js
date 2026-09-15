@@ -158,6 +158,7 @@ function PublicSite({ initial, onAdmin }) {
             deals={initial.essentials || []}
             onAdd={addItem}
             onSelect={setSelectedProduct}
+            list="home:essentials"
           />
 
           {forYou?.length > 0 && (
@@ -167,6 +168,7 @@ function PublicSite({ initial, onAdmin }) {
               deals={forYou}
               onAdd={addItem}
               onSelect={setSelectedProduct}
+              list="home:foryou"
               viewAllHref="/deals"
             />
           )}
@@ -177,6 +179,7 @@ function PublicSite({ initial, onAdmin }) {
             deals={topDeals}
             onAdd={addItem}
             onSelect={setSelectedProduct}
+            list="home:top"
             viewAllHref="/deals"
             rows={2}
           />
@@ -187,6 +190,7 @@ function PublicSite({ initial, onAdmin }) {
             deals={endingSoon}
             onAdd={addItem}
             onSelect={setSelectedProduct}
+            list="home:ending"
             viewAllHref="/deals?sort=expiring"
           />
 

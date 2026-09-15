@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useShoppingListStore } from '@/lib/store';
+import { track } from '@/lib/track';
 import { SUPERMARKETS } from '@/lib/constants';
 import { Icon } from './Icons';
 import { getCheaperAlternatives } from '@/actions/get-cheaper-alternatives';
@@ -83,7 +84,10 @@ export function ShoppingList({ isOpen, onClose }) {
   };
 
   const handleClear = () => {
-    if (confirm('Εκκαθάριση λίστας;')) clearList();
+    if (confirm('Εκκαθάριση λίστας;')) {
+      track({ eventType: 'list_remove', page: 'list', query: 'clear', resultCount: items.length });
+      clearList();
+    }
   };
 
   return (
@@ -167,7 +171,17 @@ export function ShoppingList({ isOpen, onClose }) {
                               )}
                             </div>
                             <div className="qty-stepper">
-                              <button type="button" onClick={() => decreaseItem(item.id)} aria-label="Μείωση">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // The last unit leaving the list is a removal.
+                                  if ((item.quantity || 1) <= 1) {
+                                    track({ eventType: 'list_remove', supermarket: item.supermarket || undefined, discountId: item.id, page: 'list' });
+                                  }
+                                  decreaseItem(item.id);
+                                }}
+                                aria-label="Μείωση"
+                              >
                                 <Icon.Minus size={12} />
                               </button>
                               <span className="qty-val">{item.quantity}</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useShoppingListStore } from "@/lib/store";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -9,6 +9,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { Footer } from "@/components/Footer";
+import { track } from "@/lib/track";
 
 // Starting points for the empty search screen — the staples a Greek
 // household actually hunts for, in the words shoppers type (no brands).
@@ -23,6 +24,15 @@ export function SearchPage({ query, deals, catalogProducts = [] }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { items: cart, addItem } = useShoppingListStore();
+
+  // One `search` per query shown, with what the shopper got back. Zero-result
+  // queries are the catalogue-gap list; low-result ones are matcher misses.
+  const resultCount = deals.length + catalogProducts.length;
+  useEffect(() => {
+    if (!query) return;
+    track({ eventType: 'search', page: 'search', query: query.slice(0, 200), resultCount });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

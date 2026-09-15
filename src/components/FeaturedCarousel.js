@@ -7,7 +7,7 @@ import { Icon } from './Icons';
 import { useShoppingListStore } from '@/lib/store';
 import { groupDealsByProduct } from '@/lib/group-deals';
 
-export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHref, rows = 1 }) {
+export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHref, rows = 1, list }) {
   const cartItems = useShoppingListStore((s) => s.items);
   const cartIds = useMemo(() => new Set(cartItems.map((i) => i.id)), [cartItems]);
   const grouped = useMemo(() => groupDealsByProduct(deals), [deals]);
@@ -78,8 +78,8 @@ export function FeaturedCarousel({ title, sub, deals, onAdd, onSelect, viewAllHr
         onScroll={(e) => measure(e.currentTarget)}
         className={rows === 2 ? 'featured-scroll two-row' : 'featured-scroll'}
       >
-        {grouped.map((d) => (
-          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} />
+        {grouped.map((d, i) => (
+          <DiscountCard key={d.id} d={d} onAdd={onAdd} onSelect={onSelect} inCart={cartIds.has(d.id)} list={list} position={i} />
         ))}
       </div>
     </section>

@@ -196,6 +196,12 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
             className={`od-fav${isFavorite ? ' active' : ''}`}
             onClick={() => {
               if (!isFavorite) recordInterest({ category, productName: displayName }, WEIGHT.favorite);
+              track({
+                eventType: isFavorite ? 'unfavorite' : 'favorite',
+                supermarket: supermarketId,
+                discountId: offer.id,
+                category,
+              });
               toggleFavorite(offer);
             }}
             aria-pressed={isFavorite}
