@@ -1,0 +1,16 @@
+# Line endings (2026-09-16). The index already stores every text file with LF;
+# this stops Windows checkouts converting to CRLF and the LF->CRLF warnings on
+# every git command. PowerShell scripts run by Task Scheduler on the owner's
+# laptop keep CRLF, the Windows-native form.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+
+# Binary assets: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
