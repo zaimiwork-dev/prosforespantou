@@ -50,7 +50,9 @@ export function ProductSheet({ product, onClose, onAdd }) {
 }
 
 function ProductSheetInner({ product, onClose, onAdd }) {
-  const [comparison, setComparison] = useState([]);
+  // null while loading — PriceComparison renders nothing until the fetch
+  // lands, then either rows or an honest "not found elsewhere" line.
+  const [comparison, setComparison] = useState(null);
   const [history, setHistory] = useState(null);
   const [similar, setSimilar] = useState([]);
 

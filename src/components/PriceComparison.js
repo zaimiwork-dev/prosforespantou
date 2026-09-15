@@ -12,7 +12,23 @@ import { formatShortDate } from '@/lib/expiry-label';
 // goes to the absolute cheapest row, shelf or offer — "where do I pay least"
 // stays honest; the tag disambiguates when a plain shelf price beats the deal.
 export function PriceComparison({ offer, comparison, compact = false }) {
-  if (!comparison || comparison.length === 0) return null;
+  // null = still loading (sheet); [] = loaded and genuinely nothing to show.
+  if (comparison === null || comparison === undefined) return null;
+  if (comparison.length === 0) {
+    // 2026-09-15: ~70% of offers have no comparison and the section used to
+    // vanish silently — the product's headline promise looked broken. Say
+    // what happened instead. Kept short; it is a fact, not an apology.
+    return (
+      <section style={{ marginTop: compact ? 18 : 28 }}>
+        <div className="pc-head">
+          <h2>Σύγκριση τιμής</h2>
+        </div>
+        <p className="pc-empty">
+          Δεν βρήκαμε αυτό το προϊόν σε άλλο κατάστημα αυτή την εβδομάδα.
+        </p>
+      </section>
+    );
+  }
 
   const sm = SUPERMARKETS.find((s) => s.id === offer.supermarket)
     || { name: offer.store?.name || '', color: 'var(--ink-2)' };
