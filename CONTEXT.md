@@ -32,7 +32,16 @@ Living snapshot of what the project is, how data flows, and where things live. R
 | 5 | `673d3c5` | **Search tab** opened on «Δεν βρέθηκαν προϊόντα για ""». Now 12 large tappable staples | `/search` with no query |
 | 6 | `30c2d7d` | `withDbRetry` now retries the pooler errors that actually killed 5 jobs on 09-09 (`EAUTHQUERY`, `auth_query`, `statement timeout`); watch-alerts skip when `RESEND_API_KEY` is absent instead of burning cooldowns on unsent mail | — |
 | 7 | (this commit) | **Sentry was dead**: `sentry.*.config.js` existed but nothing imported them (Next 15+/Sentry v8+ need `src/instrumentation.ts` + `src/instrumentation-client.ts`). Added. Every `captureException` in `src/actions` and the watchdog had been a no-op | Owner: confirm `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` exist in Vercel env; throw a test error |
-| 8 | (this commit) | `.env.example` documents the 8 env vars CI actually uses (`PROXY_URL`, `R2_*`, `SUPABASE_*`); the dead "Llama-4 Scout / scrape-lidl" note on `GROQ_API_KEY` is gone | — |
+| 8 | `878ec50` | `.env.example` documents the 8 env vars CI actually uses (`PROXY_URL`, `R2_*`, `SUPABASE_*`); the dead "Llama-4 Scout / scrape-lidl" note on `GROQ_API_KEY` is gone | — |
+| 9 | `b8083bd` | **Resolver phantom path closed** — claim at any source; on a miss cache the match and write nothing (the legacy path created offers with invented dates) | Masoutis smoke `34987171929`: 4 live rows, 0 errors |
+| 10 | `c7e33d6` | **W1d — shelf rows gated on feed freshness** (`lib/feed-freshness.ts`), not snapshot age. «Κανονική τιμή · ελέγχθηκε DD/MM» | Offers with a shelf row **83 → 1,898**; offers with any comparison **4,287 → 4,976** (recompute ran live) |
+| 11 | `2406c68` | **Homepage is cacheable** (ISR 5 min): the per-request cookie read moved to the hidden admin trigger | `npm run build` shows `○ /` with revalidate 5m; cold TTFB was 5.7 s |
+| 12 | `5754dbe` | **W2b+2c cards**: size on its own line, €/κιλό-€/λίτρο under the price, source tag only when web+leaflet both, 44 px add button, bigger type | `/deals` at 390px |
+| 13 | `555b569` | **W3a ranking**: department prior, %/mechanics halved on non-staples and capped, «χωρίς ζάχαρη» no longer a sugar staple, one item per brand in the top rail | Homepage top rail = milk, detergent, diapers, olive oil, cheese, coffee (recompute ran live) |
+
+**Measured and dropped from the plan:** the pg_trgm search index. The raw SQL filter scan runs in **81 ms** for a term; the 0.8–1.7 s search latency is the 12-term expansion + second fetch + serverless, not the scan. Not worth DDL now.
+
+**In flight (Opus subagent, supervised, 2026-09-15 evening):** W1c matchedVia re-verify in `matchItem` + `ingestCatalog` stamping + Kritikos canonical through `ingestCatalog` + offline `backfill-matched-via.mjs`; W1e catalog feeds in `EXPECTED_FEEDS` + `ingestCatalog` volume guard; a `ci.yml` (test + lint + build on push). Review before commit.
 
 ### What is actually wrong — ranked by what a shopper feels (the audit)
 
@@ -58,17 +67,17 @@ Living snapshot of what the project is, how data flows, and where things live. R
 
 ### The plan — five workstreams, in order; each step ships on its own
 
-**W1 — Unstick the machine** (mostly done today; remaining ≈ 1.5 days)
+**W1 — Unstick the machine** (1a, 1b, 1d DONE 09-15; 1c/1e in flight)
 - 1c `matchedVia` backfill, offline, no LLM: mapping whose Product has a barcode AND whose chain item carried a GTIN at ingest (kritikos `barcodes[]`, bazaar filename, Wolt-enriched) → `'barcode'`; Product created from that chain's own catalog SKU → `'catalog'`; rest stay null. Then re-run `audit-comparison-truth.mjs` so T6 has numbers.
 - 1d Shelf rows: replace the 14-day snapshot-age gate with **feed freshness** — latest `IngestRun` for `(chain,'catalog')` healthy within 10 days ⇒ that chain's latest `normal` snapshot is current. Touch `lib/shelf-comparison.ts`, `actions/get-price-comparison.ts`, `lib/comparison-count.ts` (lockstep!), then `recompute-comparison-counts.mjs`. Keep barcode-backed-only for now. Expected 83 → ~2,000 rows.
 - 1e Watchdog: add the catalog feeds to `EXPECTED_FEEDS` (weekly windows; `evaluateVolume` already exists → a 29-item run alarms). Route `kritikos-canonical-scraper.mjs` through `ingestCatalog`. Give the laptop task the R2 env (`scripts/windows/run-sklavenitis.ps1`). Add a `ci.yml` that runs `test:run` + `lint` + `build` on push.
 
-**W2 — Honest savings on every card** (≈ 2 days)
+**W2 — Honest savings on every card** (2b, 2c DONE 09-15; 2a waits on owner decision #2 — build the data side regardless)
 - 2a For ΜΟΝΟ offers with a same-chain `normal` snapshot under the 1d freshness rule: persist `Discount.baselinePrice` + `baselineAt` in `recompute-price-verdicts.mjs` (already keyed by product+chain) and render **"−X% · κανονικά ~Y€"** on the card in a visibly different style from a chain-published strikethrough (it is *our* inference, never the chain's claim). ⚠️ Owner check on wording — the June call declined a literal «κανονική τιμή» line on the detail view; this is a different element with a different claim.
 - 2b Unit price (€/kg, €/L) under the price: `Product.unitInfo` covers 43%; `lib/pack-info.ts` parses the rest from the name.
 - 2c Card: drop the source tag unless a product has both web+leaflet rows (`group-deals.js` already attaches `sources`); price larger; pack size on its own line instead of truncated inside the name; add button ≥44 px; pills ≥12 px.
 
-**W3 — A feed that looks like a Greek shopper's week** (≈ 4 days)
+**W3 — A feed that looks like a Greek shopper's week** (3a DONE 09-15 minus the "cheapest across chains" boost, which needs the 2a recompute; 3b/3c/3d open)
 - 3a `computeHotScore`: add a **department prior** (γαλακτοκομικά/λάδι/καφές/ζυμαρικά/απορρυπαντικά/χαρτικά/βρεφικά high; cosmetics/gum/impulse low), scale % and mechanic boosts by KVI-ness, add a strong boost for "cheapest of all chains today" (`comparisonCount>0` and this row is the min), and collapse **product families** (brand + type + pack) in the top rail, not just exact duplicates. Keep it a pure function (imported by `.mjs`).
 - 3b Homepage: first rail = **«Τα βασικά της εβδομάδας»** (the KVI staples, cheapest-per-item across chains, one card each); then favorites/για σένα; category grid cut to 8 big tiles + «Περισσότερα»; chains as one horizontal strip; newsletter out of the first scroll; larger base type; a **text-size toggle** wired to the existing density CSS; `alert()`/`confirm()` → inline confirmations.
 - 3c **Consent redesign (owner decision #1).** Vercel analytics is already consent-free on the "no storage on the device, aggregate only" basis. Make the first-party tracker consent-free *by construction*: no persistent identifier (session id in `sessionStorage`, dies with the tab), no user-agent storage, events limited to ranking/personalization aggregates, documented on `/cookies`. Then the banner becomes a one-line notice. Code it behind one env flag so it reverts in a minute if the owner's counsel disagrees.
