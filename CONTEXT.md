@@ -43,6 +43,8 @@ Living snapshot of what the project is, how data flows, and where things live. R
 | 15 | `70459cb` | **Comparison empty state**: «Δεν βρήκαμε αυτό το προϊόν σε άλλο κατάστημα αυτή την εβδομάδα» instead of a vanishing section | open any offer with no chip |
 | 16 | — | **Found while reviewing:** the "29-item Sklavenitis catalog runs" every Sunday since July were the **Wolt enrichment job filing itself under `source='catalog'`** (its GTIN-backed count, 29–34). Fixed at the source by T11 P1 (`sourceLabel='wolt'`); the historical rows are still mislabelled (the inline SQL relabel was blocked by the auto-mode classifier — owner can run: `UPDATE ingest_runs SET source='wolt' WHERE chain='sklavenitis' AND source='catalog' AND scraped_items < 100;`). The guard and the freshness gate use the half-of-peak rule so they are immune either way | — |
 
+| 17 | `2609081` | **«Μεγάλα γράμματα»** switch in «Οι προτιμήσεις μου»: scales the whole UI ×1.18 (text, images, 44 px targets), applied instantly and before first paint on return | ⚙️ → Μέγεθος γραμμάτων → Μεγάλα |
+
 **Measured and dropped from the plan:** the pg_trgm search index. The raw SQL filter scan runs in **81 ms** for a term; the 0.8–1.7 s search latency is the 12-term expansion + second fetch + serverless, not the scan. Not worth DDL now.
 
 **In flight (Opus subagent, supervised, 2026-09-15 evening):** W1c matchedVia re-verify in `matchItem` + `ingestCatalog` stamping + Kritikos canonical through `ingestCatalog` + offline `backfill-matched-via.mjs`; W1e catalog feeds in `EXPECTED_FEEDS` + `ingestCatalog` volume guard; a `ci.yml` (test + lint + build on push). Review before commit.
