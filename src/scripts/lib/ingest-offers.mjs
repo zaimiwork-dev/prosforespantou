@@ -86,7 +86,43 @@ async function matchItem(prisma, item, chain, dryRun) {
     const mapping = await prisma.chainProductMapping.findUnique({
       where: { supermarket_chainItemcode: { supermarket: chain, chainItemcode: String(item.chainItemcode) } },
     });
-    if (mapping) return { productId: mapping.productId, via: 'mapping' };
+    if (mapping) {
+      // A step-1 hit used to return immediately and never re-verify, so
+      // `matchedVia` was stamped ONLY on the run that first created the
+      // mapping — leaving it NULL on ~98% of rows (measured 2026-09-15) even
+      // for chains whose items carry a GTIN on every run. Provenance is what
+      // decides whether a comparison is provable, so re-check here whenever the
+      // item carries a barcode and the mapping isn't already barcode-proven.
+      // Cost: ONE extra product lookup per still-unstamped item, which drops to
+      // zero as the stamps land (`matchedVia === 'barcode'` short-circuits).
+      const itemBarcode = normalizeBarcode(item.barcode);
+      if (itemBarcode && mapping.matchedVia !== 'barcode') {
+        const byBarcode = await prisma.product.findUnique({
+          where: { barcode: itemBarcode },
+          select: { id: true },
+        });
+        if (byBarcode && byBarcode.id === mapping.productId) {
+          // Same product, now proven. Stamp it.
+          if (!dryRun) {
+            await prisma.chainProductMapping.update({
+              where: { id: mapping.id },
+              data: { matchedVia: 'barcode', verifiedAt: new Date() },
+            });
+          }
+          return { productId: mapping.productId, via: 'mapping', restamped: true };
+        }
+        if (byBarcode) {
+          // The chain's own GTIN points at a DIFFERENT product than the stored
+          // mapping. A barcode is proof and may overwrite anything (the
+          // never-downgrade rule only forbids the reverse), so rebind — this is
+          // exactly the stale name-match the provenance work exists to correct.
+          await bind(byBarcode.id, 'barcode');
+          return { productId: byBarcode.id, via: 'mapping', rebound: true };
+        }
+        // Barcode unknown to the catalog → nothing proven, leave the mapping.
+      }
+      return { productId: mapping.productId, via: 'mapping' };
+    }
   }
 
   // 2. Barcode → canonical Product. Record a mapping so step 1 hits next time.
@@ -503,6 +539,10 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
   const report = {
     chain, source, scrapedItems: items.length,
     matched: 0, viaMapping: 0, viaBarcode: 0, viaCache: 0,
+    // Provenance repair on existing mappings (see matchItem step 1):
+    //   restamped — same product, matchedVia NULL/weaker → stamped 'barcode'
+    //   rebound   — the item's GTIN proved a DIFFERENT product; mapping moved
+    restamped: 0, rebound: 0,
     reviewQueued: 0, unmatchedShown: 0, priceChanges: 0, errors: 0, deactivated: 0,
     healthOk: true, warnings: [...extraWarnings],
   };
@@ -565,7 +605,9 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
       // still run matching so the report is meaningful
       for (const item of items) {
         try {
-          const { via } = await matchItem(prisma, item, chain, true);
+          const { via, restamped, rebound } = await matchItem(prisma, item, chain, true);
+          if (restamped) report.restamped++;
+          if (rebound) report.rebound++;
           if (via === 'none') report.reviewQueued++;
           else { report.matched++; report[`via${via[0].toUpperCase()}${via.slice(1)}`]++; }
         } catch { report.errors++; }
@@ -580,9 +622,11 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     for (const item of items) {
       idx++;
       try {
-        const { productId, via } = await withDbRetry(`match ${item.name}`, () =>
+        const { productId, via, restamped, rebound } = await withDbRetry(`match ${item.name}`, () =>
           matchItem(prisma, item, chain, false)
         );
+        if (restamped) report.restamped++;
+        if (rebound) report.rebound++;
         if (!productId) {
           await prisma.pendingMatch.upsert({
             where: { rawName_supermarket: { rawName: item.name, supermarket: chain } },
@@ -694,6 +738,7 @@ export function printReport(report) {
   console.log(`\n📊 Ingest report — ${report.chain} / ${report.source}`);
   console.log(`   scraped items:    ${report.scrapedItems}`);
   console.log(`   matched:          ${report.matched}  (mapping=${report.viaMapping} barcode=${report.viaBarcode} cache=${report.viaCache})`);
+  console.log(`   provenance:       ${report.restamped ?? 0} stamped 'barcode', ${report.rebound ?? 0} rebound by GTIN`);
   console.log(`   → Review Queue:   ${report.reviewQueued}  (shown unmatched: ${report.unmatchedShown})`);
   console.log(`   price changes:    ${report.priceChanges}`);
   console.log(`   deactivated:      ${report.deactivated}`);

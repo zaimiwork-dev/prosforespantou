@@ -7,11 +7,13 @@ import {
   median,
   EXPECTED_FEEDS,
   VOLUME_MIN_REFERENCE,
+  CATALOG_VOLUME_MIN_SAMPLES,
   type FeedSpec,
 } from './pipeline-health';
 
 const daily: FeedSpec = { chain: 'masoutis', source: 'web', maxAgeHours: 36, schedule: 'test' };
 const weekly: FeedSpec = { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'test' };
+const catalog: FeedSpec = { chain: 'sklavenitis', source: 'catalog', maxAgeHours: 9 * 24, schedule: 'test' };
 
 const now = new Date('2026-06-10T12:00:00Z');
 const hoursAgo = (h: number) => new Date(now.getTime() - h * 3600_000);
@@ -52,6 +54,26 @@ describe('evaluateFeed', () => {
     expect(evaluateFeed(weekly, run, run, now)).toBe('ok');
     expect(evaluateFeed(daily, run, run, now)).toBe('stale');
   });
+
+  it('accepts a catalog feed that ran last Sunday', () => {
+    // Sunday-to-Sunday is 7 days; the 9-day window tolerates a late run.
+    const run = { finishedAt: hoursAgo(7 * 24), healthOk: true };
+    expect(evaluateFeed(catalog, run, run, now)).toBe('ok');
+  });
+
+  it('flags a catalog feed that missed two Sundays', () => {
+    // The Sklavenitis shape: the laptop task stops firing and nobody notices
+    // because no Discount row changes when a catalog walk goes missing.
+    const run = { finishedAt: hoursAgo(10 * 24), healthOk: true };
+    expect(evaluateFeed(catalog, run, run, now)).toBe('stale');
+    expect(isAlarming(evaluateFeed(catalog, run, run, now))).toBe(true);
+  });
+
+  it('reads a catalog feed that never recorded a run as "never"', () => {
+    // kritikos/catalog until the canonical scraper is routed through
+    // ingestCatalog: no IngestRun has ever existed for that pair.
+    expect(evaluateFeed({ ...catalog, chain: 'kritikos' }, null, null, now)).toBe('never');
+  });
 });
 
 describe('isAlarming', () => {
@@ -80,6 +102,41 @@ describe('EXPECTED_FEEDS', () => {
       'mymarket',
       'sklavenitis',
     ]));
+  });
+
+  it('watches a shelf-price feed for every chain that has one', () => {
+    // Shelf prices are what «κανονικά ~Y€» is built on, so a silently dead
+    // catalog walk is a product bug, not just an ops one. Kritikos' shelf
+    // series comes from its nightly offers run (BASELINE=1), not a Sunday
+    // catalog job, so it qualifies through 'baseline'.
+    const shelfFeeds = new Set(
+      EXPECTED_FEEDS.filter((f) => f.source === 'catalog' || f.source === 'baseline').map((f) => f.chain)
+    );
+    expect(shelfFeeds).toEqual(new Set([
+      'ab',
+      'bazaar',
+      'kritikos',
+      'lidl',
+      'masoutis',
+      'mymarket',
+      'sklavenitis',
+    ]));
+  });
+
+  it('gives every weekly feed a window longer than a week', () => {
+    // A 7-day window on a 7-day cadence alarms on any run that slips by an
+    // hour. Everything that runs on Sundays must sit above 168h.
+    const weeklySources = new Set(['catalog', 'wolt', 'leaflet']);
+    for (const feed of EXPECTED_FEEDS.filter((f) => weeklySources.has(f.source))) {
+      expect(feed.maxAgeHours).toBeGreaterThan(7 * 24);
+    }
+  });
+
+  it('describes where every feed runs, in Greek, with a cadence', () => {
+    for (const feed of EXPECTED_FEEDS) {
+      expect(feed.schedule.length).toBeGreaterThan(10);
+      expect(feed.maxAgeHours).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -132,6 +189,32 @@ describe('evaluateVolume', () => {
   it('uses the median, so one unusually big run does not condemn normal ones', () => {
     // A single 3,000-item week must not make 300 look like a collapse.
     expect(evaluateVolume(300, [3000, 300, 310, 295])).toBe('ok');
+  });
+
+  it('flags the 29-item catalog run that was recorded healthy on 2026-09-13', () => {
+    // Sklavenitis' catalog task was killed mid-walk (exit 0xC000013A); the run
+    // wrote 29 rows, recorded health_ok=true, and nothing alarmed. Against the
+    // chain's ~7.5k norm this is the signal that was missing.
+    expect(evaluateVolume(29, [7475, 7390, 7501, 7402])).toBe('collapsed');
+  });
+
+  it('accepts a full catalog walk that merely wobbles week to week', () => {
+    expect(evaluateVolume(7301, [7475, 7390, 7501, 7402])).toBe('ok');
+  });
+
+  it('lets the ingest-time catalog guard judge on a single prior run', () => {
+    // The watchdog needs 3 samples before it will speak; the ingest guard is
+    // deciding about a run it is about to write and only needs one full-size
+    // predecessor to know 29 is not a catalog.
+    expect(evaluateVolume(29, [7475])).toBe('unknown');
+    expect(evaluateVolume(29, [7475], CATALOG_VOLUME_MIN_SAMPLES)).toBe('collapsed');
+    expect(evaluateVolume(7400, [7475], CATALOG_VOLUME_MIN_SAMPLES)).toBe('ok');
+  });
+
+  it('stays quiet on the very first catalog run of a chain', () => {
+    // No history at all → nothing to compare against; a first run must not be
+    // recorded unhealthy just for being first.
+    expect(evaluateVolume(7475, [], CATALOG_VOLUME_MIN_SAMPLES)).toBe('unknown');
   });
 
   it('does not flag a weekly feed whose offers merely expired between runs', () => {

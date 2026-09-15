@@ -17,7 +17,7 @@ $settings = New-ScheduledTaskSettingsSet `
   -WakeToRun `
   -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
   -RestartCount 2 -RestartInterval (New-TimeSpan -Minutes 15) `
-  -ExecutionTimeLimit (New-TimeSpan -Hours 3)
+  -ExecutionTimeLimit (New-TimeSpan -Hours 6)
 
 $defs = @(
   @{ Name = 'Sklavenitis Offers';  Args = '-Job offers';  Trigger = (New-ScheduledTaskTrigger -Daily -At 02:30) },
