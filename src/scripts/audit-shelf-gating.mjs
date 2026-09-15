@@ -32,6 +32,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 import { pickShelfRows, SHELF_PRICE_MAX_AGE_DAYS } from '../lib/shelf-comparison.ts';
+import { loadFreshShelfChains } from '../lib/feed-freshness.ts';
 import { withPublicDealVisibility } from '../lib/public-deal-filters.ts';
 
 const { default: prisma } = await import('../lib/prisma.ts');
@@ -91,7 +92,11 @@ for (let i = 0; i < productIds.length; i += 500) {
     snapsByProduct.get(s.productId).push(s);
   }
 }
-console.log(`products with a recent shelf snapshot: ${snapsByProduct.size}\n`);
+console.log(`products with a recent shelf snapshot: ${snapsByProduct.size}`);
+
+// 2026-09-15: the gate is feed freshness, not snapshot age (lib/feed-freshness).
+const freshChains = await loadFreshShelfChains(prisma, now);
+console.log(`fresh shelf feeds: ${[...freshChains.keys()].sort().join(', ') || '(none)'}\n`);
 
 let today = 0, strict = 0, hedgedProven = 0, hedgedUnproven = 0;
 let offersWithShelfToday = 0, offersWithShelfStrict = 0;
@@ -106,7 +111,7 @@ for (const o of offers) {
   const excluded = new Set(chainsWithOffer.get(o.productId) ?? []);
   if (o.supermarket) excluded.add(o.supermarket);
 
-  const rows = pickShelfRows({ snapshots: snaps, excludedChains: excluded, now });
+  const rows = pickShelfRows({ snapshots: snaps, excludedChains: excluded, freshChains, now });
   if (rows.length === 0) continue;
 
   today += rows.length;

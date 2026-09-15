@@ -3,6 +3,12 @@ import { comparisonChainCount } from './comparison-count';
 
 const NOW = new Date('2026-07-08T12:00:00Z');
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86400000);
+// Chains whose catalog feed is alive (lib/feed-freshness). lidl deliberately
+// absent in most cases: a dead feed renders no shelf row.
+const FRESH = new Map([
+  ['ab', daysAgo(1).toISOString()],
+  ['kritikos', daysAgo(1).toISOString()],
+]);
 
 const source = { productName: 'ΗΒΗ Πορτοκαλάδα με ανθρακικό 1,5lt', supermarket: 'masoutis' };
 
@@ -37,7 +43,7 @@ describe('comparisonChainCount', () => {
     expect(n).toBe(0);
   });
 
-  it('adds barcode-gated shelf chains, latest-per-chain and recency-gated', () => {
+  it('adds barcode-gated shelf chains, latest-per-chain and feed-freshness-gated', () => {
     const n = comparisonChainCount({
       source,
       clusterOffers: [],
@@ -45,11 +51,35 @@ describe('comparisonChainCount', () => {
       snapshots: [
         { supermarket: 'ab', price: 1.85, recordedAt: daysAgo(2) },
         { supermarket: 'ab', price: 1.79, recordedAt: daysAgo(5) }, // older dup, same chain
-        { supermarket: 'lidl', price: 1.6, recordedAt: daysAgo(20) }, // stale → out
+        { supermarket: 'lidl', price: 1.6, recordedAt: daysAgo(1) }, // feed not fresh → out
       ],
+      freshChains: FRESH,
       now: NOW,
     });
     expect(n).toBe(1);
+  });
+
+  it('an old snapshot from a fresh feed still counts (stable prices have no recent row)', () => {
+    const n = comparisonChainCount({
+      source,
+      clusterOffers: [],
+      barcodeBacked: true,
+      snapshots: [{ supermarket: 'ab', price: 1.85, recordedAt: daysAgo(40) }],
+      freshChains: FRESH,
+      now: NOW,
+    });
+    expect(n).toBe(1);
+  });
+
+  it('without a fresh-chains map no shelf chain counts (fail closed)', () => {
+    const n = comparisonChainCount({
+      source,
+      clusterOffers: [],
+      barcodeBacked: true,
+      snapshots: [{ supermarket: 'ab', price: 1.85, recordedAt: daysAgo(2) }],
+      now: NOW,
+    });
+    expect(n).toBe(0);
   });
 
   it('ignores snapshots entirely without a barcode', () => {
@@ -58,6 +88,7 @@ describe('comparisonChainCount', () => {
       clusterOffers: [],
       barcodeBacked: false,
       snapshots: [{ supermarket: 'ab', price: 1.85, recordedAt: daysAgo(2) }],
+      freshChains: FRESH,
       now: NOW,
     });
     expect(n).toBe(0);
@@ -76,6 +107,7 @@ describe('comparisonChainCount', () => {
         { supermarket: 'ab', price: 2.1, recordedAt: daysAgo(1) },
         { supermarket: 'kritikos', price: 2.3, recordedAt: daysAgo(1) },
       ],
+      freshChains: FRESH,
       now: NOW,
     });
     expect(n).toBe(1); // kritikos only
@@ -90,6 +122,7 @@ describe('comparisonChainCount', () => {
         { supermarket: 'ab', price: 1.9, recordedAt: daysAgo(1) }, // excluded (has offer)
         { supermarket: 'kritikos', price: 1.95, recordedAt: daysAgo(1) },
       ],
+      freshChains: FRESH,
       now: NOW,
     });
     expect(n).toBe(2); // ab (offer) + kritikos (shelf)

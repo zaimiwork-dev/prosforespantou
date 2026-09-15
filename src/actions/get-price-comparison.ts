@@ -6,6 +6,7 @@ import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 import { pickShelfRows, SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
+import { loadFreshShelfChains } from '@/lib/feed-freshness';
 
 export async function getPriceComparison(discountId: string) {
   return await Sentry.withServerActionInstrumentation(
@@ -92,19 +93,25 @@ export async function getPriceComparison(discountId: string) {
         if (source.supermarket) excludedChains.add(source.supermarket);
         for (const d of others) if (d.supermarket) excludedChains.add(d.supermarket);
 
-        const snapshots = await prisma.priceSnapshot.findMany({
-          where: {
-            productId: { in: [...matchedProductIds] },
-            kind: 'normal',
-            recordedAt: { gte: new Date(now.getTime() - SHELF_PRICE_MAX_AGE_DAYS * 86400000) },
-            supermarket: { notIn: [...excludedChains] },
-          },
-          orderBy: { recordedAt: 'desc' },
-          take: 100,
-          select: { supermarket: true, price: true, recordedAt: true },
-        });
+        // Gate = the chain's catalog feed is alive (lib/feed-freshness), NOT
+        // snapshot age — shelf snapshots are written only on price change, so
+        // a stable price has no recent row. SHELF_PRICE_MAX_AGE_DAYS is only
+        // a sanity cap here. No `take`: on-change snapshots are few per chain.
+        const [freshChains, snapshots] = await Promise.all([
+          loadFreshShelfChains(prisma, now),
+          prisma.priceSnapshot.findMany({
+            where: {
+              productId: { in: [...matchedProductIds] },
+              kind: 'normal',
+              recordedAt: { gte: new Date(now.getTime() - SHELF_PRICE_MAX_AGE_DAYS * 86400000) },
+              supermarket: { notIn: [...excludedChains] },
+            },
+            orderBy: { recordedAt: 'desc' },
+            select: { supermarket: true, price: true, recordedAt: true },
+          }),
+        ]);
 
-        const shelfRows = pickShelfRows({ snapshots, excludedChains, now });
+        const shelfRows = pickShelfRows({ snapshots, excludedChains, freshChains, now });
         return [...offerRows, ...shelfRows];
       } catch (error) {
         Sentry.captureException(error);

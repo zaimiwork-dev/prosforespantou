@@ -14,6 +14,7 @@
 import { samePack } from './packaging.ts';
 import { filterComparable } from './offer-similarity.ts';
 import { pickShelfRows, type ShelfSnapshotInput } from './shelf-comparison.ts';
+import type { FreshChains } from './feed-freshness.ts';
 
 export type ComparisonCandidate = {
   productName: string;
@@ -25,6 +26,7 @@ export function comparisonChainCount({
   clusterOffers,
   barcodeBacked = false,
   snapshots = [],
+  freshChains = new Map(),
   now = new Date(),
 }: {
   source: ComparisonCandidate;
@@ -32,9 +34,12 @@ export function comparisonChainCount({
   // EXCLUDING the source row itself (caller applies visibility + activity).
   clusterOffers: ComparisonCandidate[];
   barcodeBacked?: boolean;
-  // kind='normal' snapshots for the cluster's productIds (recency + chain
-  // exclusions are enforced here via pickShelfRows).
+  // kind='normal' snapshots for the cluster's productIds (feed freshness +
+  // chain exclusions are enforced here via pickShelfRows).
   snapshots?: ShelfSnapshotInput[];
+  // Chains whose catalog feed is alive (lib/feed-freshness). Must be the same
+  // map the action loads, or the chip and the sheet disagree.
+  freshChains?: FreshChains;
   now?: Date;
 }): number {
   const chains = new Set<string>();
@@ -60,7 +65,7 @@ export function comparisonChainCount({
     const excludedChains = new Set<string>();
     if (source.supermarket) excludedChains.add(source.supermarket);
     for (const d of clusterOffers) if (d.supermarket) excludedChains.add(d.supermarket);
-    for (const row of pickShelfRows({ snapshots, excludedChains, now })) {
+    for (const row of pickShelfRows({ snapshots, excludedChains, freshChains, now })) {
       chains.add(row.supermarket);
     }
   }

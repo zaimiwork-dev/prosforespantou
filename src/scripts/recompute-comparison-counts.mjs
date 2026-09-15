@@ -23,6 +23,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 import { comparisonChainCount } from '../lib/comparison-count.ts';
 import { SHELF_PRICE_MAX_AGE_DAYS } from '../lib/shelf-comparison.ts';
+import { loadFreshShelfChains } from '../lib/feed-freshness.ts';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 
@@ -67,7 +68,12 @@ async function run() {
     byPid.set(d.productId, arr);
   }
 
-  // Normal-shelf snapshots (14d window) for every barcode-backed cluster.
+  // Which chains' shelf prices are current = whose catalog feed is alive
+  // (lib/feed-freshness). Same loader the action uses — lockstep.
+  const freshChains = await loadFreshShelfChains(prisma, now);
+  console.log(`   fresh shelf feeds: ${[...freshChains.keys()].sort().join(', ') || '(none)'}`);
+
+  // Normal-shelf snapshots (sanity-capped window) for every barcode-backed cluster.
   const shelfPids = [...new Set(
     active.filter((d) => d.productId && d.product?.barcode).map((d) => d.productId)
   )];
@@ -100,6 +106,7 @@ async function run() {
         clusterOffers,
         barcodeBacked: Boolean(d.product?.barcode),
         snapshots: snapsByPid.get(d.productId) || [],
+        freshChains,
         now,
       });
     }

@@ -23,7 +23,10 @@ export function PriceComparison({ offer, comparison, compact = false }) {
       const chain = SUPERMARKETS.find((s) => s.id === c.supermarket)
         || { name: c.store?.name || c.supermarket || '', color: '#888' };
       return c.rowType === 'shelf'
-        ? { id: c.id, price: Number(c.price), sm: chain, isCurrent: false, isShelf: true, asOf: c.recordedAt }
+        // checkedAt = when the chain's catalog feed last confirmed this
+        // price is still on the shelf (feed freshness), not when it last
+        // moved — the honest "as of" for a stable price.
+        ? { id: c.id, price: Number(c.price), sm: chain, isCurrent: false, isShelf: true, asOf: c.checkedAt || c.recordedAt }
         : { id: c.id, price: Number(c.discountedPrice), sm: chain, isCurrent: false, isShelf: false };
     }),
   ].sort((a, b) => a.price - b.price);
@@ -51,7 +54,7 @@ export function PriceComparison({ offer, comparison, compact = false }) {
                 {row.isCurrent && <span className="pc-current">Βλέπεις τώρα</span>}
                 {row.isShelf && (
                   <span className="pc-normal">
-                    Κανονική τιμή{row.asOf ? ` · ${formatShortDate(row.asOf)}` : ''}
+                    Κανονική τιμή{row.asOf ? ` · ελέγχθηκε ${formatShortDate(row.asOf)}` : ''}
                   </span>
                 )}
                 {!isCheapest && diff > 0 && <span className="pc-diff">+{diff.toFixed(2)}€</span>}
