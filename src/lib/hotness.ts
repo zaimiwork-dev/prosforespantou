@@ -37,6 +37,9 @@ export type HotInput = {
   // it hundreds of no-click rows share one score and the list collapses into
   // same-chain blocks ordered by expiry.
   jitterKey?: string | null;
+  // Discount.isCheapestInCluster (recompute-comparison-counts, nightly): no
+  // other chain shows this product cheaper on the comparison sheet.
+  cheapestInCluster?: boolean | null;
 };
 
 // Per-click immediate bump applied in track-event.ts (cheap, no recompute).
@@ -165,6 +168,15 @@ function popularityBoost(clicks: number, listAdds: number): number {
   return Math.log2(1 + c) * 7 + Math.log2(1 + a) * 10;
 }
 
+// «Cheapest of the stores that sell it» (W3a, 2026-09-16): no row on the
+// offer's comparison sheet is cheaper. Sized on the verdict scale (good +4,
+// lowest +8). Measured before choosing: the top of the ranking is a band a few
+// points wide, so +5 already put 27 flagged rows in the top 30 and +6/+8/+10
+// all put 30; +6 turned the approximated 20-slot homepage rail into verified
+// cheapest staples (olive oil, pasta, diapers, detergent, coffee) across five
+// chains, instead of uncompared rows. The plan's +10 bought nothing more.
+export const CHEAPEST_BOOST = 6;
+
 // Honest deal quality: surface what's genuinely cheap, demote offers priced
 // above their own 90-day history. Mirrors lib/price-verdict.ts levels.
 const VERDICT_BOOST: Record<string, number> = {
@@ -199,6 +211,7 @@ export function computeHotScore(input: HotInput): number {
     pct * 0.2 * scale +
     popularityBoost(input.clicks ?? 0, input.listAdds ?? 0) +
     (VERDICT_BOOST[input.priceVerdict ?? ''] ?? 0) +
+    (input.cheapestInCluster ? CHEAPEST_BOOST : 0) +
     recencyBoost(input.createdAt) +
     (input.jitterKey ? stableJitter(input.jitterKey) : 0);
 

@@ -490,6 +490,17 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Recompute comparison counts (card «Τιμές σε N καταστήματα» chips)
+        # After the resolvers so counts reflect the productIds they just
+        # linked, and BEFORE hotScore, which folds in the «cheapest in
+        # cluster» flag this step writes. Precompute twin of
+        # get-price-comparison — see src/lib/comparison-count.ts.
+        id: rc_compare
+        continue-on-error: true
+        run: node src/scripts/recompute-comparison-counts.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
       - name: Recompute hotScore (default-sort ranking)
         # Runs last so scores reflect every Discount the resolvers just wrote,
         # fresh price verdicts, the day's recent-window clicks/list-adds, and
@@ -498,16 +509,6 @@ jobs:
         id: rc_hotness
         continue-on-error: true
         run: node src/scripts/recompute-hotness.mjs
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      - name: Recompute comparison counts (card «Τιμές σε N καταστήματα» chips)
-        # After the resolvers so counts reflect the productIds they just
-        # linked. Precompute twin of get-price-comparison — see
-        # src/lib/comparison-count.ts.
-        id: rc_compare
-        continue-on-error: true
-        run: node src/scripts/recompute-comparison-counts.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}

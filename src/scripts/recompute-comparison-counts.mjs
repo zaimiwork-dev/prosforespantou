@@ -21,7 +21,7 @@ import 'dotenv/config';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
-import { comparisonChainCount } from '../lib/comparison-count.ts';
+import { comparisonRivals, isCheapestInCluster } from '../lib/comparison-count.ts';
 import { SHELF_PRICE_MAX_AGE_DAYS } from '../lib/shelf-comparison.ts';
 import { loadFreshShelfChains } from '../lib/feed-freshness.ts';
 
@@ -49,9 +49,11 @@ async function run() {
       productId: true,
       productName: true,
       supermarket: true,
+      discountedPrice: true,
       originalPrice: true,
       description: true,
       comparisonCount: true,
+      isCheapestInCluster: true,
       product: { select: { barcode: true } },
     },
   });
@@ -92,16 +94,20 @@ async function run() {
   }
   console.log(`   barcode-backed products: ${shelfPids.length}, with fresh shelf snapshots: ${snapsByPid.size}`);
 
-  // Compute, then group changed rows by their new count → one updateMany per
-  // distinct value instead of 15k single-row updates.
-  const changedByCount = new Map();
+  // Compute, then group changed rows by their new (count, cheapest) pair → one
+  // updateMany per distinct value instead of 15k single-row updates.
+  // The count and the «cheapest» flag come from the SAME rival rows
+  // (lib/comparison-count comparisonRivals), so they cannot disagree.
+  const changedByValue = new Map();
   const tally = new Map();
   let withComparison = 0;
+  let cheapest = 0;
   for (const d of active) {
     let count = 0;
+    let isCheapest = false;
     if (d.productId) {
       const clusterOffers = (byPid.get(d.productId) || []).filter((o) => o.id !== d.id);
-      count = comparisonChainCount({
+      const rivals = comparisonRivals({
         source: d,
         clusterOffers,
         barcodeBacked: Boolean(d.product?.barcode),
@@ -109,30 +115,36 @@ async function run() {
         freshChains,
         now,
       });
+      count = new Set(rivals.map((r) => r.supermarket)).size;
+      // A hidden row (public visibility) is never shown, so it cannot be
+      // «cheapest» on screen either.
+      isCheapest = publiclyVisible(d) && isCheapestInCluster(d.discountedPrice, rivals);
     }
     tally.set(count, (tally.get(count) || 0) + 1);
     if (count > 0) withComparison++;
-    if (count !== d.comparisonCount) {
-      const arr = changedByCount.get(count) || [];
-      arr.push(d.id);
-      changedByCount.set(count, arr);
+    if (isCheapest) cheapest++;
+    if (count !== d.comparisonCount || isCheapest !== d.isCheapestInCluster) {
+      const k = `${count}|${isCheapest}`;
+      const entry = changedByValue.get(k) || { count, isCheapest, ids: [] };
+      entry.ids.push(d.id);
+      changedByValue.set(k, entry);
     }
   }
 
   let updated = 0;
-  for (const [count, ids] of changedByCount) {
+  for (const { count, isCheapest, ids } of changedByValue.values()) {
     for (const batch of chunk(ids, 1000)) {
       if (!DRY_RUN) {
         await prisma.discount.updateMany({
           where: { id: { in: batch } },
-          data: { comparisonCount: count },
+          data: { comparisonCount: count, isCheapestInCluster: isCheapest },
         });
       }
       updated += batch.length;
     }
   }
 
-  console.log(`🏁 comparison counts done — updated=${updated}, offers with a comparison: ${withComparison}/${active.length}`);
+  console.log(`🏁 comparison counts done — updated=${updated}, offers with a comparison: ${withComparison}/${active.length}, cheapest in their cluster: ${cheapest}`);
   for (const [count, n] of [...tally.entries()].sort((a, b) => a[0] - b[0])) {
     console.log('   ', `${count} chains:`, n);
   }

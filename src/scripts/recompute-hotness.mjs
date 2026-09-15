@@ -52,7 +52,7 @@ async function run() {
 
   const deals = await prisma.discount.findMany({
     where: { isActive: true, validUntil: { gt: now } },
-    select: { id: true, productName: true, description: true, category: true, discountPercent: true, createdAt: true, hotScore: true, priceVerdict: true },
+    select: { id: true, productName: true, description: true, category: true, discountPercent: true, createdAt: true, hotScore: true, priceVerdict: true, isCheapestInCluster: true },
   });
   console.log(`🔢 active deals to score: ${deals.length}${DRY_RUN ? ' (DRY_RUN)' : ''}`);
 
@@ -71,6 +71,7 @@ async function run() {
         clicks: clicksById.get(d.id) || 0,
         listAdds: addsById.get(d.id) || 0,
         priceVerdict: d.priceVerdict,
+        cheapestInCluster: d.isCheapestInCluster,
         jitterKey: d.id,
       });
       if (Math.abs((d.hotScore ?? 0) - score) < 0.01) { unchanged++; continue; }

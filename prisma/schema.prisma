@@ -156,6 +156,11 @@ model Discount {
   // resolvers-all job) so cards can advertise «Τιμές σε N καταστήματα»
   // without per-row similarity work. 0 = no comparison available.
   comparisonCount Int      @default(0) @map("comparison_count")
+  // W3a (2026-09-16): no row on this offer's comparison sheet (rival offers +
+  // rival shelf prices) is cheaper, and there is at least one. Same nightly
+  // pass as comparisonCount (lib/comparison-count isCheapestInCluster); folds
+  // into hotScore (+10) so the rails lead with the store that is cheapest.
+  isCheapestInCluster Boolean @default(false) @map("is_cheapest_in_cluster")
   // The chain's own SKU for this offer — the stable dedup key that lets the
   // ingest pipeline write offers BEFORE they're matched to a Product
   // (display-first: productId null until the resolver/admin claims the row).

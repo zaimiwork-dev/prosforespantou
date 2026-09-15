@@ -19,16 +19,18 @@ import type { FreshChains } from './feed-freshness.ts';
 export type ComparisonCandidate = {
   productName: string;
   supermarket: string | null;
+  // The offer price the sheet prints for this row (Discount.discountedPrice).
+  discountedPrice?: number | null;
 };
 
-export function comparisonChainCount({
-  source,
-  clusterOffers,
-  barcodeBacked = false,
-  snapshots = [],
-  freshChains = new Map(),
-  now = new Date(),
-}: {
+// One row the comparison sheet renders for ANOTHER chain.
+export type RivalRow = {
+  supermarket: string;
+  price: number | null;
+  rowType: 'offer' | 'shelf';
+};
+
+type ComparisonArgs = {
   source: ComparisonCandidate;
   // Active, publicly-visible offers on the same matched product cluster,
   // EXCLUDING the source row itself (caller applies visibility + activity).
@@ -41,8 +43,18 @@ export function comparisonChainCount({
   // map the action loads, or the chip and the sheet disagree.
   freshChains?: FreshChains;
   now?: Date;
-}): number {
-  const chains = new Set<string>();
+};
+
+// The rows the sheet shows for other chains, with their prices.
+export function comparisonRivals({
+  source,
+  clusterOffers,
+  barcodeBacked = false,
+  snapshots = [],
+  freshChains = new Map(),
+  now = new Date(),
+}: ComparisonArgs): RivalRow[] {
+  const rows: RivalRow[] = [];
 
   // Offer rows — same pipeline as the action: pack guard, then the
   // variant/quantity/similarity/per-chain-best filter, then the 8-row cap.
@@ -54,7 +66,9 @@ export function comparisonChainCount({
     (d) => d.supermarket
   ).slice(0, 8);
   for (const d of comparable) {
-    if (d.supermarket && d.supermarket !== source.supermarket) chains.add(d.supermarket);
+    if (d.supermarket && d.supermarket !== source.supermarket) {
+      rows.push({ supermarket: d.supermarket, price: d.discountedPrice ?? null, rowType: 'offer' });
+    }
   }
 
   // Shelf rows — barcode-gated only (snapshots carry no chain-side name, so
@@ -66,9 +80,26 @@ export function comparisonChainCount({
     if (source.supermarket) excludedChains.add(source.supermarket);
     for (const d of clusterOffers) if (d.supermarket) excludedChains.add(d.supermarket);
     for (const row of pickShelfRows({ snapshots, excludedChains, freshChains, now })) {
-      chains.add(row.supermarket);
+      rows.push({ supermarket: row.supermarket, price: row.price, rowType: 'shelf' });
     }
   }
 
-  return chains.size;
+  return rows;
+}
+
+export function comparisonChainCount(args: ComparisonArgs): number {
+  return new Set(comparisonRivals(args).map((r) => r.supermarket)).size;
+}
+
+// «Cheapest here» (W3a, 2026-09-16): the source offer costs no more than ANY
+// row its comparison sheet shows for another chain — rival offers and rival
+// shelf prices alike (the pack guard already made the sizes equal). Needs at
+// least one rival: with nothing to beat, there is no claim. A rival row with
+// an unknown price blocks the claim rather than being skipped.
+export const CHEAPEST_EPSILON = 0.005;
+
+export function isCheapestInCluster(sourcePrice: number | null | undefined, rivals: RivalRow[]): boolean {
+  if (sourcePrice == null || !Number.isFinite(sourcePrice) || sourcePrice <= 0) return false;
+  if (rivals.length === 0) return false;
+  return rivals.every((r) => r.price != null && Number.isFinite(r.price) && sourcePrice <= r.price + CHEAPEST_EPSILON);
 }
