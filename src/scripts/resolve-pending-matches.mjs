@@ -30,8 +30,6 @@ import 'dotenv/config';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
-import { computeHotScore } from '../lib/hotness.ts';
-import { categorize } from '../lib/categories.ts';
 import { samePack } from '../lib/packaging.ts';
 import { foldHomoglyphs } from '../lib/offer-similarity.ts';
 
@@ -351,12 +349,7 @@ async function run() {
   );
   console.log(`   candidate pool: ${candidates.length} canonical Products`);
 
-  const storeName = SM_MAPPING[CHAIN];
-  const store = await withDbRetry('ensureStore', () =>
-    prisma.store.upsert({ where: { name: storeName }, create: { name: storeName }, update: {} })
-  );
-
-  let resolved = 0, stillPending = 0, errors = 0, brandRejects = 0, hallucinations = 0, lowConf = 0, packRejects = 0;
+  let resolved = 0, stillPending = 0, errors = 0, brandRejects = 0, hallucinations = 0, lowConf = 0, packRejects = 0, unclaimed = 0;
   // Set when the free-tier daily allowance runs out mid-run (see MODEL note).
   let stoppedEarly = null;
   // Measured Groq token consumption — turns the free-tier drain estimate into
@@ -467,58 +460,30 @@ async function run() {
         continue;
       }
 
-      const now = new Date();
-      const validUntil = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-      const originalPrice = null; // PendingMatch doesn't carry originalPrice; resolver assumes single-price (ΜΟΝΟ-style).
-
       await withDbRetry('write resolved', async () => {
         // Display-first: the ingest pipeline already wrote this offer as a
         // visible productless Discount with the chain's REAL dates/image/
         // original price. Claiming = just setting productId — overwriting the
         // rest with resolver-synthesized data (now+14d, no original) would
         // degrade the row.
+        //
+        // Claim at ANY source. PendingMatch is keyed (rawName, chain) with no
+        // source, so the masoutis web and leaflet steps read the same queue;
+        // a product identity is the same fact for both rows.
         const claimed = await prisma.discount.updateMany({
-          where: { supermarket: CHAIN, source: SOURCE, productName: pm.rawName, productId: null },
+          where: { supermarket: CHAIN, productName: pm.rawName, productId: null },
           data: { productId: chosenProductId },
         });
         if (claimed.count === 0) {
-          // Legacy path — no productless row exists (pre-display-first
-          // backlog, or a showUnmatched-off chain like Lidl).
-          const existing = await prisma.discount.findFirst({
-            where: { productId: chosenProductId, supermarket: CHAIN, source: SOURCE },
-          });
-          const discountData = {
-            productName: pm.rawName,
-            // The LLM's category is a department-level guess → keep it as the
-            // subcategory hint and let the shared categorizer have final say
-            // (uniform with every other write path).
-            category: categorize(pm.rawName, llm.category),
-            subcategory: llm.category || null,
-            discountedPrice: pm.rawPrice,
-            originalPrice,
-            validFrom: now,
-            validUntil,
-            imageUrl: pm.imageUrl || null,
-            storeId: store.id,
-            productId: chosenProductId,
-            supermarket: CHAIN,
-            source: SOURCE,
-            isActive: true,
-          };
-          // originalPrice is null here (ΜΟΝΟ-style), so % contributes 0 — score
-          // rides on KVI/brand/mechanic + clicks; daily cron is authoritative.
-          const hotScore = computeHotScore({
-            productName: pm.rawName,
-            description: null,
-            discountPercent: null,
-            createdAt: existing ? existing.createdAt : now,
-            clicks: existing ? existing.clickCount : 0,
-          });
-          if (existing) {
-            await prisma.discount.update({ where: { id: existing.id }, data: { ...discountData, hotScore } });
-          } else {
-            await prisma.discount.create({ data: { ...discountData, hotScore } });
-          }
+          // No live productless row for this name at any source: the offer
+          // expired since the row was queued, or the chain dropped it. Until
+          // 2026-09-15 this fell into a legacy path that CREATED a fresh
+          // Discount with a now+14d window — a phantom offer the chain no
+          // longer lists. Every adapter is display-first now, so the right
+          // move is to remember the match (MatchCache below) and stop: the
+          // next ingest that sees the name resolves instantly, with real data.
+          console.log('   ↪ no live productless row — match cached, no offer written');
+          unclaimed++;
         }
 
         // MatchCache — next adapter run for the same rawName hits this and skips the LLM.
@@ -534,20 +499,24 @@ async function run() {
           update: { productId: chosenProductId, lastUsedAt: new Date(), source: 'llm' },
         });
 
-        // PriceSnapshot — only when price actually changed.
-        const last = await prisma.priceSnapshot.findFirst({
-          where: { productId: chosenProductId, supermarket: CHAIN },
-          orderBy: { recordedAt: 'desc' },
-        });
-        if (!last || last.price !== pm.rawPrice) {
-          await prisma.priceSnapshot.create({
-            data: {
-              productId: chosenProductId,
-              supermarket: CHAIN,
-              price: pm.rawPrice,
-              isDiscounted: !!originalPrice,
-            },
+        // PriceSnapshot — only when the offer is live (a queued price from an
+        // expired offer is not today's price) and only when it actually moved.
+        if (claimed.count > 0) {
+          const last = await prisma.priceSnapshot.findFirst({
+            where: { productId: chosenProductId, supermarket: CHAIN },
+            orderBy: { recordedAt: 'desc' },
           });
+          if (!last || last.price !== pm.rawPrice) {
+            await prisma.priceSnapshot.create({
+              data: {
+                productId: chosenProductId,
+                supermarket: CHAIN,
+                price: pm.rawPrice,
+                // PendingMatch carries no originalPrice — single-price (ΜΟΝΟ-style).
+                isDiscounted: false,
+              },
+            });
+          }
         }
 
         // Drop the resolved PendingMatch.
@@ -569,7 +538,7 @@ async function run() {
   }
 
   console.log(`\n🏁 Resolver finished for chain="${CHAIN}" source="${SOURCE}"${DRY_RUN ? ' (DRY_RUN)' : ''}`);
-  console.log(`   ✅ resolved:       ${resolved}`);
+  console.log(`   ✅ resolved:       ${resolved}${unclaimed ? ` (${unclaimed} cached only — offer no longer live, nothing written)` : ''}`);
   console.log(`   ⚠️  still pending:  ${stillPending} (low-conf=${lowConf} brand-rej=${brandRejects} pack-rej=${packRejects} hallucination=${hallucinations})`);
   console.log(`   ❌ errors:         ${errors}`);
   if (tokenedCalls > 0) {
