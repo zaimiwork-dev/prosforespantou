@@ -8,6 +8,11 @@ export const metadata = {
 // NOTE for the owner: the inventory below is ACCURATE to the current codebase
 // (localStorage keys + the analytics events). Keep it in sync if you add trackers.
 // The prose can be polished, but do NOT remove an item that's actually in use.
+// NEXT_PUBLIC_PROFILE_SYNC=1 switches on the anonymous server profile (W4a).
+// The preferences wording below follows the same flag so the page never
+// describes a data flow that is not running, or hides one that is.
+const PROFILE_SYNC = process.env.NEXT_PUBLIC_PROFILE_SYNC === '1';
+
 export default function CookiesPage() {
   const cell = { border: '1px solid #eee', padding: '8px 10px', textAlign: 'left', verticalAlign: 'top', fontSize: 13.5 };
   return (
@@ -38,13 +43,27 @@ export default function CookiesPage() {
         <tbody>
           <tr><td style={cell}><code>cookie-consent</code></td><td style={cell}>Θυμάται την επιλογή σου (αποδοχή/απόρριψη).</td><td style={cell}>Απαραίτητο</td></tr>
           <tr><td style={cell}><code>sid</code></td><td style={cell}>Ανώνυμο αναγνωριστικό συνεδρίας για στατιστικά χρήσης. Δημιουργείται μόνο μετά την αποδοχή.</td><td style={cell}>Στατιστικά</td></tr>
-          <tr><td style={cell}>Προτιμήσεις (αγαπημένα, καταστήματα, ενδιαφέροντα, onboarding)</td><td style={cell}>Θυμάται τις επιλογές σου ώστε να βλέπεις πιο σχετικές προσφορές. Μένουν στη συσκευή σου.</td><td style={cell}>Προτιμήσεων</td></tr>
+          <tr><td style={cell}>Προτιμήσεις (αγαπημένα, καταστήματα, ενδιαφέροντα, onboarding)</td><td style={cell}>Θυμάται τις επιλογές σου ώστε να βλέπεις πιο σχετικές προσφορές.{PROFILE_SYNC ? '' : ' Μένουν στη συσκευή σου.'}</td><td style={cell}>Προτιμήσεων</td></tr>
+          {PROFILE_SYNC && (
+            <tr><td style={cell}><code>pp-profile-id</code></td><td style={cell}>Ανώνυμο αναγνωριστικό για το αντίγραφο των προτιμήσεών σου στον διακομιστή μας. Δημιουργείται μόνο μετά την αποδοχή· διαγράφεται μαζί με το αντίγραφο αν την ανακαλέσεις.</td><td style={cell}>Στατιστικά / εξατομίκευση</td></tr>
+          )}
         </tbody>
       </table>
-      <p style={{ fontSize: 13, color: '#777' }}>
-        Οι προτιμήσεις (αγαπημένα κ.λπ.) αποθηκεύονται <em>τοπικά στη συσκευή σου</em> και
-        δεν αποστέλλονται σε εμάς — εκτός αν στο μέλλον συνδεθείς με λογαριασμό (προαιρετικό).
-      </p>
+      {PROFILE_SYNC ? (
+        <p style={{ fontSize: 13, color: '#777' }}>
+          Οι προτιμήσεις αποθηκεύονται στη συσκευή σου. <em>Αν αποδεχτείς</em>, κρατάμε και ένα
+          αντίγραφό τους στον διακομιστή μας (καταστήματα, κατηγορίες, αγαπημένα, τη λίστα σου,
+          τα ενδιαφέροντα που προκύπτουν από τη χρήση και το μέγεθος γραμμάτων), συνδεδεμένο μόνο
+          με το ανώνυμο <code>pp-profile-id</code> — όχι με όνομα ή email — ώστε να σου δείχνουμε
+          πιο σχετικές προσφορές. Αν πατήσεις «Απόρριψη» ή ανακαλέσεις τη συγκατάθεση, το
+          αντίγραφο διαγράφεται.
+        </p>
+      ) : (
+        <p style={{ fontSize: 13, color: '#777' }}>
+          Οι προτιμήσεις (αγαπημένα κ.λπ.) αποθηκεύονται <em>τοπικά στη συσκευή σου</em> και
+          δεν αποστέλλονται σε εμάς — εκτός αν στο μέλλον συνδεθείς με λογαριασμό (προαιρετικό).
+        </p>
+      )}
 
       <H2>Στατιστικά χρήσης (μετά από συγκατάθεση)</H2>
       <p>

@@ -8,6 +8,10 @@ export const metadata = {
 // The data inventory + processors list below is ACCURATE to the codebase as of
 // 2026-06-15. Update it when data flows change. Legal prose may be polished by a
 // lawyer/ChatGPT, but the factual lists must stay truthful (that's what GDPR audits).
+// NEXT_PUBLIC_PROFILE_SYNC=1 switches on the anonymous server profile (W4a);
+// the preferences item below follows the same flag.
+const PROFILE_SYNC = process.env.NEXT_PUBLIC_PROFILE_SYNC === '1';
+
 export default function PrivacyPage() {
   return (
     <LegalLayout title="Πολιτική Απορρήτου" updated="2026-06-15">
@@ -38,11 +42,22 @@ export default function PrivacyPage() {
           (user-agent) και ένα ανώνυμο αναγνωριστικό συνεδρίας (<code>sid</code>). Δεν
           συνδέονται με το όνομα ή το email σου. <em>Νομική βάση: η συγκατάθεσή σου.</em>
         </li>
-        <li>
-          <strong>Προτιμήσεις (αγαπημένα, καταστήματα, ενδιαφέροντα):</strong> αποθηκεύονται
-          τοπικά στη συσκευή σου και δεν αποστέλλονται σε εμάς (εκτός αν στο μέλλον συνδεθείς
-          με προαιρετικό λογαριασμό).
-        </li>
+        {PROFILE_SYNC ? (
+          <li>
+            <strong>Προτιμήσεις (καταστήματα, κατηγορίες, αγαπημένα, λίστα, ενδιαφέροντα, μέγεθος
+            γραμμάτων):</strong> αποθηκεύονται στη συσκευή σου και, μόνο μετά από συγκατάθεση
+            cookies, ως αντίγραφο στον διακομιστή μας, συνδεδεμένο με ένα ανώνυμο τυχαίο
+            αναγνωριστικό (<code>pp-profile-id</code>), όχι με όνομα ή email. Χρησιμοποιείται για πιο
+            σχετικές προσφορές. Διαγράφεται όταν ανακαλέσεις τη συγκατάθεση.
+            <em> Νομική βάση: η συγκατάθεσή σου.</em>
+          </li>
+        ) : (
+          <li>
+            <strong>Προτιμήσεις (αγαπημένα, καταστήματα, ενδιαφέροντα):</strong> αποθηκεύονται
+            τοπικά στη συσκευή σου και δεν αποστέλλονται σε εμάς (εκτός αν στο μέλλον συνδεθείς
+            με προαιρετικό λογαριασμό).
+          </li>
+        )}
         <li>
           <strong>Τεχνικά δεδομένα ασφάλειας:</strong> η διεύθυνση IP χρησιμοποιείται
           παροδικά για προστασία από κατάχρηση (rate-limiting) και από τους παρόχους

@@ -49,6 +49,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { PushRegistrar } from "@/components/PushRegistrar";
 import { CookieConsent } from "@/components/CookieConsent";
 import { PageViewTracker } from "@/components/PageViewTracker";
+import { ProfileSync } from "@/components/ProfileSync";
 import SiteAnalytics from "@/components/SiteAnalytics";
 import { TEXT_SIZE_BOOTSTRAP } from "@/lib/text-size";
 
@@ -74,6 +75,9 @@ export default function RootLayout({ children }) {
         <CookieConsent />
         {/* Consent-gated page_view funnel signal (no-op until opt-in). */}
         <PageViewTracker />
+        {/* Anonymous server profile sync (W4a): off unless
+            NEXT_PUBLIC_PROFILE_SYNC=1 and consent; erases on withdrawal. */}
+        <ProfileSync />
         {/* Cookieless aggregate visit count — NOT consent-gated, and not a
             substitute for the tracker above. Stores nothing on the device, so
             there is no behavioural profile to consent to. See SiteAnalytics. */}

@@ -299,6 +299,31 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// W4a (2026-09-16): anonymous server-side profile — a bounded copy of what
+// the shopper set on ONE device (declared stores/departments, favorites, list
+// lines, learned interest weights, text size), keyed by a random id the device
+// creates only after cookie consent (lib/profile-sync.js). Written by
+// actions/sync-profile.ts; no read path yet. Hard-deleted when consent is
+// withdrawn. The whole flow is OFF unless NEXT_PUBLIC_PROFILE_SYNC=1, because
+// the privacy policy promises preferences stay on the device (owner
+// decision #7). `userId` is for the merge on first login, once login exists.
+model Profile {
+  id                  String   @id @db.Uuid
+  preferredStores     String[] @map("preferred_stores")
+  preferredCategories String[] @map("preferred_categories")
+  favorites           Json     @default("[]")
+  listItems           Json     @default("[]") @map("list_items")
+  interests           Json     @default("{}")
+  textSize            String?  @map("text_size")
+  userId              String?  @db.Uuid @map("user_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("profiles")
+}
+
 // Device push tokens for native (Capacitor FCM/APNs) + web push. Keyed to the
 // user; the alert engine gains push as a second delivery channel alongside email.
 model PushToken {
