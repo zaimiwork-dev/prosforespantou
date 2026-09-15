@@ -5,6 +5,7 @@ import { unstable_cache } from 'next/cache';
 import { dedupeDeals } from '@/lib/dedupe-deals';
 import { capPerFamily } from '@/lib/deal-family';
 import { activePublicDealWhere, withPublicDealVisibility } from '@/lib/public-deal-filters';
+import { ESSENTIALS, pickEssentials } from '@/lib/weekly-essentials';
 
 const getDefaultDeals = unstable_cache(
   async (limit: number) => {
@@ -229,6 +230,48 @@ const getEndingSoonCached = unstable_cache(
 export async function getEndingSoonDeals(limit = 10) {
   try {
     return await getEndingSoonCached(limit);
+  } catch (error) {
+    Sentry.captureException(error);
+    return [];
+  }
+}
+
+// «Τα βασικά της εβδομάδας» (lib/weekly-essentials): the cheapest active offer
+// per staple, per kilo/litre/piece, across ALL chains — it is a comparison
+// rail, so it deliberately ignores «Τα καταστήματά μου» (a Lidl-only shopper
+// still wants to know milk is cheaper elsewhere this week).
+// Reads only the staple departments (~7k rows, 5 columns) and matches names in
+// JS: Postgres ILIKE is accent-sensitive (γάλα ≠ γαλα), the regexes are not.
+const ESSENTIAL_DEPARTMENTS = Array.from(new Set(ESSENTIALS.flatMap((e) => e.departments)));
+
+const getWeeklyEssentialsCached = unstable_cache(
+  async () => {
+    const now = new Date();
+    const rows = await prisma.discount.findMany({
+      where: activePublicDealWhere(now, { category: { in: ESSENTIAL_DEPARTMENTS } }),
+      select: { id: true, productName: true, category: true, discountedPrice: true, supermarket: true },
+    });
+    const picks = pickEssentials(rows);
+    if (picks.length === 0) return [];
+
+    const full = await prisma.discount.findMany({
+      where: { id: { in: picks.map((p) => p.deal.id) } },
+      include: { store: true, leaflet: true, product: true },
+    });
+    const byId = new Map(full.map((d) => [d.id, d]));
+    return picks.flatMap((p) => {
+      const d = byId.get(p.deal.id);
+      if (!d) return [];
+      return [{ ...d, essential: { id: p.id, label: p.label, chainCount: p.chainCount } }];
+    });
+  },
+  ['deals:essentials'],
+  { tags: ['deals:default'], revalidate: 300 }
+);
+
+export async function getWeeklyEssentials() {
+  try {
+    return await getWeeklyEssentialsCached();
   } catch (error) {
     Sentry.captureException(error);
     return [];

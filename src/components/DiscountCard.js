@@ -168,6 +168,9 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
       </div>
 
       <div className="card-body">
+        {/* «Τα βασικά της εβδομάδας» names the staple the card answers for —
+            the product title alone («GMUNDNER MILCH …») doesn't say «Γάλα». */}
+        {d.essential?.label && <div className="card-eyebrow">{d.essential.label}</div>}
         <h3 className="card-title" title={displayName}>{nameParts.title}</h3>
         {nameParts.size && <div className="card-size">{nameParts.size}</div>}
 

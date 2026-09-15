@@ -1,4 +1,4 @@
-import { getTopDeals, getEndingSoonDeals } from "@/actions/get-active-deals";
+import { getTopDeals, getEndingSoonDeals, getWeeklyEssentials } from "@/actions/get-active-deals";
 import { getDealCounts } from "@/actions/get-deal-counts";
 import HomeClient from "@/components/HomeClient";
 
@@ -14,8 +14,9 @@ import HomeClient from "@/components/HomeClient";
 export const revalidate = 300;
 
 export default async function Home() {
-  const [counts, topDeals, endingSoon] = await Promise.all([
+  const [counts, essentials, topDeals, endingSoon] = await Promise.all([
     getDealCounts(),
+    getWeeklyEssentials(),
     getTopDeals(20), // two-row carousel needs the doubled pool
     getEndingSoonDeals(10),
   ]);
@@ -23,6 +24,7 @@ export default async function Home() {
   const initial = {
     total: counts.total,
     counts,
+    essentials,
     topDeals,
     endingSoon,
   };

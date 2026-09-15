@@ -148,6 +148,18 @@ function PublicSite({ initial, onAdmin }) {
               user's own watchlist outranks everything when it has live hits. */}
           <FavoritesRow onAdd={addItem} onSelect={setSelectedProduct} />
 
+          {/* The question an everyday shopper opens the app with: where are
+              milk, oil, detergent cheapest this week? One card per staple,
+              compared per kilo/litre (lib/weekly-essentials). Across ALL
+              chains on purpose — it is the comparison promise in one rail. */}
+          <FeaturedCarousel
+            title="Τα βασικά της εβδομάδας"
+            sub="Φθηνότερη προσφορά, ανά κιλό ή λίτρο"
+            deals={initial.essentials || []}
+            onAdd={addItem}
+            onSelect={setSelectedProduct}
+          />
+
           {forYou?.length > 0 && (
             <FeaturedCarousel
               title="✨ Για σένα"
@@ -191,7 +203,7 @@ function PublicSite({ initial, onAdmin }) {
             </Link>
           </section>
 
-          <CategoryGrid asLinks counts={initial.counts?.byCategory || {}} />
+          <CategoryGrid asLinks limit={8} counts={initial.counts?.byCategory || {}} />
 
           <SupermarketTiles counts={initial.counts?.bySupermarket || {}} />
 
