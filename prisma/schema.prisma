@@ -141,6 +141,15 @@ model Discount {
   // recompute-price-verdicts.mjs (daily) so card lists need no per-row query;
   // null until the next recompute pass. Detail/modal compute it live instead.
   priceVerdict    String?  @map("price_verdict")
+  // W2a (2026-09-16), ΜΟΝΟ offers only: the same chain's current shelf price
+  // (lib/baseline-price — latest kind='normal' snapshot while its catalog feed
+  // is alive), the feed run that confirmed it, and the rounded % the offer sits
+  // below it (<= 0: not below shelf). Written by recompute-price-verdicts.mjs.
+  // Our inference, never the chain's claim; not rendered on cards until the
+  // owner decides the wording.
+  baselinePrice   Float?    @map("baseline_price")
+  baselineAt      DateTime? @map("baseline_at")
+  impliedPercent  Int?      @map("implied_percent")
   // How many OTHER chains this offer's price-comparison sheet renders rows
   // for (cross-chain offers passing the pack/variant guards + barcode-gated
   // shelf prices). Precomputed by recompute-comparison-counts.mjs (nightly,

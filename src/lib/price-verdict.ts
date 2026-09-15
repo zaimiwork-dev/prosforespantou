@@ -37,6 +37,11 @@ export function isPositiveVerdict(v: Verdict | null | undefined): boolean {
 const MIN_POINTS = 3;
 
 /**
+ * SUPERSEDED for display (2026-09-16): the detail view, the card baseline and
+ * the comparison sheet all use lib/baseline-price (the LATEST shelf price at a
+ * live feed). Snapshots are written only on change, so a median lags price
+ * moves. Kept for analysis scripts and its tests.
+ *
  * The price this chain normally charges: the median of its `normal` (shelf)
  * snapshots. Returned separately from the series average because mixing shelf
  * and promo prices produces a number that describes neither — how many of each

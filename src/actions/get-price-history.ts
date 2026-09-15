@@ -2,7 +2,10 @@
 
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
-import { computeVerdict, normalReference } from '@/lib/price-verdict';
+import { computeVerdict } from '@/lib/price-verdict';
+import { shelfPriceFor } from '@/lib/baseline-price';
+import { loadFreshShelfChains } from '@/lib/feed-freshness';
+import { SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
 
 export interface PricePoint {
   recordedAt: string;
@@ -28,9 +31,12 @@ export interface PriceHistory {
   // Percent above the window min (0 when at min). Useful for "↓ X% below average".
   percentAboveMin: number | null;
   daysCovered: number;
-  // Median of this chain's `normal` (shelf) snapshots — "what you normally pay
-  // here". Null when the chain has no shelf baseline for this product yet.
-  // Kept apart from `avg` on purpose: see normalReference in lib/price-verdict.
+  // This chain's current shelf price — "what you normally pay here": its latest
+  // `normal` snapshot while its catalog feed is alive (lib/baseline-price).
+  // The same number Discount.baselinePrice stores and the comparison sheet's
+  // «Κανονική τιμή» rows show. Null without a live shelf price. (Was a 90-day
+  // median until 2026-09-16; snapshots are written only on change, so the
+  // median lagged every price move.) Kept apart from `avg` on purpose.
   normalPrice: number | null;
   // Which chain the series describes, or null for an unscoped (legacy) call.
   supermarket: string | null;
@@ -93,6 +99,24 @@ export async function getPriceHistory(
 
         if (rows.length === 0) return FALLBACK;
 
+        // Shelf price over the longer sanity window, and only for a chain-scoped
+        // call: a cross-chain series has no single «normal» price.
+        const [shelfSnaps, freshChains] = options.supermarket
+          ? await Promise.all([
+              prisma.priceSnapshot.findMany({
+                where: {
+                  productId,
+                  supermarket: options.supermarket,
+                  kind: 'normal',
+                  recordedAt: { gte: new Date(Date.now() - SHELF_PRICE_MAX_AGE_DAYS * 86400000) },
+                },
+                select: { supermarket: true, price: true, recordedAt: true },
+              }),
+              loadFreshShelfChains(prisma),
+            ])
+          : [[], new Map<string, string>()];
+        const shelf = shelfPriceFor({ supermarket: options.supermarket, normalSnapshots: shelfSnaps, freshChains });
+
         const prices = rows.map((r) => r.price);
 
         // The verdict must judge the price the shopper actually sees. Prefer the
@@ -116,7 +140,7 @@ export async function getPriceHistory(
           verdict: v.verdict,
           percentAboveMin: v.percentAboveMin,
           daysCovered: days,
-          normalPrice: normalReference(rows),
+          normalPrice: shelf ? shelf.price : null,
           supermarket: options.supermarket ?? null,
         };
       } catch (error) {
