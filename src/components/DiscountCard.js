@@ -106,9 +106,9 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false }) {
             // Prefer the chain's printed sticker text ("-25%", "1+1", "ΧΑΜΗΛΗ
             // ΤΙΜΗ") over a generic ΜΟΝΟ when we have it — way more honest.
             d.description && d.description.length <= 24 ? (
-              <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>{d.description.toUpperCase()}</div>
+              <div className="discount-badge" style={{ backgroundColor: 'var(--accent)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>{d.description.toUpperCase()}</div>
             ) : (
-              <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
+              <div className="discount-badge" style={{ backgroundColor: 'var(--accent)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>ΜΟΝΟ</div>
             )
           ) : null}
           <div className="card-top-right">

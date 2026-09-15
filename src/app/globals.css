@@ -2096,7 +2096,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink-2);
   cursor: pointer;
 }

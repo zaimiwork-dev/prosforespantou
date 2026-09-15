@@ -86,7 +86,7 @@ export function ProductCard({ p, onSelect }) {
           {pct > 0 ? (
             <div className="discount-badge">-{pct}%</div>
           ) : showMono ? (
-            <div className="discount-badge" style={{ backgroundColor: 'var(--red-6)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>
+            <div className="discount-badge" style={{ backgroundColor: 'var(--accent)', fontSize: '0.65rem', padding: '3px 6px', letterSpacing: '0.5px' }}>
               {offer.description && offer.description.length <= 24 ? offer.description.toUpperCase() : 'ΜΟΝΟ'}
             </div>
           ) : null}

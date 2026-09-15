@@ -10,6 +10,13 @@ import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { Footer } from "@/components/Footer";
 
+// Starting points for the empty search screen — the staples a Greek
+// household actually hunts for, in the words shoppers type (no brands).
+const SEARCH_STARTERS = [
+  'γάλα', 'καφές', 'ελαιόλαδο', 'φέτα', 'απορρυπαντικό', 'χαρτί υγείας',
+  'πάνες', 'ζυμαρικά', 'αναψυκτικά', 'μπύρα', 'σαμπουάν', 'κοτόπουλο',
+];
+
 export function SearchPage({ query, deals, catalogProducts = [] }) {
   const router = useRouter();
   const [inputValue, setInputValue] = useState(query);
@@ -86,7 +93,33 @@ export function SearchPage({ query, deals, catalogProducts = [] }) {
           )}
         </div>
 
-        {(deals.length > 0 || catalogProducts.length === 0) && (
+        {/* The bottom-nav «Αναζήτηση» tab lands here with no query. Show a
+            starting point instead of a "no results" message for nothing. */}
+        {!query && (
+          <div style={{ padding: "4px 4px 8px" }}>
+            <p style={{ fontSize: 16, color: "#1c1e24", margin: "0 0 12px", fontWeight: 600 }}>
+              Τι ψάχνεις σήμερα;
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {SEARCH_STARTERS.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => router.push(`/search?q=${encodeURIComponent(term)}`)}
+                  style={{
+                    padding: "12px 16px", borderRadius: 999, border: "1px solid #ececf0",
+                    background: "#fff", color: "#1c1e24", fontSize: 16, fontWeight: 600,
+                    cursor: "pointer", minHeight: 48,
+                  }}
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {query && (deals.length > 0 || catalogProducts.length === 0) && (
           <DealGrid
             deals={deals}
             loading={false}
