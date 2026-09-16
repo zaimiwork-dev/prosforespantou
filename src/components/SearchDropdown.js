@@ -4,16 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SUPERMARKETS } from "@/lib/constants";
 import { rankSearchResults } from "@/lib/search-rank";
+import { Icon } from "@/components/Icons";
 
 // Optimized 40px thumbnail — was a raw <img> downloading the full-size product
 // image just to render it at 40px (real waste on mobile data). Falls back to a
-// cart glyph when there's no image or the host fails.
+// bag icon when there is no image or the host fails.
 function SearchThumb({ src, alt }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div style={{ width: 40, height: 40, borderRadius: 8, background: "#f3f5f8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-        🛒
+      <div style={{ width: 40, height: 40, borderRadius: 8, background: "#f3f5f8", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#9aa1ab" }}>
+        <Icon.Bag size={18} />
       </div>
     );
   }

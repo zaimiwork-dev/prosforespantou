@@ -50,7 +50,7 @@ export function CookieConsent() {
       }}
     >
       <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
-        🍪 Λίγα cookies για καλύτερες προσφορές
+        Λίγα cookies για καλύτερες προσφορές
       </div>
       <p style={{ fontSize: 13.5, color: '#555', lineHeight: 1.5, margin: '0 0 16px' }}>
         Με την αποδοχή, μας βοηθάς να καταλάβουμε ποιες προσφορές σε ενδιαφέρουν, ώστε

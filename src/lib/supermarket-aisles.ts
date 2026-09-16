@@ -8,7 +8,8 @@ type AisleDeal = {
 export type SupermarketAisle<T> = {
   key: string;
   label: string;
-  emoji: string;
+  // A CategoryIcon key, rendered as a stroke glyph by the aisle strip.
+  icon: string;
   deals: T[];
 };
 
@@ -38,30 +39,33 @@ const DEPARTMENT_ORDER = [
   'Άλλο',
 ];
 
-const META: Record<string, { label: string; emoji: string }> = {
-  'Φρούτα & Λαχανικά': { label: 'Φρούτα & Λαχανικά', emoji: '🍎' },
-  'Κρέας & Ψάρι': { label: 'Κρέας & Ψάρι', emoji: '🥩' },
-  'Γαλακτοκομικά & Είδη Ψυγείου': { label: 'Γαλακτοκομικά & Ψυγείο', emoji: '🥛' },
-  'Τυριά & Αλλαντικά': { label: 'Τυριά & Αλλαντικά', emoji: '🧀' },
-  'Σαλάτες & Αλοιφές': { label: 'Σαλάτες & Αλοιφές', emoji: '🥗' },
-  'Αρτοποιία': { label: 'Αρτοποιία', emoji: '🍞' },
-  'Κατεψυγμένα': { label: 'Κατεψυγμένα', emoji: '🧊' },
-  'Κονσέρβες': { label: 'Κονσέρβες', emoji: '🥫' },
-  'Είδη Παντοπωλείου': { label: 'Είδη Παντοπωλείου', emoji: '🛒' },
-  breakfast: { label: 'Πρωινό & Δημητριακά', emoji: '🥣' },
-  coffee: { label: 'Καφές', emoji: '☕' },
-  tea: { label: 'Τσάι & Ροφήματα', emoji: '🫖' },
-  juice: { label: 'Χυμοί', emoji: '🧃' },
-  'Σνακ & Γλυκά': { label: 'Σνακ & Γλυκά', emoji: '🍫' },
-  alcohol: { label: 'Αλκοολούχα Ποτά', emoji: '🍷' },
-  'soft-drinks': { label: 'Αναψυκτικά & Energy Drinks', emoji: '🥤' },
-  water: { label: 'Νερά', emoji: '💧' },
-  'drinks-other': { label: 'Άλλα Ποτά', emoji: '🍹' },
-  'Προσωπική Φροντίδα': { label: 'Προσωπική Φροντίδα', emoji: '🧴' },
-  'Βρεφικά Είδη': { label: 'Βρεφικά Είδη', emoji: '👶' },
-  'Είδη Καθαρισμού & Σπιτιού': { label: 'Καθαρισμός & Σπίτι', emoji: '🧼' },
-  'Είδη Κατοικιδίων': { label: 'Είδη Κατοικιδίων', emoji: '🐾' },
-  'Άλλο': { label: 'Άλλο', emoji: '📦' },
+// `icon` is a CategoryIcon key (src/components/CategoryIcon.js), not an
+// emoji: the aisle strip renders the same stroke glyphs as the rest of the
+// UI. Sub-aisles with no department of their own borrow the nearest one.
+const META: Record<string, { label: string; icon: string }> = {
+  'Φρούτα & Λαχανικά': { label: 'Φρούτα & Λαχανικά', icon: 'Φρούτα & Λαχανικά' },
+  'Κρέας & Ψάρι': { label: 'Κρέας & Ψάρι', icon: 'Κρέας & Ψάρι' },
+  'Γαλακτοκομικά & Είδη Ψυγείου': { label: 'Γαλακτοκομικά & Ψυγείο', icon: 'Γαλακτοκομικά & Είδη Ψυγείου' },
+  'Τυριά & Αλλαντικά': { label: 'Τυριά & Αλλαντικά', icon: 'Τυριά & Αλλαντικά' },
+  'Σαλάτες & Αλοιφές': { label: 'Σαλάτες & Αλοιφές', icon: 'Σαλάτες & Αλοιφές' },
+  'Αρτοποιία': { label: 'Αρτοποιία', icon: 'Αρτοποιία' },
+  'Κατεψυγμένα': { label: 'Κατεψυγμένα', icon: 'Κατεψυγμένα' },
+  'Κονσέρβες': { label: 'Κονσέρβες', icon: 'Κονσέρβες' },
+  'Είδη Παντοπωλείου': { label: 'Είδη Παντοπωλείου', icon: 'Είδη Παντοπωλείου' },
+  breakfast: { label: 'Πρωινό & Δημητριακά', icon: 'Αρτοποιία' },
+  coffee: { label: 'Καφές', icon: 'Πρωινό & Ροφήματα' },
+  tea: { label: 'Τσάι & Ροφήματα', icon: 'Πρωινό & Ροφήματα' },
+  juice: { label: 'Χυμοί', icon: 'Πρωινό & Ροφήματα' },
+  'Σνακ & Γλυκά': { label: 'Σνακ & Γλυκά', icon: 'Σνακ & Γλυκά' },
+  alcohol: { label: 'Αλκοολούχα Ποτά', icon: 'Κάβα' },
+  'soft-drinks': { label: 'Αναψυκτικά & Energy Drinks', icon: 'Κάβα' },
+  water: { label: 'Νερά', icon: 'Κάβα' },
+  'drinks-other': { label: 'Άλλα Ποτά', icon: 'Κάβα' },
+  'Προσωπική Φροντίδα': { label: 'Προσωπική Φροντίδα', icon: 'Προσωπική Φροντίδα' },
+  'Βρεφικά Είδη': { label: 'Βρεφικά Είδη', icon: 'Βρεφικά Είδη' },
+  'Είδη Καθαρισμού & Σπιτιού': { label: 'Καθαρισμός & Σπίτι', icon: 'Είδη Καθαρισμού & Σπιτιού' },
+  'Είδη Κατοικιδίων': { label: 'Είδη Κατοικιδίων', icon: 'Είδη Κατοικιδίων' },
+  'Άλλο': { label: 'Άλλο', icon: 'Άλλο' },
 };
 
 const normalize = (value: string | null | undefined) =>
@@ -111,7 +115,7 @@ export function groupSupermarketDealsByAisle<T extends AisleDeal>(deals: T[]): S
     .map(([key, aisleDeals]) => ({
       key,
       label: META[key]?.label || key,
-      emoji: META[key]?.emoji || '📦',
+      icon: META[key]?.icon || 'Άλλο',
       // Graspable order inside each aisle: biggest provable discount first,
       // cheapest first among equals — the incoming hotScore order carries
       // ranking jitter that reads as random on a shelf.

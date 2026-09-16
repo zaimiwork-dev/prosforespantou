@@ -132,7 +132,7 @@ export function ShoppingList({ isOpen, onClose }) {
                     </div>
                     {savings >= 0.10 && (
                       <div className="list-group-savings">
-                        💡 Με αλλαγή καταστήματος σε αυτά τα προϊόντα γλιτώνεις έως <b>{savings.toFixed(2)}€</b>
+                        <Icon.Info size={14} /> Με αλλαγή καταστήματος σε αυτά τα προϊόντα γλιτώνεις έως <b>{savings.toFixed(2)}€</b>
                       </div>
                     )}
                     <div className="list-group-body">

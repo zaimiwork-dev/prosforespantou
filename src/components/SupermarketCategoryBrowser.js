@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { browseSupermarketDeals } from '@/actions/browse-supermarket-deals';
 import { DealGrid } from './DealGrid';
+import { Icon } from './Icons';
 
 const PAGE_SIZE = 48;
 
@@ -15,7 +16,7 @@ function CategoryCard({ node, onClick }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={node.image} alt="" />
         ) : (
-          <span>🏷️</span>
+          <Icon.Tag size={22} />
         )}
       </span>
       <strong>{node.label}</strong>

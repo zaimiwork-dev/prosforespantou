@@ -16,7 +16,8 @@ import { baselineForCard } from '@/lib/baseline-price';
 
 // Honest "good deal" labels — only positive verdicts ever reach the card
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
-const VERDICT_LABEL = { lowest: '🔥 Χαμηλότερη τιμή', good: '✅ Καλή τιμή' };
+const VERDICT_LABEL = { lowest: 'Χαμηλότερη τιμή', good: 'Καλή τιμή' };
+const VERDICT_ICON = { lowest: Icon.Fire, good: Icon.Check };
 
 // `list` names the surface the card sits in ("home:essentials", "deals" …;
 // defaults to the route) and `position` its slot — both ride on impressions,
@@ -85,6 +86,7 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
   }, nowMs);
 
   const showVerdict = isPositiveVerdict(d.priceVerdict);
+  const VerdictIcon = VERDICT_ICON[d.priceVerdict];
 
   // Precomputed count of OTHER chains the comparison sheet renders rows for
   // (recompute-comparison-counts.mjs). +1 = total stores with a price shown,
@@ -230,10 +232,16 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
         {(showVerdict || showCompare) && (
           <div className="pill-row">
             {showVerdict && (
-              <div className="verdict-pill">{VERDICT_LABEL[d.priceVerdict]}</div>
+              <div className="verdict-pill">
+                {VerdictIcon && <VerdictIcon size={12} />}
+                <span>{VERDICT_LABEL[d.priceVerdict]}</span>
+              </div>
             )}
             {showCompare && (
-              <div className="compare-pill">⚖️ Τιμές σε {compareChains} καταστήματα</div>
+              <div className="compare-pill">
+                <Icon.Store size={12} />
+                <span>Τιμές σε {compareChains} καταστήματα</span>
+              </div>
             )}
           </div>
         )}

@@ -101,4 +101,51 @@ export const Icon = {
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   ),
+  // Comparison, alerts and empty states — added 2026-09-16 when the emoji
+  // that stood in for them (🔔 💰 📦 🏢 💡 📖 ⚠️ 🔍 ⚖️) were replaced: they
+  // rendered differently on every platform and read as decoration, not UI.
+  Bell: ({ size = 18 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M18 9a6 6 0 1 0-12 0c0 4-1.5 5.5-2 6h16c-.5-.5-2-2-2-6Z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </svg>
+  ),
+  Wallet: ({ size = 14 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+      <path d="M16 11h5v4h-5a2 2 0 0 1 0-4Z" />
+    </svg>
+  ),
+  Box: ({ size = 14 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5v-7Z" />
+      <path d="m3 8.5 9 4.5 9-4.5M12 13v7" />
+    </svg>
+  ),
+  Store: ({ size = 14 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M4 10v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9" />
+      <path d="M3 5h18l1 4a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0l1-4Z" />
+    </svg>
+  ),
+  Book: ({ size = 16 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z" />
+      <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H12v16h5.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" />
+    </svg>
+  ),
+  Info: ({ size = 14 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <circle cx="12" cy="8" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  Warning: ({ size = 32 }) => (
+    <svg {...base(size)} strokeWidth="1.6">
+      <path d="M10.3 4.3 2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 10v4" />
+      <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };

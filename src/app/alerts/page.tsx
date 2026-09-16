@@ -2,6 +2,7 @@ import { getAlerts } from '@/actions/alerts';
 import { AlertsClient } from '@/components/AlertsClient';
 import { SiteHeader } from '@/components/SiteHeader';
 import { Footer } from '@/components/Footer';
+import { Icon } from '@/components/Icons';
 
 export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token } = await searchParams;
@@ -13,7 +14,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <SiteHeader cartCount={0} />
         <main style={{ flex: 1, padding: '48px 20px', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
+          <div style={{ color: 'var(--brand)', marginBottom: 12 }}><Icon.Bell size={36} /></div>
           <h1 style={{ fontSize: 24, marginBottom: 12 }}>Ειδοποιήσεις προσφορών</h1>
           <p style={{ color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 8 }}>
             Γράψου στο newsletter από την αρχική σελίδα και θα σου στέλνουμε email

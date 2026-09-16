@@ -167,7 +167,12 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
           if (perPiece) parts.push(`Η τιμή αφορά ${pack.units} τεμάχια — περίπου ${perPiece}€/τεμ.`);
           if (unit && unit.per !== 'τεμ.') parts.push(`≈ ${unit.value.toFixed(2)}€/${unit.per}`);
           else if (unit && !perPiece) parts.push(`≈ ${unit.value.toFixed(2)}€/τεμ.`);
-          return <div className="od-pack">📦 {parts.join(' · ')}</div>;
+          return (
+    <div className="od-pack">
+      <Icon.Box size={14} />
+      <span>{parts.join(' · ')}</span>
+    </div>
+  );
         })()}
 
         {exp.upcoming && exp.startFull && (
@@ -225,7 +230,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
             onClick={handleAdd}
             disabled={added}
           >
-            {added ? '✓ Προστέθηκε' : 'Προσθήκη στη λίστα'}
+            {added ? <><Icon.Check size={16} /> Προστέθηκε</> : 'Προσθήκη στη λίστα'}
           </button>
         </div>
 

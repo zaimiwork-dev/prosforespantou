@@ -15,10 +15,11 @@
 import { useState } from 'react';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { formatShortDate } from '@/lib/expiry-label';
+import { Icon } from './Icons';
 
 const VERDICT_STYLE = {
-  lowest: { bg: '#d1fae5', fg: '#065f46', label: '🔥 Χαμηλότερη τιμή που έχουμε δει' },
-  good:   { bg: '#dcfce7', fg: '#166534', label: '✅ Καλή τιμή' },
+  lowest: { bg: '#d1fae5', fg: '#065f46', label: 'Χαμηλότερη τιμή που έχουμε δει', icon: Icon.Fire },
+  good:   { bg: '#dcfce7', fg: '#166534', label: 'Καλή τιμή', icon: Icon.Check },
 };
 
 // Internal drawing space; the svg scales to its container.
@@ -112,11 +113,13 @@ export function PriceHistory({ history, compact = false }) {
       }}>
         {showBadge && (
           <div style={{
-            display: 'inline-block', background: style.bg, color: style.fg,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            background: style.bg, color: style.fg,
             fontSize: 11, fontWeight: 800, padding: '4px 10px',
             borderRadius: 8, letterSpacing: '0.2px', marginBottom: 8,
           }}>
-            {style.label}
+            <style.icon size={12} />
+            <span>{style.label}</span>
           </div>
         )}
 

@@ -21,7 +21,7 @@ import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 const PAGE_SIZE = 24;
 
 const SORTS = [
-  { id: "hot",       label: "🔥 Δημοφιλή" },
+  { id: "hot",       label: "Δημοφιλή" },
   { id: "expiring",  label: "Λήγουν σύντομα" },
   { id: "discount",  label: "Μεγαλύτερη έκπτωση" },
   { id: "price_asc", label: "Τιμή: χαμηλή → υψηλή" },
@@ -282,7 +282,7 @@ export default function DealsClient({ initial }) {
               onClick={() => setSelectedSMs([])}
               aria-pressed={selectedSMs.length === 0}
             >
-              <span className="sm-chip-all-icon" aria-hidden="true">★</span>
+              <span className="sm-chip-all-icon" aria-hidden="true"><Icon.Star size={12} filled /></span>
               <span className="sm-chip-label">Όλα</span>
             </button>
             {liveSMs.map((s) => (

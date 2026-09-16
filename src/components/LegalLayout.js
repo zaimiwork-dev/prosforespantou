@@ -1,6 +1,7 @@
 // Shared chrome for the static legal pages (Απόρρητο / Όροι / Cookies).
 // Server component — plain readable layout matching the site's vanilla-CSS style.
 import Link from 'next/link';
+import { Icon } from './Icons';
 
 export function LegalLayout({ title, updated, children }) {
   return (
@@ -30,8 +31,9 @@ export function H2({ children }) {
 export function Fill({ children }) {
   // Visible marker for content the owner / a lawyer must finalise before launch.
   return (
-    <span style={{ background: '#fff3cd', border: '1px solid #ffe69c', borderRadius: 4, padding: '0 4px', fontSize: 13 }}>
-      ⚠️ {children}
+    <span style={{ background: '#fff3cd', border: '1px solid #ffe69c', borderRadius: 4, padding: '0 4px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <Icon.Warning size={13} />
+      {children}
     </span>
   );
 }

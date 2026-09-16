@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useShoppingListStore } from '@/lib/store';
 import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from './CategoryIcon';
+import { Icon } from './Icons';
 import { getTextSize, setTextSize } from '@/lib/text-size';
 import { track } from '@/lib/track';
 
@@ -95,7 +96,7 @@ function PreferredStoresSheetInner({ onClose, intro }) {
         {/* Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #ececf0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "#1c1e24", display: "flex", alignItems: "center", gap: 8 }}>
-            {intro ? 'Καλώς ήρθες! 👋' : '⚙️ Οι προτιμήσεις μου'}
+            {intro ? 'Καλώς ήρθες' : (<><Icon.Settings size={18} /> Οι προτιμήσεις μου</>)}
           </h2>
           <button
             onClick={onClose}
@@ -123,7 +124,7 @@ function PreferredStoresSheetInner({ onClose, intro }) {
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
           <p style={{ fontSize: 14, color: "#8b929c", margin: "0 0 20px 0", lineHeight: "1.5" }}>
             {intro
-              ? 'Χιλιάδες προσφορές κάθε μέρα — πες μας τι ψωνίζεις και θα σου δείχνουμε πρώτα ό,τι σε ενδιαφέρει. Τα αλλάζεις όποτε θες από το ⚙️ πάνω δεξιά.'
+              ? 'Χιλιάδες προσφορές κάθε μέρα — πες μας τι ψωνίζεις και θα σου δείχνουμε πρώτα ό,τι σε ενδιαφέρει. Τα αλλάζεις όποτε θες από τις ρυθμίσεις, πάνω δεξιά.'
               : 'Διάλεξε καταστήματα και κατηγορίες. Θα προτεραιοποιούμε προσφορές από αυτά.'}
           </p>
 
@@ -153,7 +154,7 @@ function PreferredStoresSheetInner({ onClose, intro }) {
                 >
                   <span style={{ fontSize: opt.size, fontWeight: 900, lineHeight: 1 }}>{opt.sample}</span>
                   {opt.label}
-                  {isSelected && <span style={{ color: "#2d6a4f", fontWeight: 900 }}>✓</span>}
+                  {isSelected && <span style={{ color: "#2d6a4f", display: "inline-flex" }}><Icon.Check size={14} /></span>}
                 </button>
               );
             })}
@@ -187,7 +188,7 @@ function PreferredStoresSheetInner({ onClose, intro }) {
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: sm.color, flexShrink: 0 }} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#1c1e24" }}>{sm.name}</span>
                   {isSelected && (
-                    <span style={{ position: "absolute", top: 6, right: 8, fontSize: 12, color: sm.color, fontWeight: 900 }}>✓</span>
+                    <span style={{ position: "absolute", top: 6, right: 8, color: sm.color, display: "inline-flex" }}><Icon.Check size={13} /></span>
                   )}
                 </button>
               );
@@ -221,7 +222,7 @@ function PreferredStoresSheetInner({ onClose, intro }) {
                 >
                   <CategoryIcon id={c.id} size={15} />
                   {c.label}
-                  {isSelected && <span style={{ color: "#2d6a4f", fontWeight: 900 }}>✓</span>}
+                  {isSelected && <span style={{ color: "#2d6a4f", display: "inline-flex" }}><Icon.Check size={14} /></span>}
                 </button>
               );
             })}

@@ -10,6 +10,7 @@ import { ProductSheet } from "@/components/ProductSheet";
 import { ShoppingList } from "@/components/ShoppingList";
 import { Footer } from "@/components/Footer";
 import { track } from "@/lib/track";
+import { Icon } from "@/components/Icons";
 
 // Starting points for the empty search screen — the staples a Greek
 // household actually hunts for, in the words shoppers type (no brands).
@@ -173,10 +174,10 @@ export function SearchPage({ query, deals, catalogProducts = [] }) {
             color: "#fff", width: 56, height: 56, borderRadius: "50%",
             border: "none", cursor: "pointer", zIndex: 100,
             boxShadow: "0 10px 24px rgba(0,157,224,0.45)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          🛒
+          <Icon.Bag size={24} />
           <span style={{
             position: "absolute", top: -4, right: -4,
             background: "#ff3b30", color: "#fff", minWidth: 22, height: 22,

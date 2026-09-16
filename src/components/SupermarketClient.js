@@ -113,7 +113,7 @@ function expandSearch(query) {
 }
 
 const SORTS = [
-  { id: "hot",        label: "🔥 Δημοφιλή" },
+  { id: "hot",        label: "Δημοφιλή" },
   { id: "expiring",   label: "Λήγουν σύντομα" },
   { id: "discount",   label: "Μεγαλύτερη έκπτωση" },
   { id: "price_asc",  label: "Τιμή: χαμηλή → υψηλή" },
@@ -318,7 +318,8 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
                     });
                   }}
                 >
-                  📖 Δες το φυλλάδιο
+                  <Icon.Book size={16} />
+                  <span>Δες το φυλλάδιο</span>
                 </a>
               </>
             )}
@@ -344,7 +345,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
             className={viewMode === "offers" ? "active" : ""}
             onClick={() => switchView("offers")}
           >
-            <span>🏷️</span>
+            <span className="svt-ico"><Icon.Tag size={18} /></span>
             <span>
               <strong>Προσφορές</strong>
               <small>{initialPreviewCount.toLocaleString("el-GR")} επιλεγμένες</small>
@@ -355,7 +356,7 @@ export default function SupermarketClient({ sm, initialDeals, totalCount, catalo
             className={viewMode === "categories" ? "active" : ""}
             onClick={() => switchView("categories")}
           >
-            <span>▦</span>
+            <span className="svt-ico"><Icon.Grid size={18} /></span>
             <span>
               <strong>Κατηγορίες</strong>
               <small>Βρες αυτό που ψάχνεις</small>

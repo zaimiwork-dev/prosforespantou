@@ -106,7 +106,7 @@ ${confirmUrl}
 Για αποεγγραφή: ${unsubUrl}`;
 
   const body = `
-    <p style="margin:0 0 16px">Καλώς ήρθες! 👋</p>
+    <p style="margin:0 0 16px">Καλώς ήρθες.</p>
     <p style="margin:0 0 20px">Πάτησε το παρακάτω κουμπί για να επιβεβαιώσεις την εγγραφή σου στις ενημερώσεις προσφορών.</p>
     <p style="margin:0 0 24px;text-align:center">
       <a href="${confirmUrl}" style="display:inline-block;padding:13px 28px;background:#009de0;color:#fff;text-decoration:none;border-radius:10px;font-weight:800;font-size:15px">

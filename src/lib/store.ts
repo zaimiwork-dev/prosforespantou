@@ -134,7 +134,13 @@ export const useShoppingListStore = create<ShoppingListState>()(
           return `• ${qty}x ${name} (${sm?.short || 'SM'}) - ${price}€`;
         }).join('\n');
 
-        return `🏷️ ΠΡΟΣΦΟΡΕΣ ΠΑΝΤΟΥ - Η Λίστα Μου\n\n${itemsList}\n\n💰 ΣΥΝΟΛΙΚΟ ΚΟΣΤΟΣ: ${total}€\n\nΔες περισσότερα στο: ${window.location.origin}`;
+        return `ΠΡΟΣΦΟΡΕΣ ΠΑΝΤΟΥ — Η λίστα μου
+
+${itemsList}
+
+Σύνολο: ${total}€
+
+Δες περισσότερα στο: ${window.location.origin}`;
       }
     }),
     {

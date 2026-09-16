@@ -188,7 +188,7 @@ function PublicSite({ initial, onAdmin }) {
 
           {forYou?.length > 0 && (
             <FeaturedCarousel
-              title="✨ Για σένα"
+              title="Για σένα"
               sub="Με βάση όσα σε ενδιαφέρουν"
               deals={forYou}
               onAdd={addItem}

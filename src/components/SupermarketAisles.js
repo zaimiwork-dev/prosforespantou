@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { DealGrid } from './DealGrid';
 import { groupSupermarketDealsByAisle } from '@/lib/supermarket-aisles';
+import { CategoryIcon } from './CategoryIcon';
 
 const PREVIEW_SIZE = 6;
 
@@ -21,7 +22,7 @@ export function SupermarketAisles({ deals, onAdd, onSelect }) {
           <section className="supermarket-aisle" key={aisle.key}>
             <div className="supermarket-aisle-head">
               <div className="supermarket-aisle-title">
-                <span aria-hidden="true">{aisle.emoji}</span>
+                <CategoryIcon id={aisle.icon} size={18} />
                 <h3>{aisle.label}</h3>
               </div>
               <span>{aisle.deals.length.toLocaleString('el-GR')} εμφανίζονται</span>

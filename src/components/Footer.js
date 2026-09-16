@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { subscribe } from '@/actions/subscribe';
+import { Icon } from './Icons';
 
 export function Footer() {
   const [email, setEmail] = useState('');
@@ -24,7 +25,7 @@ export function Footer() {
   return (
     <footer style={{ background: '#fff', borderTop: '1px solid #eee', padding: '48px 20px', marginTop: 40 }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 900 }}>Μην χάνεις καμία προσφορά! 📢</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 900 }}>Μην χάνεις καμία προσφορά</h3>
         <p style={{ color: '#666', marginBottom: 24, fontSize: 14, maxWidth: 400 }}>
           Θα σου στέλνουμε τις κορυφαίες προσφορές της εβδομάδας. Άκυρο οποτεδήποτε.
         </p>
@@ -64,9 +65,13 @@ export function Footer() {
           </button>
         </form>
 
-        {status === 'success' && <p style={{ color: '#2d6a4f', fontSize: 12, marginTop: 12, fontWeight: 700 }}>✓ Είσαι στη λίστα! Θα σε ειδοποιήσουμε όταν ξεκινήσει το newsletter.</p>}
-        {status === 'rate_limited' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>⏳ Πολλές προσπάθειες. Δοκίμασε σε λίγο.</p>}
-        {status === 'error' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>❌ Κάτι πήγε στραβά. Δοκίμασε ξανά.</p>}
+        {status === 'success' && (
+          <p style={{ color: '#2d6a4f', fontSize: 12, marginTop: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Icon.Check size={14} /> Είσαι στη λίστα! Θα σε ειδοποιήσουμε όταν ξεκινήσει το newsletter.
+          </p>
+        )}
+        {status === 'rate_limited' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>Πολλές προσπάθειες. Δοκίμασε σε λίγο.</p>}
+        {status === 'error' && <p style={{ color: '#e63946', fontSize: 12, marginTop: 12, fontWeight: 700 }}>Κάτι πήγε στραβά. Δοκίμασε ξανά.</p>}
 
         <nav style={{ marginTop: 40, display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 13 }}>
           <a href="/aporrito" style={{ color: '#666', textDecoration: 'none' }}>Απόρρητο</a>

@@ -4,6 +4,9 @@ import { createAlert, deleteAlert } from '@/actions/alerts';
 import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { Icon } from './Icons';
 
+// One criterion chip on a saved alert: icon and text on the same baseline.
+const CRIT = { display: 'inline-flex', alignItems: 'center', gap: 4 };
+
 export function AlertsClient({ initialAlerts, token }) {
   const [alerts, setAlerts] = useState(initialAlerts || []);
   const [keyword, setKeyword] = useState('');
@@ -11,7 +14,7 @@ export function AlertsClient({ initialAlerts, token }) {
   const [selectedSMs, setSelectedSMs] = useState([]);
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState(null);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -30,12 +33,12 @@ export function AlertsClient({ initialAlerts, token }) {
       setMaxPrice('');
       setSelectedSMs([]);
       setCategory('');
-      setMsg('✓ Ειδοποίηση προστέθηκε!');
+      setMsg({ ok: true, text: 'Η ειδοποίηση προστέθηκε' });
     } else {
-      setMsg(`❌ ${res.error}`);
+      setMsg({ ok: false, text: res.error });
     }
     setLoading(false);
-    setTimeout(() => setMsg(''), 3000);
+    setTimeout(() => setMsg(null), 3000);
   };
 
   const handleDelete = async (id) => {
@@ -54,7 +57,7 @@ export function AlertsClient({ initialAlerts, token }) {
 
   return (
     <div>
-      <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Οι Ειδοποιήσεις μου 🔔</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Οι ειδοποιήσεις μου</h1>
       <p style={{ color: '#666', marginBottom: 32 }}>Θα σε ενημερώσουμε αμέσως μόλις βρεθεί προσφορά που ταιριάζει στα κριτήριά σου.</p>
 
       <div style={{ background: '#fff', padding: 24, borderRadius: 20, border: '1px solid #eee', marginBottom: 40, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
@@ -105,7 +108,11 @@ export function AlertsClient({ initialAlerts, token }) {
             {loading ? '...' : 'ΔΗΜΙΟΥΡΓΙΑ ΕΙΔΟΠΟΙΗΣΗΣ'}
           </button>
         </form>
-        {msg && <p style={{ textAlign: 'center', marginTop: 12, fontSize: 13, fontWeight: 700, color: msg.includes('❌') ? '#e63946' : '#2d6a4f' }}>{msg}</p>}
+        {msg && (
+          <p style={{ textAlign: 'center', marginTop: 12, fontSize: 13, fontWeight: 700, color: msg.ok ? '#2d6a4f' : '#e63946' }}>
+            {msg.text}
+          </p>
+        )}
       </div>
 
       <div style={{ display: 'grid', gap: 12 }}>
@@ -119,9 +126,9 @@ export function AlertsClient({ initialAlerts, token }) {
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{a.keyword}</div>
               <div style={{ fontSize: 12, color: '#666', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {a.maxPrice && <span>💰 Έως {Number(a.maxPrice).toFixed(2)}€</span>}
-                {a.category && <span>📦 {a.category}</span>}
-                {a.supermarkets.length > 0 && <span>🏢 {a.supermarkets.map(s => SUPERMARKETS.find(sm => sm.id === s)?.short).join(', ')}</span>}
+                {a.maxPrice && <span style={CRIT}><Icon.Wallet size={13} /> Έως {Number(a.maxPrice).toFixed(2)}€</span>}
+                {a.category && <span style={CRIT}><Icon.Box size={13} /> {a.category}</span>}
+                {a.supermarkets.length > 0 && <span style={CRIT}><Icon.Store size={13} /> {a.supermarkets.map(s => SUPERMARKETS.find(sm => sm.id === s)?.short).join(', ')}</span>}
                 {!a.maxPrice && !a.category && a.supermarkets.length === 0 && <span>Όλα τα κριτήρια</span>}
               </div>
             </div>
