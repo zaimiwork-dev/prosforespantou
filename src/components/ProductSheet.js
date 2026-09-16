@@ -52,6 +52,7 @@ export function ProductSheet({ product, onClose, onAdd }) {
 function ProductSheetInner({ product, onClose, onAdd }) {
   // null while loading — PriceComparison renders nothing until the fetch
   // lands, then either rows or an honest "not found elsewhere" line.
+  const [copied, setCopied] = useState(false);
   const [comparison, setComparison] = useState(null);
   const [history, setHistory] = useState(null);
   const [similar, setSimilar] = useState([]);
@@ -93,7 +94,8 @@ function ProductSheetInner({ product, onClose, onAdd }) {
       try { await navigator.share({ title: displayName, text, url }); } catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(`${text}\n\n${url}`);
-      alert('Ο σύνδεσμος αντιγράφηκε!');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
@@ -103,9 +105,12 @@ function ProductSheetInner({ product, onClose, onAdd }) {
       onClose={onClose}
       title={sm?.name || 'Προσφορά'}
       actions={
-        <button type="button" className="sheet-close" onClick={handleShare} title="Κοινοποίηση" aria-label="Κοινοποίηση">
-          <Icon.Share size={15} />
-        </button>
+        <>
+          {copied && <span className="sheet-copied">Αντιγράφηκε</span>}
+          <button type="button" className="sheet-close" onClick={handleShare} title="Κοινοποίηση" aria-label="Κοινοποίηση">
+            <Icon.Share size={15} />
+          </button>
+        </>
       }
     >
       <OfferDetails offer={product} comparison={comparison} history={history} similar={similar} onAdd={onAdd} compact />

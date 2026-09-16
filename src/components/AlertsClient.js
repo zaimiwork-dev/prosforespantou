@@ -15,6 +15,7 @@ export function AlertsClient({ initialAlerts, token }) {
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -41,8 +42,15 @@ export function AlertsClient({ initialAlerts, token }) {
     setTimeout(() => setMsg(null), 3000);
   };
 
+  // Asks inside the row rather than through a browser dialog: one tap arms
+  // the bin, the next one deletes, and it disarms itself after five seconds.
   const handleDelete = async (id) => {
-    if (!confirm('Να διαγραφεί η ειδοποίηση;')) return;
+    if (pendingDelete !== id) {
+      setPendingDelete(id);
+      setTimeout(() => setPendingDelete((cur) => (cur === id ? null : cur)), 5000);
+      return;
+    }
+    setPendingDelete(null);
     const res = await deleteAlert(token, id);
     if (res.success) {
       setAlerts(alerts.filter(a => a.id !== id));
@@ -132,8 +140,18 @@ export function AlertsClient({ initialAlerts, token }) {
                 {!a.maxPrice && !a.category && a.supermarkets.length === 0 && <span>Όλα τα κριτήρια</span>}
               </div>
             </div>
-            <button onClick={() => handleDelete(a.id)} style={{ background: 'none', border: 'none', color: '#e63946', cursor: 'pointer', padding: 8 }}>
-              <Icon.X size={20} />
+            <button
+              onClick={() => handleDelete(a.id)}
+              style={{
+                background: pendingDelete === a.id ? '#e63946' : 'none',
+                color: pendingDelete === a.id ? '#fff' : '#e63946',
+                border: 'none', borderRadius: 10, cursor: 'pointer',
+                padding: pendingDelete === a.id ? '8px 12px' : 8,
+                fontWeight: 800, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <Icon.Trash size={16} />
+              {pendingDelete === a.id && 'Διαγραφή;'}
             </button>
           </div>
         ))}

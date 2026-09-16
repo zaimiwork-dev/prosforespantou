@@ -198,6 +198,10 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .btn-ghost:hover { background: var(--bg-soft); }
 .btn-outline { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); }
 .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+/* An armed destructive action — the second tap of an inline confirmation
+   (2026-09-16, replacing window.confirm in the shopping list). */
+.btn-danger { background: #e63946; color: #fff; border: 1px solid #e63946; }
+.btn-danger:hover { background: #d62839; }
 .btn-sm { padding: 6px 12px; font-size: 13px; }
 .btn-lg { padding: 14px 24px; font-size: 15px; height: 48px; }
 
@@ -1899,6 +1903,26 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* Inline answer to an action that used to be a browser dialog: the clear
+   confirmation and the «copied to clipboard» note both land here, under the
+   buttons, where the eye already is. */
+.drawer-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+.drawer-note .linkish {
+  color: var(--brand);
+  font-weight: 700;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .drawer-savings {
   margin: -4px 0 14px;
   font-size: 13px;
@@ -1982,6 +2006,16 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   border-bottom: 1px solid var(--line);
 }
 .sheet-head h2 { font-size: 17px; font-weight: 800; margin: 0; color: var(--ink); }
+.sheet-copied {
+  font-size: 12px; font-weight: 700;
+  color: var(--good);
+  background: color-mix(in oklab, var(--good) 12%, #fff);
+  border-radius: 999px;
+  padding: 4px 10px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
 .sheet-close {
   width: 32px; height: 32px; border-radius: 50%;
   border: none; background: var(--bg-soft); color: var(--ink-3);

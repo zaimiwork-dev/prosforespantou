@@ -12,6 +12,8 @@ import { getCheaperAlternatives } from '@/actions/get-cheaper-alternatives';
 export function ShoppingList({ isOpen, onClose }) {
   const { items, addItem, decreaseItem, clearList, getShareText } = useShoppingListStore();
   const [alternatives, setAlternatives] = useState({});
+  const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -64,6 +66,13 @@ export function ShoppingList({ isOpen, onClose }) {
     [groupSavings]
   );
 
+  // An armed «Άδειασμα» gives itself back if the shopper does nothing.
+  useEffect(() => {
+    if (!confirming) return undefined;
+    const t = setTimeout(() => setConfirming(false), 5000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
   if (!isOpen) return null;
 
   const handleShare = async () => {
@@ -79,15 +88,22 @@ export function ShoppingList({ isOpen, onClose }) {
       } catch (err) { console.error('Error sharing:', err); }
     } else {
       await navigator.clipboard.writeText(text);
-      alert('Η λίστα αντιγράφηκε στο πρόχειρο!');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
+  // Emptying the list is the one destructive thing in here, and a browser
+  // confirm() is a jarring grey box that names the site, not the action. The
+  // button asks in place instead and gives itself back after a few seconds.
   const handleClear = () => {
-    if (confirm('Εκκαθάριση λίστας;')) {
-      track({ eventType: 'list_remove', page: 'list', query: 'clear', resultCount: items.length });
-      clearList();
+    if (!confirming) {
+      setConfirming(true);
+      return;
     }
+    setConfirming(false);
+    track({ eventType: 'list_remove', page: 'list', query: 'clear', resultCount: items.length });
+    clearList();
   };
 
   return (
@@ -215,10 +231,21 @@ export function ShoppingList({ isOpen, onClose }) {
               <button type="button" className="btn btn-primary" onClick={handleShare}>
                 <Icon.Share size={14} /> Κοινοποίηση
               </button>
-              <button type="button" className="btn btn-outline" onClick={handleClear}>
-                <Icon.Trash size={14} /> Άδειασμα
+              <button
+                type="button"
+                className={confirming ? 'btn btn-danger' : 'btn btn-outline'}
+                onClick={handleClear}
+              >
+                <Icon.Trash size={14} /> {confirming ? 'Σίγουρα;' : 'Άδειασμα'}
               </button>
             </div>
+            {confirming && (
+              <div className="drawer-note">
+                Θα αδειάσει και τα {items.length} προϊόντα.{' '}
+                <button type="button" className="linkish" onClick={() => setConfirming(false)}>Ακύρωση</button>
+              </div>
+            )}
+            {copied && <div className="drawer-note">Η λίστα αντιγράφηκε στο πρόχειρο.</div>}
           </div>
         )}
       </div>
