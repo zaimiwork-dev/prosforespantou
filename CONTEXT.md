@@ -160,7 +160,7 @@ Living snapshot of what the project is, how data flows, and where things live. R
 4. `RESEND_API_KEY` + verified domain (unchanged since June). Until then alerts, confirmation emails and `/alerts` are dead.
 5. `PROXY_URL` — or accept the laptop dependency and at least give the task the R2 env.
 6. Confirm the Sentry DSNs exist in Vercel (the fix shipped today is inert without them).
-7. ~~**Switch on the anonymous server profile (W4a).**~~ **DECIDED 2026-09-16: yes.** Owner to set `NEXT_PUBLIC_PROFILE_SYNC=1` in Vercel → Production and redeploy; /cookies and /aporrito switch to the server-profile wording automatically with the flag. Until the env var is set in Vercel, the feature stays inert in production.
+7. ~~**Switch on the anonymous server profile (W4a).**~~ **DECIDED 2026-09-16: yes.** Owner added `NEXT_PUBLIC_PROFILE_SYNC=1` in Vercel → Production (**Config**, not Secret — a Secret is not inlined into the browser bundle, so the flag would stay off) on 2026-09-16. The value is baked in at BUILD time, so it only takes effect on the next deploy. Verify live with: `curl -s https://prosforespantou.gr/cookies | grep -c pp-profile-id` (expect 1) and a row in `profiles` after a visitor accepts cookies.
 
 ### ⛔ Do NOT (in addition to every invariant in PHASES.md)
 - Do not widen `SHELF_PRICE_MAX_AGE_DAYS` as "the fix" for shelf rows — replace the gate with feed freshness (1d).
