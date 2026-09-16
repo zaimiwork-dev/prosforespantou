@@ -109,8 +109,19 @@ on:
           - kritikos-canonical
           - masoutis-catalog
           - sklavenitis-catalog
+          - shrink-images
       limit:
         description: 'Cap items for a *-resolver-only smoke run (blank = no cap)'
+        required: false
+        default: ''
+        type: string
+      apply:
+        description: 'shrink-images only: write the smaller objects back (off = dry run)'
+        required: false
+        default: false
+        type: boolean
+      prefix:
+        description: 'shrink-images only: bucket prefix, e.g. kritikos/ (blank = whole bucket)'
         required: false
         default: ''
         type: string
@@ -1090,3 +1101,29 @@ jobs:
           MIRROR_MAX_NEW: '2500'
           MIRROR_CONCURRENCY: '3'
           QUERY_LIMIT: '4000'
+
+  shrink-images:
+    # Manual only. Re-encodes the images already in the mirror bucket to WebP
+    # at 800px, in place (same key, same URL, nothing to change in the DB).
+    # Runs here rather than on the dev PC because it moves gigabytes: the
+    # bucket was 3.3 GB across 48k objects on 2026-09-16, and a random sample
+    # of the objects over 30 KB came out 72% smaller.
+    #
+    # Default is a DRY RUN — tick `apply` to actually write.
+    if: github.event.inputs.chain == 'shrink-images'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Shrink mirrored images
+        run: node src/scripts/shrink-mirrored-images.mjs
+        env:
+          APPLY: ${{ inputs.apply && '1' || '' }}
+          PREFIX: ${{ inputs.prefix }}
+          LIMIT: ${{ inputs.limit }}
+          CONCURRENCY: '8'

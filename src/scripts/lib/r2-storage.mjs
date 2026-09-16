@@ -57,6 +57,41 @@ export function makeR2Backend(cfg = resolveR2Config()) {
       });
       if (!res.ok) throw new Error(`R2 upload HTTP ${res.status}: ${(await res.text()).slice(0, 120)}`);
     },
+    // One object's bytes + media type, via the signed S3 API.
+    async download(path) {
+      const res = await client.fetch(`${cfg.endpoint}/${cfg.bucket}/${encodeURI(path)}`, {
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`R2 get HTTP ${res.status}`);
+      return {
+        bytes: Buffer.from(await res.arrayBuffer()),
+        contentType: res.headers.get('content-type') || '',
+      };
+    },
+    // Like listKeys, but with each object's size — enough to plan bulk work
+    // (shrink-mirrored-images.mjs) without downloading anything first.
+    async listObjects(onProgress) {
+      const out = [];
+      let token = null;
+      do {
+        const u = new URL(`${cfg.endpoint}/${cfg.bucket}`);
+        u.searchParams.set('list-type', '2');
+        u.searchParams.set('max-keys', '1000');
+        if (token) u.searchParams.set('continuation-token', token);
+        const res = await client.fetch(u.toString(), { signal: AbortSignal.timeout(30000) });
+        if (!res.ok) throw new Error(`R2 list HTTP ${res.status}: ${(await res.text()).slice(0, 120)}`);
+        const xml = await res.text();
+        for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+          const key = m[1].match(/<Key>([^<]+)<\/Key>/);
+          const size = m[1].match(/<Size>(\d+)<\/Size>/);
+          if (key) out.push({ key: decodeXml(key[1]), size: size ? parseInt(size[1], 10) : 0 });
+        }
+        const t = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
+        token = t ? decodeXml(t[1]) : null;
+        if (onProgress) onProgress(out.length);
+      } while (token);
+      return out;
+    },
     // Every key currently in the bucket (S3 ListObjectsV2, paginated). Uses the
     // signed S3 API — NOT the rate-limited public r2.dev host — so it is safe to
     // call for bulk resume/skip logic.

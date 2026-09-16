@@ -20,6 +20,7 @@
 
 import { createHash } from 'node:crypto';
 import { resolveR2Config, makeR2Backend } from './r2-storage.mjs';
+import { shrinkImage } from './shrink-image.mjs';
 
 export const BUCKET = 'chain-images';
 
@@ -119,7 +120,7 @@ export async function mirrorImages({
   rewrite = null,
   concurrency = parseInt(process.env.MIRROR_CONCURRENCY || '3', 10),
 }) {
-  const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, skipped: 0, warnings: [] };
+  const result = { enabled: false, attempted: 0, mirrored: 0, reused: 0, failed: 0, skipped: 0, shrunk: 0, warnings: [] };
 
   const backend = resolveMirrorBackend();
   if (!backend) {
@@ -177,7 +178,15 @@ export async function mirrorImages({
       const bytes = Buffer.from(await dl.arrayBuffer());
       if (bytes.byteLength < 100) throw new Error(`suspiciously small body (${bytes.byteLength} bytes)`);
 
-      await backend.upload(path, bytes, contentType);
+      // Downscale before storing: the image optimizer is off, so whatever
+      // lands here is what a phone downloads (see lib/shrink-image.mjs).
+      // The object KEEPS its source extension — the path is computed before
+      // the download so a re-run can HEAD-skip it — and the media type on the
+      // object says what the bytes really are. Browsers follow the header.
+      const shrunk = await shrinkImage(bytes, contentType);
+      if (shrunk.changed) result.shrunk++;
+
+      await backend.upload(path, shrunk.bytes, shrunk.contentType);
 
       item.imageUrl = publicUrl;
       result.mirrored++;
