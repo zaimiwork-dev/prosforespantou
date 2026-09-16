@@ -8,6 +8,7 @@ import { deleteDiscount } from "@/actions/admin/delete-discount";
 import { createDiscount } from "@/actions/admin/create-discount";
 import { createLeaflet, listLeaflets, deleteLeaflet } from "@/actions/admin/leaflet-actions";
 import { getStats } from "@/actions/admin/get-stats";
+import { Icon } from "@/components/Icons";
 import { getSubscribers } from "@/actions/admin/get-subscribers";
 import { listPendingMatches } from "@/actions/admin/list-pending-matches";
 import { approvePendingMatch } from "@/actions/admin/approve-pending-match";
@@ -36,6 +37,7 @@ const normalize = (s) => {
 const G = {
   blue: "#009de0",
   red: "#ff3b30",
+  green: "#2d6a4f",
   muted: "#707680",
   text: "#1c1e24"
 };
@@ -59,7 +61,7 @@ export function AdminAuth({ onAuth }) {
     <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: "#f0f2f5" }}>
       <form onSubmit={handleLogin} style={{ background: "#fff", padding: 40, borderRadius: 20, boxShadow: "0 10px 30px rgba(0,0,0,0.1)", width: "100%", maxWidth: 360 }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
-          <div style={{ fontSize: 40, marginBottom: 10 }}>🔒</div>
+          <div style={{ color: "#707680", marginBottom: 10 }}><Icon.Lock size={34} /></div>
           <h2 style={{ margin: 0 }}>Admin Login</h2>
         </div>
         <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Κωδικός Πρόσβασης" style={{ ...inp, marginBottom: 20 }} />
@@ -220,7 +222,7 @@ export function AdminPanel({ onBack }) {
       category: state.category || "Άλλο",
     });
     if (res.success) {
-      showMsg("✓ Approved");
+      showMsg("Approved");
       setPending((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== row.id), total: Math.max(0, p.total - 1) }));
     } else {
       showMsg(res.error || "Approve failed", "error");
@@ -262,7 +264,7 @@ export function AdminPanel({ onBack }) {
     const res = await bulkApprovePendingMatches({ supermarket: pendingFilterSM, minConfidence: conf });
     setBulkBusy(false);
     if (res.success) {
-      showMsg(`✓ Approved ${res.approved} · skipped ${res.skipped} · remaining ${res.remaining}`);
+      showMsg(`Approved ${res.approved} · skipped ${res.skipped} · remaining ${res.remaining}`);
       loadPending();
     } else {
       showMsg(res.error || "Bulk approve failed", "error");
@@ -278,7 +280,7 @@ export function AdminPanel({ onBack }) {
       category: state.category || "Άλλο",
     });
     if (res.success) {
-      showMsg("✓ Νέο SKU δημιουργήθηκε");
+      showMsg("Νέο SKU δημιουργήθηκε");
       setPending((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== row.id), total: Math.max(0, p.total - 1) }));
     } else {
       showMsg(res.error || "Create failed", "error");
@@ -319,7 +321,7 @@ export function AdminPanel({ onBack }) {
       autoDeleteDays: isDateless && autoDays && autoDays > 0 ? autoDays : null,
     });
     if (res.success) {
-      showMsg("✓ Φυλλάδιο αποθηκεύτηκε!");
+      showMsg("Φυλλάδιο αποθηκεύτηκε");
       setLeafletForm(emptyLeafletForm);
       loadLeaflets();
     } else {
@@ -351,7 +353,7 @@ export function AdminPanel({ onBack }) {
     setSaving(true);
     const res = await createDiscount(form);
     if (res.success) {
-      showMsg("✓ Η προσφορά αποθηκεύτηκε!");
+      showMsg("Η προσφορά αποθηκεύτηκε");
       setForm(emptyForm);
       loadList(true);
     } else {
@@ -406,7 +408,7 @@ export function AdminPanel({ onBack }) {
   const filteredList = discounts.filter((d) => !search || normalize(d.productName || "").includes(normalize(search)));
 
   const renderStatsTable = () => {
-    if (statsLoading) return <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση στατιστικών...</div>;
+    if (statsLoading) return <div style={{ textAlign: "center", padding: 40 }}>Φόρτωση στατιστικών…</div>;
     
     const smStats = {};
     SUPERMARKETS.forEach(sm => {
@@ -464,7 +466,7 @@ export function AdminPanel({ onBack }) {
   };
 
   const renderHealthTab = () => {
-    if (healthLoading) return <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση υγείας pipeline...</div>;
+    if (healthLoading) return <div style={{ textAlign: "center", padding: 40 }}>Φόρτωση υγείας pipeline…</div>;
 
     const STATUS = {
       ok: { label: "OK", bg: "#e8f7ee", fg: "#1b7a43" },
@@ -506,7 +508,7 @@ export function AdminPanel({ onBack }) {
           <div style={{ fontSize: 12, color: G.muted }}>
             Ένα feed ανά (αλυσίδα, πηγή). «Νεκρό» = καμία υγιής εκτέλεση μέσα στο όριό του — έλεγξε τον adapter.
           </div>
-          <button onClick={loadHealth} style={{ marginLeft: "auto", background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 RELOAD</button>
+          <button onClick={loadHealth} style={{ marginLeft: "auto", background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>RELOAD</button>
         </div>
 
         {coverage && (
@@ -629,7 +631,9 @@ export function AdminPanel({ onBack }) {
                   <tr key={r.id} style={{ borderTop: "1px solid #eee", background: r.healthOk ? "transparent" : "#fff8f0" }}>
                     <td style={td} title={new Date(r.finishedAt).toLocaleString("el-GR")}>{timeAgo(r.finishedAt)}</td>
                     <td style={{ ...td, fontWeight: 700 }}>{r.chain} <span style={{ color: G.muted, fontWeight: 400 }}>/ {r.source}</span></td>
-                    <td style={td}>{r.healthOk ? "✅" : "⚠️"}</td>
+                    <td style={td}>{r.healthOk
+                      ? <span style={{ color: G.green, display: "inline-flex" }}><Icon.Check size={15} /></span>
+                      : <span style={{ color: G.red, display: "inline-flex" }}><Icon.Warning size={15} /></span>}</td>
                     <td style={{ ...td, textAlign: "right" }}>{r.scrapedItems}</td>
                     <td style={{ ...td, textAlign: "right" }}>{r.matched}</td>
                     <td style={{ ...td, textAlign: "right" }}>{r.reviewQueued}</td>
@@ -648,7 +652,7 @@ export function AdminPanel({ onBack }) {
   };
 
   const renderSubsTable = () => {
-    if (subsLoading) return <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση συνδρομητών...</div>;
+    if (subsLoading) return <div style={{ textAlign: "center", padding: 40 }}>Φόρτωση συνδρομητών…</div>;
     
     const exportCSV = () => {
       const headers = ["Email", "Source", "Created", "Confirmed", "Unsubscribed"];
@@ -682,7 +686,7 @@ export function AdminPanel({ onBack }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Πρόσφατες εγγραφές</h3>
           <button onClick={exportCSV} style={{ background: "#1c1e24", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-            📥 EXPORT CSV
+            <Icon.Download size={14} /> EXPORT CSV
           </button>
         </div>
 
@@ -723,7 +727,7 @@ export function AdminPanel({ onBack }) {
     <div style={{ background: "#f8f9fa", minHeight: "100vh", padding: "24px 16px" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>⚙️ Admin Panel</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, display: "flex", alignItems: "center", gap: 8 }}><Icon.Settings size={20} /> Admin Panel</h1>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={handleLogout} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 700 }}>Logout</button>
             <button onClick={onBack} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 700 }}>← Back to Site</button>
@@ -732,9 +736,19 @@ export function AdminPanel({ onBack }) {
 
         <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: "1px solid #ddd", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "#f8f9fa", borderRadius: 12, padding: 5, width: "fit-content", border: "1px solid #eee" }}>
-            {[["list", `📋 Λίστα`], ["lib", "📚 Library"], ["leaf", "📖 Φυλλάδια"], ["review", "🧐 Review"], ["health", "🩺 Υγεία"], ["stats", "📊 Αναλυτικά"], ["subs", "📧 Συνδρομητές"], ["add", "➕ Νέα"]].map(([id, label]) => (
+            {[
+              ["list", "Λίστα", Icon.Tag],
+              ["lib", "Library", Icon.Grid],
+              ["leaf", "Φυλλάδια", Icon.Book],
+              ["review", "Review", Icon.Search],
+              ["health", "Υγεία", Icon.Pulse],
+              ["stats", "Αναλυτικά", Icon.Chart],
+              ["subs", "Συνδρομητές", Icon.Mail],
+              ["add", "Νέα", Icon.Plus],
+            ].map(([id, label, TabIcon]) => (
               <button key={id} onClick={() => setTab(id)}
-                style={{ background: tab === id ? "#1c1e24" : "transparent", color: tab === id ? "#fff" : "#707680", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                style={{ background: tab === id ? "#1c1e24" : "transparent", color: tab === id ? "#fff" : "#707680", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <TabIcon size={14} />
                 {label}
               </button>
             ))}
@@ -747,7 +761,7 @@ export function AdminPanel({ onBack }) {
                   <option value="all">Όλα τα supermarkets</option>
                   {SUPERMARKETS.map(sm => <option key={sm.id} value={sm.id}>{sm.name}</option>)}
                 </select>
-                <button onClick={loadPending} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 RELOAD</button>
+                <button onClick={loadPending} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>RELOAD</button>
                 <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{pending.total} σε εκκρεμότητα</div>
               </div>
 
@@ -772,22 +786,22 @@ export function AdminPanel({ onBack }) {
                     disabled={bulkBusy}
                     style={{ background: "#2d6a4f", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", cursor: bulkBusy ? "wait" : "pointer", fontWeight: 700, fontSize: 11 }}
                   >
-                    {bulkBusy ? "..." : "✓ Bulk approve"}
+                    {bulkBusy ? "…" : "Bulk approve"}
                   </button>
                   <button
                     onClick={handleBulkReject}
                     disabled={bulkBusy}
                     style={{ background: "#fff", border: `1px solid ${G.red}`, color: G.red, borderRadius: 8, padding: "6px 12px", cursor: bulkBusy ? "wait" : "pointer", fontWeight: 700, fontSize: 11, marginLeft: "auto" }}
                   >
-                    ✗ Reject all ({pending.total})
+                    Reject all ({pending.total})
                   </button>
                 </div>
               )}
 
               {pendingLoading ? (
-                <div style={{ textAlign: "center", padding: 40 }}>⏳ Φόρτωση...</div>
+                <div style={{ textAlign: "center", padding: 40 }}>Φόρτωση…</div>
               ) : pending.rows.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 60, background: "#f8f9fa", borderRadius: 16, color: G.muted }}>✅ Καμία εκκρεμότητα.</div>
+                <div style={{ textAlign: "center", padding: 60, background: "#f8f9fa", borderRadius: 16, color: G.muted }}>Καμία εκκρεμότητα.</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   {pending.rows.map((row) => {
@@ -809,8 +823,8 @@ export function AdminPanel({ onBack }) {
                             {canApprove
                               ? `→ ${row.suggestedProduct.name}`
                               : canCreateSku
-                                ? "❌ Καμία αντιστοιχία — δημιούργησε νέο SKU"
-                                : "❌ Καμία αντιστοιχία και χωρίς εικόνα"}
+                                ? "Καμία αντιστοιχία — δημιούργησε νέο SKU"
+                                : "Καμία αντιστοιχία και χωρίς εικόνα"}
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -829,7 +843,7 @@ export function AdminPanel({ onBack }) {
                               disabled={state.busy}
                               style={{ background: "#2d6a4f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}
                             >
-                              {state.busy ? "..." : "✓ Approve"}
+                              {state.busy ? "…" : "Approve"}
                             </button>
                           )}
                           {canCreateSku && (
@@ -838,14 +852,14 @@ export function AdminPanel({ onBack }) {
                               disabled={state.busy}
                               style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}
                             >
-                              {state.busy ? "..." : "🌟 Create SKU"}
+                              {state.busy ? "…" : "Create SKU"}
                             </button>
                           )}
                           <button
                             onClick={() => handleReject(row)}
                             style={{ background: "#fff", border: `1px solid ${G.red}`, color: G.red, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}
                           >
-                            ✗ Reject
+                            Reject
                           </button>
                         </div>
                       </div>
@@ -924,7 +938,7 @@ export function AdminPanel({ onBack }) {
                       })()}</td>
                       <td style={{ padding: 12 }}>{l.pdfUrl ? <a href={l.pdfUrl} target="_blank" rel="noreferrer" style={{ color: G.blue }}>PDF ↗</a> : "—"}</td>
                       <td style={{ padding: 12 }}>
-                        <button onClick={() => handleDeleteLeaflet(l.id)} style={{ color: G.red, background: "none", border: "none", cursor: "pointer" }}>🗑️</button>
+                        <button onClick={() => handleDeleteLeaflet(l.id)} style={{ color: G.red, background: "none", border: "none", cursor: "pointer" }} aria-label="Διαγραφή"><Icon.Trash size={16} /></button>
                       </td>
                     </tr>
                   ))}
@@ -936,16 +950,16 @@ export function AdminPanel({ onBack }) {
           {tab === "lib" && (
             <div>
               <div style={{ marginBottom: 18, display: "flex", gap: 10, alignItems: "center" }}>
-                <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="🔍 Search library..." style={{ ...inp, maxWidth: 300 }} />
+                <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search library…" style={{ ...inp, maxWidth: 300 }} />
                 <select value={libSM} onChange={(e) => setLibSM(e.target.value)} style={{ ...inp, maxWidth: 160 }}>
                   <option value="all">All Stores</option>
                   {SUPERMARKETS.map(sm => <option key={sm.id} value={sm.id}>{sm.name}</option>)}
                 </select>
-                <button onClick={() => loadLibrary(true)} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>🔄 LOAD PRODUCTS</button>
+                <button onClick={() => loadLibrary(true)} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>LOAD PRODUCTS</button>
                 <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: G.muted }}>{products.length} of {productTotal}</div>
               </div>
               {libLoading && products.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 60, background: "#f8f9fa", borderRadius: 16 }}>⏳ Fetching products...</div>
+                <div style={{ textAlign: "center", padding: 60, background: "#f8f9fa", borderRadius: 16 }}>Fetching products…</div>
               ) : (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
@@ -968,7 +982,7 @@ export function AdminPanel({ onBack }) {
                   {products.length < productTotal && (
                     <div style={{ textAlign: "center", marginTop: 18 }}>
                       <button onClick={() => loadLibrary(false)} disabled={libLoading} style={{ background: G.blue, color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", cursor: libLoading ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 12, opacity: libLoading ? 0.6 : 1 }}>
-                        {libLoading ? "⏳ Loading..." : `Φόρτωσε κι άλλα (${productTotal - products.length} ακόμα)`}
+                        {libLoading ? "Loading…" : `Φόρτωσε κι άλλα (${productTotal - products.length} ακόμα)`}
                       </button>
                     </div>
                   )}
@@ -980,7 +994,7 @@ export function AdminPanel({ onBack }) {
           {tab === "list" && (
             <div>
               <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 15, flexWrap: "wrap" }}>
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search active offers..." style={{ ...inp, maxWidth: 320 }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search active offers…" style={{ ...inp, maxWidth: 320 }} />
                 <label style={{ fontSize: 13, fontWeight: 700, color: G.muted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
                   <input type="checkbox" checked={filterFeatured} onChange={e => setFilterFeatured(e.target.checked)} />
                   Μόνο προβεβλημένες
@@ -1023,10 +1037,13 @@ export function AdminPanel({ onBack }) {
                                 fontSize: 11,
                               }}
                             >
-                              {featuredActive ? `⭐ ${d.featuredLabel || 'Featured'}` : "☆ Feature"}
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                <Icon.Star size={12} filled={featuredActive} />
+                                {featuredActive ? (d.featuredLabel || 'Featured') : 'Feature'}
+                              </span>
                             </button>
                           </td>
-                          <td style={{ padding: 12 }}><button onClick={() => handleDelete(d.id)} style={{ color: G.red, background: "none", border: "none", cursor: "pointer" }}>🗑️</button></td>
+                          <td style={{ padding: 12 }}><button onClick={() => handleDelete(d.id)} style={{ color: G.red, background: "none", border: "none", cursor: "pointer" }} aria-label="Διαγραφή"><Icon.Trash size={16} /></button></td>
                         </tr>
                       );
                     })}
@@ -1107,7 +1124,7 @@ export function AdminPanel({ onBack }) {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, paddingRight: 16 }}>{productDetail.name}</h2>
-              <button onClick={() => setProductDetail(null)} style={{ background: "transparent", border: "none", fontSize: 24, cursor: "pointer", color: G.muted, lineHeight: 1, padding: 0 }}>✕</button>
+              <button onClick={() => setProductDetail(null)} aria-label="Κλείσιμο" style={{ background: "transparent", border: "none", cursor: "pointer", color: G.muted, lineHeight: 1, padding: 0, display: "inline-flex" }}><Icon.X size={20} /></button>
             </div>
             {productDetail.imageUrl && (
               <div style={{ background: "#f8f9fa", borderRadius: 12, padding: 16, marginBottom: 16, textAlign: "center" }}>

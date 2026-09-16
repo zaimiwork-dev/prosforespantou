@@ -148,4 +148,36 @@ export const Icon = {
       <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
     </svg>
   ),
+  // Admin-panel glyphs (2026-09-16, when its emoji came out too).
+  Lock: ({ size = 32 }) => (
+    <svg {...base(size)} strokeWidth="1.7">
+      <rect x="4" y="10.5" width="16" height="10.5" rx="2.2" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+      <circle cx="12" cy="15.8" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  Download: ({ size = 16 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M12 3v11" />
+      <path d="m7 11 5 5 5-5" />
+      <path d="M5 20h14" />
+    </svg>
+  ),
+  Chart: ({ size = 16 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M4 20V4M4 20h16" />
+      <path d="M8 20v-6M12.5 20V8M17 20v-9" />
+    </svg>
+  ),
+  Mail: ({ size = 16 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="m3.5 7 8.5 6 8.5-6" />
+    </svg>
+  ),
+  Pulse: ({ size = 16 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M3 12h4l2.5-6 4 13L16 12h5" />
+    </svg>
+  ),
 };
