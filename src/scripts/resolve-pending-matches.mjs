@@ -211,7 +211,11 @@ async function callGroq(apiKey, prompt) {
         // max_completion_tokens.
         reasoning_effort: 'low',
         include_reasoning: false,
-        max_completion_tokens: 1024,
+        // 1024 still ran out on a long candidate list (CI 35113586372). The
+        // answer itself is ~40 tokens; the rest is thinking, and unused
+        // budget costs nothing — only what the model actually emits counts
+        // against the daily token cap.
+        max_completion_tokens: 1536,
       }),
       signal: AbortSignal.timeout(30000),
     });
@@ -220,6 +224,15 @@ async function callGroq(apiKey, prompt) {
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    // A 400 normally means the request is wrong and every later one will be
+    // too — worth aborting for. `json_validate_failed` is the exception: the
+    // model spent its output budget thinking and never closed the JSON for
+    // THIS item. Aborting the run over one awkward product name cost a whole
+    // CI resolver pass on 2026-09-16 (run 35113586372, item 24 of 50), so it
+    // is now a per-item miss: the row stays pending and the next item runs.
+    if (res.status === 400 && /json_validate_failed|max completion tokens/i.test(body)) {
+      return { error: `json_validate_failed (out of output budget): ${body.slice(0, 120)}`, status: 400 };
+    }
     if (PERMANENT_STATUSES.has(res.status)) {
       throw new GroqFatalError(`${res.status} ${body.slice(0, 300)}`);
     }

@@ -59,11 +59,26 @@ export function statedPieces(name: string | null | undefined): number | null {
   return null;
 }
 
-/** True when two names carry the same pack size (so prices are comparable). */
+/**
+ * True when two names carry the same pack size (so prices are comparable).
+ *
+ * packCount() is the old gate and still decides when neither name spells out
+ * a piece count. A stated count is stronger evidence and overrides it, which
+ * fixes both directions seen in the wild (CI resolver run, 2026-09-16):
+ *   «…330ml 6τεμ»          vs «…KOYTI 6*330ML»    → 6 = 6, the same six-pack
+ *   «…90Χ60cm 15τεμ»       vs «…90x60cm 15 Τεμάχια»
+ *       — packCount reads the Latin-x dimension as a 90-pack and the Greek-Χ
+ *         one as a single, so it disagreed with itself over a printed size;
+ *         both names say 15 pieces, and that is what matters.
+ * A name that states nothing is never blocked by one that does.
+ */
 export function samePack(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (packCount(a) !== packCount(b)) return false;
-  const pa = statedPieces(a);
-  const pb = statedPieces(b);
-  if (pa !== null && pb !== null && pa !== pb) return false;
-  return true;
+  const sa = statedPieces(a);
+  const sb = statedPieces(b);
+  if (sa !== null && sb !== null) return sa === sb;
+  const pa = packCount(a);
+  const pb = packCount(b);
+  if (sa !== null && sa === pb) return true;
+  if (sb !== null && sb === pa) return true;
+  return pa === pb;
 }

@@ -66,15 +66,38 @@ describe('samePack with stated pieces', () => {
     expect(samePack('Fairy Platinum Κάψουλες 30τεμ.', 'FAIRY Platinum Κάψουλες Πλυντηρίου Πιάτων')).toBe(true);
   });
 
-  // packCount has always read «4x12» as a 4-unit multipack, so these two
-  // spellings of 48 wipes were never compared with each other. statedPieces
-  // does not change that — it only ever ADDS a reason to refuse.
-  it('leaves the existing multipack rule as it was', () => {
-    expect(samePack('Μωρομάντηλα 4x12τεμ', 'Μωρομάντηλα 48τεμ')).toBe(false);
+  // packCount reads «4x12» as a 4-unit multipack, so these two spellings of
+  // 48 wipes never met. statedPieces multiplies them out and they do now.
+  it('matches two spellings of the same 48 pieces', () => {
+    expect(samePack('Μωρομάντηλα 4x12τεμ', 'Μωρομάντηλα 48τεμ')).toBe(true);
     expect(samePack('Μωρομάντηλα 4x12τεμ', 'Μωρομάντηλα 4x12τεμ Value')).toBe(true);
+    expect(samePack('Μωρομάντηλα 4x12τεμ', 'Μωρομάντηλα 3x12τεμ')).toBe(false);
   });
 
   it('keeps the multibuy rule', () => {
     expect(samePack('Μπίρα Κουτί 330ml (9+3 Δώρο)', 'Μπίρα Κουτί 330ml')).toBe(false);
+  });
+});
+
+// Both directions found by a CI resolver run on 2026-09-16, where a stated
+// piece count is better evidence than the pack multiplier.
+describe('samePack — a stated count beats the multiplier', () => {
+  it('matches «6τεμ» with «6*330ML»', () => {
+    expect(samePack('Fanta Exotic Zero 330ml 6τεμ', 'FANTA EXOTIC ZERO KOYTI 6*330ML')).toBe(true);
+  });
+
+  it('is not fooled by a printed dimension', () => {
+    expect(samePack(
+      'Septona Dry Plus Υποσέντονα 90Χ60cm 15τεμ',
+      'SEPTONA Υποσέντονα Dry Plus Regular 90x60cm 15 Τεμάχια',
+    )).toBe(true);
+    expect(samePack(
+      'Sanitas Σακούλες Απορριμμάτων 70x95cm 8τεμ',
+      'Sanitas Σακούλες Απορριμμάτων Γίγας 8τεμ.',
+    )).toBe(true);
+  });
+
+  it('still refuses two different stated counts', () => {
+    expect(samePack('Fairy Platinum Κάψουλες 19τεμ.', 'Fairy Platinum Κάψουλες 30τεμ.')).toBe(false);
   });
 });
