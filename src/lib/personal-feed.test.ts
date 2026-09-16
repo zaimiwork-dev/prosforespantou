@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rankPersonalFeed, personalScore, exploreSlots, savingSlots, STORE_BOOST, CHAIN_CAP } from './personal-feed';
+import { rankPersonalFeed, personalScore, exploreSlots, savingSlots, blendStreams, STORE_BOOST, CHAIN_CAP } from './personal-feed';
 import { EMPTY_PROFILE, bumpProfile } from './interest-profile';
 
 const offer = (id: string, over: Partial<Record<string, unknown>> = {}) => ({
@@ -181,5 +181,58 @@ describe('rankPersonalFeed — cheaper-elsewhere slot', () => {
     ];
     const out = rankPersonalFeed({ deals, profile: EMPTY_PROFILE, declaredCategories: [], preferredStores: ['ab'], limit: 14 });
     expect(out.map((d) => d.id).sort()).toEqual(['a', 'saver']);
+  });
+});
+
+describe('blendStreams', () => {
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
+  const stream = (prefix: string, n: number, from = 0) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${prefix}${from + i}` }));
+
+  it('alternates, starting with the shopper own chains', () => {
+    const { deals } = blendStreams(stream('m', 3), stream('r', 3), 6);
+    expect(ids(deals)).toEqual(['m0', 'r0', 'm1', 'r1', 'm2', 'r2']);
+  });
+
+  it('fills the page from the rest of the market when the own chains run dry', () => {
+    const { deals, mineUsed, restUsed } = blendStreams(stream('m', 1), stream('r', 6), 6);
+    expect(ids(deals)).toEqual(['m0', 'r0', 'r1', 'r2', 'r3', 'r4']);
+    expect(mineUsed).toBe(1);
+    expect(restUsed).toBe(5);
+  });
+
+  it('fills the page from the own chains when the rest runs dry', () => {
+    const { deals, mineUsed, restUsed } = blendStreams(stream('m', 6), stream('r', 1), 6);
+    expect(ids(deals)).toEqual(['m0', 'r0', 'm1', 'm2', 'm3', 'm4']);
+    expect(mineUsed).toBe(5);
+    expect(restUsed).toBe(1);
+  });
+
+  it('reports exactly what it consumed, so the two cursors never skip a row', () => {
+    const mine = stream('m', 20);
+    const rest = stream('r', 20);
+    const seen: string[] = [];
+    let mi = 0;
+    let ri = 0;
+    for (let page = 0; page < 3; page++) {
+      const out = blendStreams(mine.slice(mi, mi + 5), rest.slice(ri, ri + 10), 10);
+      seen.push(...ids(out.deals));
+      mi += out.mineUsed;
+      ri += out.restUsed;
+    }
+    expect(seen).toHaveLength(30);
+    expect(new Set(seen).size).toBe(30); // no repeats across pages
+    expect(seen.filter((x) => x.startsWith('m'))).toEqual(ids(mine.slice(0, 15)));
+    expect(seen.filter((x) => x.startsWith('r'))).toEqual(ids(rest.slice(0, 15)));
+  });
+
+  it('never returns more than the page asks for', () => {
+    expect(blendStreams(stream('m', 50), stream('r', 50), 4).deals).toHaveLength(4);
+  });
+
+  it('is empty when both streams are', () => {
+    const { deals, mineUsed, restUsed } = blendStreams([], [], 24);
+    expect(deals).toEqual([]);
+    expect(mineUsed + restUsed).toBe(0);
   });
 });

@@ -153,3 +153,39 @@ export function rankPersonalFeed<T extends FeedOffer>({
   }
   return out;
 }
+
+// ── /deals: the same "boost, don't filter" rule on the browse page ──────────
+//
+// «Όλες οι προσφορές» used to answer a shopper who had ticked two chains with
+// `where supermarket in (mine)`. Measured 2026-09-16 on the live set: an
+// ΑΒ+Lidl shopper was shown **471 of 15,907 offers (3%)** under that title,
+// and **2,951 cheapest-in-cluster rows were hidden from them** — the exact
+// thing this app exists to surface.
+//
+// A rail can afford to re-rank in the browser; a paginated list cannot, because
+// the cheaper chain may not appear in the loaded window at all (ΑΒ is 2% of
+// live offers — its rows are simply not in the first 24 by hotScore). So the
+// server runs TWO hot-ordered streams — their chains, and everyone else — and
+// blends them here. Each stream keeps its own offset, so pages never overlap
+// or repeat, and the two together are exactly the full set: `total` stays the
+// honest count of everything.
+export const MINE_SHARE = 0.5; // half the slots are the shopper's own chains
+
+// One of theirs, one of everyone else's, starting with theirs. When a stream
+// runs out the other fills the rest of the page, so the last pages are still
+// full. Returns how many rows each stream gave up, which is what advances the
+// two cursors.
+export function blendStreams<T>(
+  mine: T[],
+  rest: T[],
+  limit: number
+): { deals: T[]; mineUsed: number; restUsed: number } {
+  const deals: T[] = [];
+  let i = 0;
+  let j = 0;
+  while (deals.length < limit && (i < mine.length || j < rest.length)) {
+    if (i < mine.length) deals.push(mine[i++]);
+    if (deals.length < limit && j < rest.length) deals.push(rest[j++]);
+  }
+  return { deals, mineUsed: i, restUsed: j };
+}

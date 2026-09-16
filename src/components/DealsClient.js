@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { track } from "@/lib/track";
 import Link from "next/link";
 import { getActiveDeals } from "@/actions/get-active-deals";
+import { getBlendedDeals } from "@/actions/get-blended-deals";
 import { useShoppingListStore } from "@/lib/store";
 
 import { ProductSheet } from "@/components/ProductSheet";
@@ -45,9 +46,21 @@ export default function DealsClient({ initial }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const { items: cart, addItem, preferredStores, clearPreferred } = useShoppingListStore();
+  const { items: cart, addItem, preferredStores } = useShoppingListStore();
 
   const skipNextReloadRef = useRef(true);
+  // Two cursors for the blended default view: one into the shopper's own
+  // chains, one into everyone else's (see actions/get-blended-deals).
+  const streamRef = useRef({ mine: 0, rest: 0 });
+
+  // «Τα καταστήματά μου» leads the default order instead of filtering it.
+  // Measured 2026-09-16: as a WHERE clause it showed an ΑΒ+Lidl shopper 471
+  // of 15,907 offers under the title «Ολες οι προσφορες» and hid 2,951
+  // cheapest-in-cluster rows — the app's whole point. An explicit SORT is
+  // left alone (a blended «Τιμή: χαμηλή → υψηλή» would not be sorted at
+  // all), and explicit chips mean the shopper asked for exactly those chains.
+  const blendPreferred =
+    sortBy === "hot" && selectedSMs.length === 0 && preferredStores.length > 0;
 
   const load = useCallback(
     async (reset) => {
@@ -56,14 +69,34 @@ export default function DealsClient({ initial }) {
 
       try {
         const currentOffset = reset ? 0 : offset;
-        const { deals, total } = await getActiveDeals(
-          PAGE_SIZE,
-          currentOffset,
-          "all",
-          activeCategory,
-          sortBy,
-          selectedSMs.length > 0 ? selectedSMs : preferredStores
-        );
+        let deals;
+        let total;
+        if (blendPreferred) {
+          const cursor = reset ? { mine: 0, rest: 0 } : streamRef.current;
+          const res = await getBlendedDeals({
+            stores: preferredStores,
+            category: activeCategory,
+            limit: PAGE_SIZE,
+            mineOffset: cursor.mine,
+            restOffset: cursor.rest,
+          });
+          streamRef.current = { mine: res.mineOffset, rest: res.restOffset };
+          deals = res.deals;
+          total = res.total;
+          setHasMore(res.hasMore);
+        } else {
+          const res = await getActiveDeals(
+            PAGE_SIZE,
+            currentOffset,
+            "all",
+            activeCategory,
+            sortBy,
+            selectedSMs.length > 0 ? selectedSMs : undefined
+          );
+          deals = res.deals;
+          total = res.total;
+          setHasMore(currentOffset + deals.length < total);
+        }
         setTotalCount(total);
         // Only reset loads come from a filter/sort/store change (the initial
         // server render never calls load).
@@ -76,7 +109,6 @@ export default function DealsClient({ initial }) {
             resultCount: total,
           });
         }
-        setHasMore(currentOffset + deals.length < total);
         setOffset(currentOffset + deals.length);
         setDiscounts(reset ? deals : (prev) => [...prev, ...deals]);
       } catch (e) {
@@ -85,14 +117,19 @@ export default function DealsClient({ initial }) {
       setLoading(false);
       setLoadingMore(false);
     },
-    [selectedSMs, activeCategory, sortBy, offset, preferredStores]
+    [selectedSMs, activeCategory, sortBy, offset, preferredStores, blendPreferred]
   );
 
   const selectedSMsKey = selectedSMs.join(",");
+  const preferredKey = preferredStores.join(",");
   useEffect(() => {
     if (skipNextReloadRef.current) {
       skipNextReloadRef.current = false;
-      return;
+      // The server render cannot know the shopper's chains — they live in
+      // localStorage, and zustand may have rehydrated them before this mount.
+      // With chains ticked, the first paint is the plain all-chain list, so
+      // fetch the blended page now; without them it is already correct.
+      if (!blendPreferred) return;
     }
     load(true);
     const url = new URL(window.location);
@@ -101,7 +138,7 @@ export default function DealsClient({ initial }) {
     if (sortBy !== "hot") url.searchParams.set("sort", sortBy); else url.searchParams.delete("sort");
     window.history.replaceState({}, "", url);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSMsKey, activeCategory, sortBy, preferredStores]);
+  }, [selectedSMsKey, activeCategory, sortBy, preferredKey]);
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !loading && !loadingMore) load(false);
@@ -227,9 +264,13 @@ export default function DealsClient({ initial }) {
 
           {preferredStores.length > 0 && selectedSMs.length === 0 && (
             <div className="pref-banner">
-              <span>Φιλτράρεται από τα αγαπημένα σου καταστήματα.</span>
-              <button type="button" className="link" onClick={clearPreferred}>
-                Δες όλα <Icon.ArrowRight size={12} />
+              <span>
+                {blendPreferred
+                  ? "Τα καταστήματά σου εμφανίζονται πρώτα, μαζί με τις υπόλοιπες αλυσίδες."
+                  : "Εμφανίζονται όλες οι αλυσίδες."}
+              </span>
+              <button type="button" className="link" onClick={() => setSelectedSMs(preferredStores)}>
+                Μόνο τα δικά μου <Icon.ArrowRight size={12} />
               </button>
             </div>
           )}
@@ -239,7 +280,7 @@ export default function DealsClient({ initial }) {
             // so no single department floods the first screenful, then spaces
             // out same-brand rows (lib/deal-family spreadFamilies; keeps every
             // row). Explicit sorts/filters render exactly what the user asked for.
-            deals={sortBy === "hot" && activeCategory === "all"
+            deals={sortBy === "hot"
               ? spreadFamilies(interleaveByCategory(dedupeDeals(discounts)))
               : dedupeDeals(discounts)}
             loading={loading}
