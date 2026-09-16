@@ -71,6 +71,25 @@ const nextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/chain-images/**',
       },
+      // The R2 mirror — 97% of live offer images (measured 2026-09-16), i.e.
+      // every chain except Sklavenitis. It was missing here: harmless while
+      // `unoptimized` is on, but the moment anyone flips that off (the comment
+      // above invites it) every product photo would 400.
+      {
+        protocol: 'https',
+        hostname: '*.r2.dev',
+        port: '',
+        pathname: '/**',
+      },
+      // Reserved for the custom image domain we should move to: the public
+      // r2.dev host is rate-limited by Cloudflare and some Greek resolvers
+      // blackhole it (this dev machine's resolver answers 127.0.0.1).
+      {
+        protocol: 'https',
+        hostname: 'images.prosforespantou.gr',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {
