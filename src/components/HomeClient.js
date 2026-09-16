@@ -7,7 +7,8 @@ import { useShoppingListStore } from "@/lib/store";
 import { getActiveDeals } from "@/actions/get-active-deals";
 import { isAdminAuthenticated } from "@/actions/admin-session";
 import { dedupeDeals } from "@/lib/dedupe-deals";
-import { loadProfile, decayProfile, topCategories, scoreOffer } from "@/lib/interest-profile";
+import { loadProfile, decayProfile, topCategories } from "@/lib/interest-profile";
+import { rankPersonalFeed } from "@/lib/personal-feed";
 import { getConsent, onConsentChange } from "@/lib/consent";
 
 import { ProductSheet } from "@/components/ProductSheet";
@@ -91,25 +92,49 @@ function PublicSite({ initial, onAdmin }) {
 
   // "✨ Για σένα" — the v1 recommender: declared categories (onboarding) +
   // learned ones (on-device interest profile, see lib/interest-profile) fetch
-  // one hot-ranked pool, then personal relevance re-ranks it. Stable sort
-  // keeps hotScore order inside equal-relevance groups. No prefs and no
-  // history → no rail (never fake personalization).
+  // the pools, then lib/personal-feed re-ranks them. Preferred stores are a
+  // BOOST there, not a WHERE clause: asking the server for `supermarket in
+  // (mine)` hid a cheaper price at a chain the user had not ticked, which is
+  // the opposite of what this app promises.
+  //
+  // Three pools, because ranking can only work with what it is given:
+  //   • every chain inside the user's categories — this is where a cheaper
+  //     rival comes from (hotScore alone is chain-lumpy: measured 09-16, the
+  //     top 30 dairy+cleaning rows were ALL Μασούτης);
+  //   • the same categories at the user's own chains, so their shops are
+  //     guaranteed a presence instead of depending on hotScore luck;
+  //   • the plain hot list (cached server-side) for the exploration slots,
+  //     minus whatever the rails below already show.
+  // No prefs and no history → no rail (never fake personalization).
   const [forYou, setForYou] = useState(null);
   const prefCatKey = preferredCategories.join(",");
   useEffect(() => {
     const profile = decayProfile(loadProfile(), Date.now());
-    const cats = [...new Set([...preferredCategories, ...topCategories(profile, 3)])].slice(0, 6);
+    const learned = topCategories(profile, 3);
+    const cats = [...new Set([...preferredCategories, ...learned])].slice(0, 6);
     if (cats.length === 0) return;
     let cancelled = false;
-    getActiveDeals(30, 0, "all", cats, "hot", preferredStores)
-      .then(({ deals }) => {
+    Promise.all([
+      getActiveDeals(30, 0, "all", cats, "hot"),
+      preferredStores.length ? getActiveDeals(20, 0, "all", cats, "hot", preferredStores) : Promise.resolve({ deals: [] }),
+      getActiveDeals(20, 0, "all", "all", "hot"),
+    ])
+      .then(([everywhere, mine, wide]) => {
         if (cancelled) return;
-        const ranked = dedupeDeals(deals)
-          .map((d) => ({ d, s: scoreOffer(d, profile, preferredCategories) }))
-          .sort((a, b) => b.s - a.s)
-          .map((x) => x.d)
-          .slice(0, 14);
-        setForYou(ranked);
+        const pool = new Map();
+        for (const d of [...everywhere.deals, ...mine.deals]) pool.set(d.id, d);
+        const shown = new Set([...topDeals, ...endingSoon].map((d) => d.id));
+        setForYou(
+          rankPersonalFeed({
+            deals: dedupeDeals([...pool.values()]),
+            explore: dedupeDeals(wide.deals).filter((d) => !shown.has(d.id)),
+            profile,
+            declaredCategories: preferredCategories,
+            learnedCategories: learned,
+            preferredStores,
+            limit: 14,
+          })
+        );
       })
       .catch(() => {});
     return () => { cancelled = true; };
