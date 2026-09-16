@@ -71,6 +71,8 @@ async function run() {
   const priceMap = new Map();
   // productId+chain -> normal snapshots over the shelf window (baselines).
   const shelfMap = new Map();
+  // productId+chain -> mono snapshots (standing-price guard, lib/baseline-price).
+  const monoMap = new Map();
   const key = (productId, supermarket) => `${productId}|${supermarket ?? ''}`;
   for (const ids of chunk(productIds, 500)) {
     const [snaps, shelf] = await Promise.all([
@@ -81,8 +83,8 @@ async function run() {
       // Shelf prices over the longer sanity window: a stable price has no
       // recent row (snapshots are written only on change).
       prisma.priceSnapshot.findMany({
-        where: { productId: { in: ids }, kind: 'normal', recordedAt: { gte: shelfSince } },
-        select: { productId: true, supermarket: true, price: true, recordedAt: true },
+        where: { productId: { in: ids }, kind: { in: ['normal', 'mono'] }, recordedAt: { gte: shelfSince } },
+        select: { productId: true, supermarket: true, price: true, kind: true, recordedAt: true },
       }),
     ]);
     for (const s of snaps) {
@@ -93,12 +95,13 @@ async function run() {
     }
     for (const s of shelf) {
       const k = key(s.productId, s.supermarket);
-      const arr = shelfMap.get(k) || [];
+      const map = s.kind === 'normal' ? shelfMap : monoMap;
+      const arr = map.get(k) || [];
       arr.push(s);
-      shelfMap.set(k, arr);
+      map.set(k, arr);
     }
   }
-  console.log(`   (product, chain) series with history: ${priceMap.size}; with shelf prices: ${shelfMap.size}`);
+  console.log(`   (product, chain) series with history: ${priceMap.size}; with shelf prices: ${shelfMap.size}; with mono history: ${monoMap.size}`);
 
   const tally = {};
   const baselineTally = { withBaseline: 0, belowShelf: 0, notBelowShelf: 0, cleared: 0 };
@@ -119,6 +122,7 @@ async function run() {
             offerType: d.offerType,
             originalPrice: d.originalPrice,
             normalSnapshots: shelfMap.get(key(d.productId, d.supermarket)) || [],
+            monoSnapshots: monoMap.get(key(d.productId, d.supermarket)) || [],
             freshChains,
             now,
           })

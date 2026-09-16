@@ -1128,6 +1128,16 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
 }
+/* «κανονικά ~Y€»: OUR estimate of the shop's usual price for a ΜΟΝΟ offer
+   (lib/baseline-price). Never struck through — that styling would read as a
+   price the chain itself advertised. */
+.price-baseline {
+  font-size: 11.5px; font-weight: 600;
+  color: var(--ink-3);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /* Honest "good deal" verdict pill (cards + history panel). */
 .verdict-pill {
@@ -1449,6 +1459,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .featured-scroll.two-row .price { font-size: 19px; }
 .featured-scroll.two-row .price-old { font-size: 11.5px; }
 .featured-scroll.two-row .price-unit { font-size: 10.5px; }
+.featured-scroll.two-row .price-baseline { font-size: 11px; }
 .featured-scroll.two-row .add-btn { width: 40px; height: 40px; }
 /* 150px cards: let «Τιμές σε N καταστήματα» wrap instead of truncating. */
 .featured-scroll.two-row .compare-pill { white-space: normal; line-height: 1.25; }

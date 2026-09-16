@@ -12,6 +12,7 @@ import { isPositiveVerdict } from '@/lib/price-verdict';
 import { displayCategoryForProduct } from '@/lib/display-category';
 import { expiryInfo } from '@/lib/expiry-label';
 import { splitNameAndSize, unitPrice } from '@/lib/pack-info';
+import { baselineForCard } from '@/lib/baseline-price';
 
 // Honest "good deal" labels — only positive verdicts ever reach the card
 // (lib/price-verdict.ts gates on >=3 points + real price spread).
@@ -90,6 +91,15 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
   // which is what the shopper cares about. 0/undefined → no chip.
   const compareChains = (d.comparisonCount ?? d.comparison_count ?? 0) + 1;
   const showCompare = compareChains >= 2;
+
+  // «κανονικά ~Y€» for ΜΟΝΟ offers at least 10% under the same chain's shelf
+  // price (lib/baseline-price, owner decision #2). Deliberately a grey note,
+  // not a struck-through price: the chain never published this number, we
+  // derived it from that chain's own catalogue.
+  const baseline = baselineForCard(d);
+  const baselineTitle = baseline
+    ? `Η τιμή που χρεώνει συνήθως το ίδιο κατάστημα για το ίδιο προϊόν${baseline.checkedAt ? `, όπως την είδαμε στις ${baseline.checkedAt.toLocaleDateString('el-GR')}` : ''}. Δική μας εκτίμηση από τον κατάλογο του καταστήματος, όχι προσφορά που ανακοίνωσε η αλυσίδα.`
+    : undefined;
 
   const page = () => list || surfaceFromPath(typeof window !== 'undefined' ? window.location.pathname : '/');
   useEffect(() => {
@@ -233,6 +243,11 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
             <div className="price">{discountedPrice?.toFixed(2)}€</div>
             {originalPrice && <div className="price-old">{originalPrice.toFixed(2)}€</div>}
             {unit && <div className="price-unit">{unit.value.toFixed(2)}€/{unit.per}</div>}
+            {baseline && (
+              <div className="price-baseline" title={baselineTitle}>
+                κανονικά ~{baseline.price.toFixed(2)}€
+              </div>
+            )}
           </div>
           <button
             type="button"

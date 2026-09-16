@@ -3,7 +3,7 @@
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { computeVerdict } from '@/lib/price-verdict';
-import { shelfPriceFor } from '@/lib/baseline-price';
+import { shelfPriceFor, isStandingPrice } from '@/lib/baseline-price';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
 import { SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
 
@@ -115,7 +115,16 @@ export async function getPriceHistory(
               loadFreshShelfChains(prisma),
             ])
           : [[], new Map<string, string>()];
-        const shelf = shelfPriceFor({ supermarket: options.supermarket, normalSnapshots: shelfSnaps, freshChains });
+        let shelf = shelfPriceFor({ supermarket: options.supermarket, normalSnapshots: shelfSnaps, freshChains });
+        // Same guard as the stored card baseline: a «ΜΟΝΟ» price this chain has
+        // charged for months IS the normal price, whatever the catalogue row
+        // says — so the two can never disagree (lib/baseline-price).
+        if (shelf && options.currentPrice) {
+          const monoRows = rows
+            .filter((r) => r.kind === 'mono' && r.supermarket === options.supermarket)
+            .map((r) => ({ supermarket: r.supermarket, price: r.price, recordedAt: r.recordedAt }));
+          if (isStandingPrice({ offerPrice: options.currentPrice, shelfPrice: shelf.price, monoSnapshots: monoRows })) shelf = null;
+        }
 
         const prices = rows.map((r) => r.price);
 
