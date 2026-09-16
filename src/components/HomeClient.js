@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useShoppingListStore } from "@/lib/store";
-import { getActiveDeals } from "@/actions/get-active-deals";
+import { getActiveDeals, getPersonalPool } from "@/actions/get-active-deals";
 import { isAdminAuthenticated } from "@/actions/admin-session";
 import { dedupeDeals } from "@/lib/dedupe-deals";
 import { loadProfile, decayProfile, topCategories } from "@/lib/interest-profile";
@@ -103,8 +103,10 @@ function PublicSite({ initial, onAdmin }) {
   //     top 30 dairy+cleaning rows were ALL Μασούτης);
   //   • the same categories at the user's own chains, so their shops are
   //     guaranteed a presence instead of depending on hotScore luck;
-  //   • the plain hot list (cached server-side) for the exploration slots,
-  //     minus whatever the rails below already show.
+  //   • the plain hot list for the exploration slots, minus whatever the
+  //     rails below already show.
+  // All three are cached server-side (5 min): the POOLS are shared between
+  // everyone who picked the same departments — only the ranking is personal.
   // No prefs and no history → no rail (never fake personalization).
   const [forYou, setForYou] = useState(null);
   const prefCatKey = preferredCategories.join(",");
@@ -115,8 +117,8 @@ function PublicSite({ initial, onAdmin }) {
     if (cats.length === 0) return;
     let cancelled = false;
     Promise.all([
-      getActiveDeals(30, 0, "all", cats, "hot"),
-      preferredStores.length ? getActiveDeals(20, 0, "all", cats, "hot", preferredStores) : Promise.resolve({ deals: [] }),
+      getPersonalPool(cats, [], 30),
+      preferredStores.length ? getPersonalPool(cats, preferredStores, 20) : Promise.resolve({ deals: [] }),
       getActiveDeals(20, 0, "all", "all", "hot"),
     ])
       .then(([everywhere, mine, wide]) => {

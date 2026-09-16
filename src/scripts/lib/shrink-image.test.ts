@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-// @ts-expect-error — plain .mjs helper shared with the scrape scripts
+// The helper is a plain .mjs module shared with the scrape scripts.
 import { shrinkImage, MAX_WIDTH } from './shrink-image.mjs';
 
 // A smooth, photo-like image: real packshots are gradients and flat product

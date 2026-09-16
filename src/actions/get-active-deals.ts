@@ -99,6 +99,57 @@ export async function getActiveDeals(
   });
 }
 
+// ── «Για σένα» pools (W4b, 2026-09-16) ──────────────────────────────────────
+// The rail ranks in the browser (lib/personal-feed), but the POOLS it ranks
+// are not personal: they are "the hottest offers in these departments", and
+// optionally "…at these chains". Shoppers share departments, so caching the
+// pools turns a per-visit query into a per-five-minutes one, while the
+// ranking stays per-device. Keys are sorted so {γάλα, καφές} and
+// {καφές, γάλα} are one entry.
+const getPersonalPoolCached = unstable_cache(
+  async (catsKey: string, storesKey: string, limit: number) => {
+    const now = new Date();
+    const where: any = activePublicDealWhere(now);
+    const cats = catsKey ? catsKey.split('\u0000') : [];
+    if (cats.length > 0) where.category = { in: cats };
+    const stores = storesKey ? storesKey.split('\u0000') : [];
+    if (stores.length > 0) where.supermarket = { in: stores };
+
+    const deals = await prisma.discount.findMany({
+      where,
+      include: { store: true, leaflet: true, product: true },
+      orderBy: orderByFor('hot'),
+      take: limit,
+    });
+    return { deals, total: deals.length };
+  },
+  ['deals:personal-pool'],
+  { tags: ['deals:default'], revalidate: 300 }
+);
+
+/**
+ * Hot offers inside a set of departments, optionally narrowed to a set of
+ * chains. Cached per (departments, chains) — see the note above.
+ */
+export async function getPersonalPool(
+  categories: string[],
+  supermarkets: string[] = [],
+  limit = 30
+) {
+  return await Sentry.withServerActionInstrumentation('getPersonalPool', { recordResponse: false }, async () => {
+    try {
+      const cats = [...new Set(categories.filter(Boolean))].sort().slice(0, 8);
+      const stores = [...new Set(supermarkets.filter(Boolean))].sort().slice(0, 10);
+      const capped = Math.min(Math.max(1, limit), 60);
+      return await getPersonalPoolCached(cats.join('\u0000'), stores.join('\u0000'), capped);
+    } catch (error) {
+      Sentry.captureException(error);
+      console.error('Error fetching personal pool:', error);
+      return { deals: [], total: 0 };
+    }
+  });
+}
+
 // Chain diversity for the homepage rail — sized for the 20-item two-row
 // carousel (cap 3 × ~7 chains ≈ 20; the fill loop covers any shortfall).
 const PER_CHAIN_CAP = 3;
