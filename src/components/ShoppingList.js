@@ -241,7 +241,9 @@ export function ShoppingList({ isOpen, onClose }) {
             </div>
             {confirming && (
               <div className="drawer-note">
-                Θα αδειάσει και τα {items.length} προϊόντα.{' '}
+                {items.length === 1
+                  ? 'Θα αφαιρεθεί το προϊόν από τη λίστα.'
+                  : `Θα αφαιρεθούν και τα ${items.length} προϊόντα.`}{' '}
                 <button type="button" className="linkish" onClick={() => setConfirming(false)}>Ακύρωση</button>
               </div>
             )}
