@@ -17,6 +17,11 @@ const PROFILE_SYNC = process.env.NEXT_PUBLIC_PROFILE_SYNC === '1';
 // off the page must keep saying nothing at all is recorded before consent,
 // because that is then the truth.
 const ANON_ANALYTICS = process.env.NEXT_PUBLIC_ANON_ANALYTICS === '1';
+// NEXT_PUBLIC_VISIT_ID=1 adds a tab-scoped visit id for non-consenting
+// visitors (lib/visit-id). It IS storage on the device, so it must appear in
+// the inventory below whenever it is on — an undisclosed key is exactly what
+// this page exists to prevent.
+const VISIT_ID = process.env.NEXT_PUBLIC_VISIT_ID === '1';
 
 export default function CookiesPage() {
   const cell = { border: '1px solid #eee', padding: '8px 10px', textAlign: 'left', verticalAlign: 'top', fontSize: 13.5 };
@@ -32,16 +37,36 @@ export default function CookiesPage() {
 
       {ANON_ANALYTICS ? (
         <>
-          <H2>Χωρίς συγκατάθεση: ανώνυμη μέτρηση που δεν αγγίζει τη συσκευή σου</H2>
+          <H2>
+            {VISIT_ID
+              ? 'Χωρίς συγκατάθεση: ανώνυμη μέτρηση χρήσης'
+              : 'Χωρίς συγκατάθεση: ανώνυμη μέτρηση που δεν αγγίζει τη συσκευή σου'}
+          </H2>
           <p>
             Για να ξέρουμε ποιες προσφορές είναι χρήσιμες, μετράμε{' '}
             <strong>ποια καρτέλα εμφανίστηκε και ποια πατήθηκε</strong> — σε ποια θέση της
-            λίστας, σε ποια κατηγορία και από ποια αλυσίδα. Αυτή η μέτρηση{' '}
-            <strong>δεν αποθηκεύει και δεν διαβάζει τίποτα στη συσκευή σου</strong>: κανένα
-            cookie, κανένα αναγνωριστικό, τίποτα στο localStorage ή στο sessionStorage. Στον
-            διακομιστή δεν κρατάμε ούτε τη διεύθυνση IP σου ούτε τον τύπο της συσκευής ή του
-            browser σου. Δεν υπάρχει επομένως τρόπος να συνδεθούν δύο ενέργειες με το ίδιο
-            πρόσωπο — είναι απλή, ανώνυμη στατιστική.
+            λίστας, σε ποια κατηγορία και από ποια αλυσίδα.{' '}
+            {VISIT_ID ? (
+              <>
+                Για να δούμε τη διαδρομή μιας επίσκεψης κρατάμε έναν{' '}
+                <strong>προσωρινό κωδικό επίσκεψης</strong> (<code>pp-visit</code>) που{' '}
+                <strong>σβήνει μόλις κλείσεις την καρτέλα</strong>: δεν σε αναγνωρίζει σε
+                επόμενη επίσκεψη, σε άλλη συσκευή ή σε άλλον ιστότοπο. Τίποτε άλλο δεν
+                αποθηκεύεται και δεν διαβάζεται στη συσκευή σου.
+              </>
+            ) : (
+              <>
+                Αυτή η μέτρηση{' '}
+                <strong>δεν αποθηκεύει και δεν διαβάζει τίποτα στη συσκευή σου</strong>:
+                κανένα cookie, κανένα αναγνωριστικό, τίποτα στο localStorage ή στο
+                sessionStorage.
+              </>
+            )}{' '}
+            Στον διακομιστή δεν κρατάμε ούτε τη διεύθυνση IP σου ούτε τον τύπο της συσκευής ή
+            του browser σου.{' '}
+            {VISIT_ID
+              ? 'Δεν δημιουργείται προφίλ που να σε ακολουθεί από επίσκεψη σε επίσκεψη.'
+              : 'Δεν υπάρχει επομένως τρόπος να συνδεθούν δύο ενέργειες με το ίδιο πρόσωπο — είναι απλή, ανώνυμη στατιστική.'}
           </p>
           <p>
             <strong>Αν πατήσεις «Αποδοχή»</strong>, προσθέτουμε ένα ανώνυμο αναγνωριστικό
@@ -74,6 +99,19 @@ export default function CookiesPage() {
         <tbody>
           <tr><td style={cell}><code>cookie-consent</code></td><td style={cell}>Θυμάται την επιλογή σου (αποδοχή/απόρριψη).</td><td style={cell}>Απαραίτητο</td></tr>
           <tr><td style={cell}><code>sid</code></td><td style={cell}>Ανώνυμο αναγνωριστικό συνεδρίας για στατιστικά χρήσης. Δημιουργείται μόνο μετά την αποδοχή.</td><td style={cell}>Στατιστικά</td></tr>
+          {VISIT_ID && (
+            <tr>
+              <td style={cell}><code>pp-visit</code></td>
+              <td style={cell}>
+                Προσωρινός κωδικός επίσκεψης, ώστε να βλέπουμε τη διαδρομή μιας επίσκεψης
+                (π.χ. αναζήτηση → προβολή → πάτημα) και να καταλαβαίνουμε τι δεν βρίσκεις.{' '}
+                <strong>Σβήνει μόλις κλείσεις την καρτέλα</strong> — δεν σε αναγνωρίζει σε
+                επόμενη επίσκεψη, σε άλλη συσκευή ή σε άλλον ιστότοπο, και δεν συνδέεται με
+                το προφίλ ή το email σου. Διαγράφεται αμέσως αν πατήσεις «Απόρριψη».
+              </td>
+              <td style={cell}>Στατιστικά</td>
+            </tr>
+          )}
           <tr><td style={cell}>Προτιμήσεις (αγαπημένα, καταστήματα, ενδιαφέροντα, onboarding)</td><td style={cell}>Θυμάται τις επιλογές σου ώστε να βλέπεις πιο σχετικές προσφορές.{PROFILE_SYNC ? '' : ' Μένουν στη συσκευή σου.'}</td><td style={cell}>Προτιμήσεων</td></tr>
           {PROFILE_SYNC && (
             <tr><td style={cell}><code>pp-profile-id</code></td><td style={cell}>Ανώνυμο αναγνωριστικό για το αντίγραφο των προτιμήσεών σου στον διακομιστή μας. Δημιουργείται μόνο μετά την αποδοχή· διαγράφεται μαζί με το αντίγραφο αν την ανακαλέσεις.</td><td style={cell}>Στατιστικά / εξατομίκευση</td></tr>

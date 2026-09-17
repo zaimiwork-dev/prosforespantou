@@ -18,6 +18,7 @@
 
 import { trackEvent } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
+import { getVisitId } from '@/lib/visit-id';
 import { analyticsMode } from '@/lib/analytics-mode';
 
 // Anonymous events have no session id, so the server's own dedupe key cannot
@@ -40,12 +41,35 @@ export function track(event) {
   const mode = analyticsMode();
   if (mode === 'off') return;
 
-  if (mode === 'anonymous') {
+  // A tab-scoped visit id when NEXT_PUBLIC_VISIT_ID is on (lib/visit-id):
+  // enough to stitch one visit together, gone when the tab closes. Null
+  // otherwise, which is the shipped default.
+  const visitId = mode === 'anonymous' ? getVisitId() : null;
+
+  // Without any id the server cannot dedupe, so the 5 s window is kept here in
+  // page memory. With a visit id the server's own window does the job.
+  if (mode === 'anonymous' && !visitId) {
     const target = event.discountId ?? event.leafletId ?? event.query ?? event.category ?? event.supermarket;
     if (isRepeat(`${event.eventType}:${target}`)) return;
   }
 
-  const sessionId = mode === 'identified' ? getSessionId() : undefined;
+  const sessionId = mode === 'identified' ? getSessionId() : visitId ?? undefined;
   // Fire-and-forget; analytics must never block UI or surface errors to the user.
   trackEvent({ ...event, sessionId }).catch(() => {});
+}
+
+// How many visitors accept, and how many refuse.
+//
+// Today this is unknowable: refusing means recording nothing, including the
+// refusal. So we cannot say whether consented profiles cover 5% of shoppers or
+// 60% — and that number is the ceiling on every consented feature (the server
+// profile, cross-device history, price alerts tied to a person).
+//
+// Deliberately sent with NO id in either direction: it is a count of choices,
+// not a record of who chose. Recording that a consent decision was made is
+// also the thing that lets us evidence consent practice if anyone asks.
+export function trackConsentChoice(value) {
+  if (typeof window === 'undefined') return;
+  if (value !== 'accepted' && value !== 'rejected') return;
+  trackEvent({ eventType: 'consent_choice', page: 'banner', query: value }).catch(() => {});
 }

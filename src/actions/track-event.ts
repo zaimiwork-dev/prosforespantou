@@ -26,10 +26,19 @@ import { CLICK_WEIGHT } from '@/lib/hotness';
 // identifying field in the table, so it is no longer stored at all. Rows
 // written before 2026-09-17 still hold theirs; clearing those is the owner's
 // call (a one-line UPDATE).
+// `sessionId` tells the two apart at a glance and, more importantly, makes the
+// second kind removable in one statement if counsel ever says no:
+//   • a bare UUID  — a consented visitor's persistent `sid`.
+//   • `v-<uuid>`   — a tab-scoped visit id (lib/visit-id), which dies with the
+//     tab and can never link two visits. `WHERE "sessionId" LIKE 'v-%'`.
 const EVENT_TYPES = [
   'deal_click', 'leaflet_click', 'list_add', 'list_remove',
   'page_view', 'search', 'filter', 'store_select',
   'favorite', 'unfavorite', 'outbound_click',
+  // The banner's own answer, always sent without an id: a count of choices,
+  // never a record of who chose. It is the only way to learn what share of
+  // shoppers a consented feature can ever reach.
+  'consent_choice',
 ] as const;
 
 const schema = z.object({

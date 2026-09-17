@@ -14,6 +14,7 @@
 
 import { trackImpressions } from '@/actions/track-event';
 import { getSessionId } from '@/lib/session-id';
+import { getVisitId } from '@/lib/visit-id';
 import { analyticsMode } from '@/lib/analytics-mode';
 import { createImpressionQueue, FLUSH_SIZE, BATCH_MAX } from '@/lib/impression-queue';
 
@@ -26,13 +27,18 @@ let timer = null;
 let observer = null;
 const targets = new Map(); // element -> { item, timeout }
 
+// True when this visitor is one we already store something for — consented, or
+// carrying a tab-scoped visit id. The pure anonymous visitor is never touched.
+const mayUseStorage = () => analyticsMode() === 'identified' || Boolean(getVisitId());
+
 function getQueue() {
   if (!queue) {
     let used = 0;
-    // Only a consented visitor's counter is allowed to persist across page
-    // loads — reading sessionStorage IS access to the device, which the
-    // anonymous mode does not do. There the cap is per page load.
-    if (analyticsMode() === 'identified') {
+    // Reading sessionStorage IS access to the device, so the counter persists
+    // across page loads only for a visitor we are already allowed to store
+    // something for: a consented one, or one carrying a tab-scoped visit id.
+    // For everyone else the cap applies per page load and nothing is touched.
+    if (mayUseStorage()) {
       try { used = parseInt(window.sessionStorage.getItem(COUNT_KEY) || '0', 10) || 0; } catch { /* blocked storage */ }
     }
     queue = createImpressionQueue({ initialCount: used });
@@ -47,13 +53,15 @@ function flush() {
   const mode = analyticsMode();
   // Consent withdrawn since queueing, or the flag is off → drop silently.
   if (mode === 'off') return;
-  const sessionId = mode === 'identified' ? getSessionId() : undefined;
+  // With a tab-scoped visit id (lib/visit-id, off by default) the server can
+  // build its dedup key again; without one the client queue is the only guard.
+  const sessionId = mode === 'identified' ? getSessionId() : getVisitId() ?? undefined;
   if (mode === 'identified' && !sessionId) return;
   while (q.size() > 0) {
     const items = q.drain(BATCH_MAX);
     trackImpressions(sessionId ? { sessionId, items } : { items }).catch(() => {});
   }
-  if (mode === 'identified') {
+  if (mayUseStorage()) {
     try { window.sessionStorage.setItem(COUNT_KEY, String(q.count())); } catch { /* blocked storage */ }
   }
 }

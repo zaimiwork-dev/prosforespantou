@@ -34,6 +34,14 @@ import { hasAnalyticsConsent } from '@/lib/consent';
 
 export const ANON_ANALYTICS_ENABLED = process.env.NEXT_PUBLIC_ANON_ANALYTICS === '1';
 
+// A separate switch, on purpose. The anonymous layer above touches nothing on
+// the device and is exempt by construction; the tab-scoped visit id
+// (lib/visit-id) IS device storage and rests on the audience-measurement
+// reasoning several EU regulators apply to first-party analytics instead. Two
+// flags means counsel can approve or refuse exactly one thing, and refusing it
+// costs none of the measurement above.
+export const VISIT_ID_ENABLED = process.env.NEXT_PUBLIC_VISIT_ID === '1';
+
 export function analyticsMode() {
   if (typeof window === 'undefined') return 'off';
   if (hasAnalyticsConsent()) return 'identified';

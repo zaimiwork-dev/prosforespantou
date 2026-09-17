@@ -10,7 +10,9 @@
 //    so users can withdraw consent as easily as they gave it.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { getConsent, setConsent, onConsentChange } from '@/lib/consent';
-import { ANON_ANALYTICS_ENABLED } from '@/lib/analytics-mode';
+import { ANON_ANALYTICS_ENABLED, VISIT_ID_ENABLED } from '@/lib/analytics-mode';
+import { trackConsentChoice } from '@/lib/track';
+import { forgetVisitId } from '@/lib/visit-id';
 
 export const OPEN_CONSENT_EVENT = 'open-consent';
 
@@ -34,7 +36,17 @@ export function CookieConsent() {
   const open = forced || consent === null;
   if (!open) return null;
 
-  const choose = (value) => { setForced(false); setConsent(value); };
+  const choose = (value) => {
+    setForced(false);
+    // Recorded BEFORE the choice lands, so it is sent without any id in either
+    // direction — a count of choices, not a record of who chose. Without it a
+    // refusal leaves no trace at all and the accept rate stays unknowable.
+    trackConsentChoice(value);
+    // A visitor who just refused should not keep carrying a visit id either,
+    // even though it is not consented data.
+    if (value === 'rejected') forgetVisitId();
+    setConsent(value);
+  };
 
   return (
     <div
@@ -67,9 +79,20 @@ export function CookieConsent() {
           about it would make the reject button say more than it means. */}
       {ANON_ANALYTICS_ENABLED && (
         <p style={{ fontSize: 12, color: '#777', lineHeight: 1.5, margin: '-8px 0 16px' }}>
-          Ακόμη κι αν πατήσεις «Απόρριψη», μετράμε ανώνυμα ποιες προσφορές εμφανίζονται και
-          ποιες πατιούνται, χωρίς να αποθηκεύουμε ή να διαβάζουμε τίποτα στη συσκευή σου και
-          χωρίς αναγνωριστικό.
+          {VISIT_ID_ENABLED ? (
+            <>
+              Ακόμη κι αν πατήσεις «Απόρριψη», μετράμε ανώνυμα ποιες προσφορές εμφανίζονται και
+              ποιες πατιούνται. Γι’ αυτό κρατάμε έναν προσωρινό κωδικό επίσκεψης που{' '}
+              <strong>σβήνει μόλις κλείσεις την καρτέλα</strong> — δεν σε αναγνωρίζει σε επόμενη
+              επίσκεψη και δεν συνδέεται με εσένα.
+            </>
+          ) : (
+            <>
+              Ακόμη κι αν πατήσεις «Απόρριψη», μετράμε ανώνυμα ποιες προσφορές εμφανίζονται και
+              ποιες πατιούνται, χωρίς να αποθηκεύουμε ή να διαβάζουμε τίποτα στη συσκευή σου και
+              χωρίς αναγνωριστικό.
+            </>
+          )}
         </p>
       )}
       <div style={{ display: 'flex', gap: 10 }}>
