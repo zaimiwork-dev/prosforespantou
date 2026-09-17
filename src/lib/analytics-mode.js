@@ -42,6 +42,22 @@ export const ANON_ANALYTICS_ENABLED = process.env.NEXT_PUBLIC_ANON_ANALYTICS ===
 // costs none of the measurement above.
 export const VISIT_ID_ENABLED = process.env.NEXT_PUBLIC_VISIT_ID === '1';
 
+// Banner layout (owner's explicit decision, 2026-09-18). Unset — the repo
+// default — puts «Αποδοχή» and «Απόρριψη» side by side on the first layer.
+// Set to '1' for the layout the owner asked for: «Αποδοχή» alone up front,
+// with declining reachable after «Περισσότερα».
+//
+// Be clear about what that second layout is, because the next person to read
+// this will need to know: EU regulators (EDPB guidance, CNIL's Google and
+// Meta decisions) treat a reject that costs more clicks than accept as a dark
+// pattern, and their finding is that it does not merely risk a fine — it makes
+// the consent itself INVALID. Invalid consent means the `profiles` rows built
+// on it have no lawful basis, which matters most at the moment this app is
+// sold: a buyer's counsel treats that table as a deletion obligation rather
+// than an asset. The owner was told this and chose the layout anyway, which is
+// their call to make; it is a flag so their lawyer can undo it in one switch.
+export const CONSENT_ACCEPT_FIRST = process.env.NEXT_PUBLIC_CONSENT_ACCEPT_FIRST === '1';
+
 export function analyticsMode() {
   if (typeof window === 'undefined') return 'off';
   if (hasAnalyticsConsent()) return 'identified';
