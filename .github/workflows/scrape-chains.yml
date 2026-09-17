@@ -110,6 +110,7 @@ on:
           - masoutis-catalog
           - sklavenitis-catalog
           - shrink-images
+          - image-hosts
       limit:
         description: 'Cap items for a *-resolver-only smoke run (blank = no cap)'
         required: false
@@ -792,6 +793,30 @@ jobs:
           fi
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+  image-hosts:
+    # Daily 08:00 UTC (alongside pipeline-health) + manual `image-hosts`.
+    # 77% of live offer images are served from Cloudflare's shared pub-*.r2.dev
+    # address, which Cloudflare rate-limits and documents as not for production
+    # use — with no published limit and no warning. If we cross it the photos
+    # just stop loading for some visitors, and nothing in our own logs says so.
+    # This is the alarm until the bucket gets a custom domain.
+    if: github.event.schedule == '0 8 * * *' || github.event.inputs.chain == 'image-hosts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/check-image-hosts.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SAMPLE: '40'
 
   lidl-offers:
     # Weekly Thu 06:00 UTC + manual `lidl-offers`. Reads the current weekly deals
