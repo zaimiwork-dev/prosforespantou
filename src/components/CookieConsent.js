@@ -10,6 +10,7 @@
 //    so users can withdraw consent as easily as they gave it.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { getConsent, setConsent, onConsentChange } from '@/lib/consent';
+import { ANON_ANALYTICS_ENABLED } from '@/lib/analytics-mode';
 
 export const OPEN_CONSENT_EVENT = 'open-consent';
 
@@ -60,6 +61,17 @@ export function CookieConsent() {
           Μάθε περισσότερα
         </a>.
       </p>
+      {/* Transparency, not a nudge: a visitor pressing «Απόρριψη» must know what
+          still happens. The anonymous layer stores and reads nothing on the
+          device, so it is not what this banner asks about — but staying silent
+          about it would make the reject button say more than it means. */}
+      {ANON_ANALYTICS_ENABLED && (
+        <p style={{ fontSize: 12, color: '#777', lineHeight: 1.5, margin: '-8px 0 16px' }}>
+          Ακόμη κι αν πατήσεις «Απόρριψη», μετράμε ανώνυμα ποιες προσφορές εμφανίζονται και
+          ποιες πατιούνται, χωρίς να αποθηκεύουμε ή να διαβάζουμε τίποτα στη συσκευή σου και
+          χωρίς αναγνωριστικό.
+        </p>
+      )}
       <div style={{ display: 'flex', gap: 10 }}>
         {/* Equal prominence — same size/weight. Reject is NOT a downgraded button. */}
         <button

@@ -7,6 +7,7 @@ import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
 import { track } from '@/lib/track';
 import { observeImpression } from '@/lib/impressions';
+import { useShoppingListStore } from '@/lib/store';
 import { surfaceFromPath } from '@/lib/impression-queue';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { displayCategoryForProduct } from '@/lib/display-category';
@@ -104,14 +105,28 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
     : undefined;
 
   const page = () => list || surfaceFromPath(typeof window !== 'undefined' ? window.location.pathname : '/');
+
+  // Is this card's chain one the shopper ticked? Sent with the impression and
+  // the tap as a one-word label about the SLOT, never about the person — with
+  // anonymous events carrying no identifier it is the only way to answer
+  // whether the preferred-store boost (rows 24 and 32) earns its place. Absent
+  // entirely when the shopper has ticked nothing, because then there is no
+  // question to answer.
+  const preferredStores = useShoppingListStore((s) => s.preferredStores);
+  const slotContext =
+    !preferredStores?.length || !supermarketId
+      ? undefined
+      : preferredStores.includes(supermarketId) ? 'mine' : 'other';
+
   useEffect(() => {
     return observeImpression(cardRef.current, {
       discountId: d.id,
       supermarket: supermarketId || undefined,
       page: list || surfaceFromPath(window.location.pathname),
       position,
+      context: slotContext,
     });
-  }, [d.id, supermarketId, list, position]);
+  }, [d.id, supermarketId, list, position, slotContext]);
 
   return (
     <div
@@ -127,6 +142,7 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
           category: category,
           page: page(),
           position,
+          context: slotContext,
         });
         onSelect(d);
       }}

@@ -12,6 +12,10 @@ export const metadata = {
 // the preferences item below follows the same flag.
 const PROFILE_SYNC = process.env.NEXT_PUBLIC_PROFILE_SYNC === '1';
 
+// Mirrors lib/analytics-mode: with NEXT_PUBLIC_ANON_ANALYTICS=1 the site runs an
+// anonymous, storage-free measurement layer and this page must say so.
+const ANON_ANALYTICS = process.env.NEXT_PUBLIC_ANON_ANALYTICS === '1';
+
 export default function PrivacyPage() {
   return (
     <LegalLayout title="Πολιτική Απορρήτου" updated="2026-06-15">
@@ -77,6 +81,16 @@ export default function PrivacyPage() {
           τίποτα στη συσκευή σου και δεν δημιουργείται αναγνωριστικό που σε ακολουθεί —
           δες την <a href="/cookies" style={{ color: '#009de0' }}>Πολιτική Cookies</a>.
         </li>
+        {ANON_ANALYTICS && (
+          <li>
+            <strong>Δική μας ανώνυμη μέτρηση χρήσης</strong> — καταγράφουμε ποια καρτέλα
+            προσφοράς εμφανίστηκε και ποια πατήθηκε, με τη θέση της στη λίστα, την
+            κατηγορία και την αλυσίδα. Χωρίς αναγνωριστικό, χωρίς cookie, χωρίς αποθήκευση
+            ή ανάγνωση στη συσκευή σου, χωρίς IP και χωρίς τύπο συσκευής/browser. Τα
+            δεδομένα είναι ανώνυμα και δεν μπορούν να συνδεθούν με εσένα. Χρησιμεύουν
+            αποκλειστικά για να κρίνουμε ποιες προσφορές αξίζει να δείχνουμε πρώτες.
+          </li>
+        )}
         <li><strong>Supabase</strong> — βάση δεδομένων &amp; αποθήκευση εικόνων.</li>
         <li><strong>Sentry</strong> — καταγραφή τεχνικών σφαλμάτων.</li>
         <li><strong>Resend</strong> — αποστολή ενημερωτικών email (όταν ενεργοποιηθεί).</li>

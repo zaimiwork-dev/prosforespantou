@@ -201,6 +201,12 @@ model ClickEvent {
   query       String?  // search text / filter state
   resultCount Int?     // results the user saw for that search / filter
   dedupKey    String?  @unique // impressions: session:discount:page:day — replays are no-ops
+  // 2026-09-17. One short label for the SLOT, never the person: 'mine' when the
+  // card's chain is one the shopper ticked, 'other' when it is not. With
+  // anonymous events carrying no identifier this is the only way to tell
+  // whether the preferred-store boost earns its place. Thousands of shoppers
+  // share each value, so it identifies nobody.
+  context     String?
 
   @@index([supermarket, createdAt])
   @@index([eventType, createdAt])

@@ -12,6 +12,11 @@ export const metadata = {
 // The preferences wording below follows the same flag so the page never
 // describes a data flow that is not running, or hides one that is.
 const PROFILE_SYNC = process.env.NEXT_PUBLIC_PROFILE_SYNC === '1';
+// NEXT_PUBLIC_ANON_ANALYTICS=1 switches on the anonymous, storage-free event
+// layer (lib/analytics-mode). The section below follows the same flag: with it
+// off the page must keep saying nothing at all is recorded before consent,
+// because that is then the truth.
+const ANON_ANALYTICS = process.env.NEXT_PUBLIC_ANON_ANALYTICS === '1';
 
 export default function CookiesPage() {
   const cell = { border: '1px solid #eee', padding: '8px 10px', textAlign: 'left', verticalAlign: 'top', fontSize: 13.5 };
@@ -25,13 +30,39 @@ export default function CookiesPage() {
         συγκατάθεσή σου στο σχετικό banner).
       </p>
 
-      <H2>Δεν τρέχει κανένα στατιστικό χωρίς τη συγκατάθεσή σου</H2>
-      <p>
-        Μέχρι να πατήσεις «Αποδοχή», δεν καταγράφουμε καμία ενέργειά σου και δεν
-        δημιουργούμε αναγνωριστικό συνεδρίας. Αν πατήσεις «Απόρριψη», τα στατιστικά
-        παραμένουν ανενεργά και διαγράφουμε το τυχόν αναγνωριστικό. Μπορείς να αλλάξεις
-        γνώμη όποτε θες από τον σύνδεσμο «Ρυθμίσεις cookies» στο υποσέλιδο.
-      </p>
+      {ANON_ANALYTICS ? (
+        <>
+          <H2>Χωρίς συγκατάθεση: ανώνυμη μέτρηση που δεν αγγίζει τη συσκευή σου</H2>
+          <p>
+            Για να ξέρουμε ποιες προσφορές είναι χρήσιμες, μετράμε{' '}
+            <strong>ποια καρτέλα εμφανίστηκε και ποια πατήθηκε</strong> — σε ποια θέση της
+            λίστας, σε ποια κατηγορία και από ποια αλυσίδα. Αυτή η μέτρηση{' '}
+            <strong>δεν αποθηκεύει και δεν διαβάζει τίποτα στη συσκευή σου</strong>: κανένα
+            cookie, κανένα αναγνωριστικό, τίποτα στο localStorage ή στο sessionStorage. Στον
+            διακομιστή δεν κρατάμε ούτε τη διεύθυνση IP σου ούτε τον τύπο της συσκευής ή του
+            browser σου. Δεν υπάρχει επομένως τρόπος να συνδεθούν δύο ενέργειες με το ίδιο
+            πρόσωπο — είναι απλή, ανώνυμη στατιστική.
+          </p>
+          <p>
+            <strong>Αν πατήσεις «Αποδοχή»</strong>, προσθέτουμε ένα ανώνυμο αναγνωριστικό
+            συνεδρίας (<code>sid</code>) ώστε να βλέπουμε τη διαδρομή μιας επίσκεψης από την
+            αναζήτηση μέχρι το πάτημα. <strong>Αν πατήσεις «Απόρριψη»</strong>, δεν
+            δημιουργείται κανένα αναγνωριστικό και διαγράφουμε όποιο υπάρχει· η παραπάνω
+            ανώνυμη μέτρηση συνεχίζει, γιατί δεν αφορά δεδομένα της συσκευής σου. Μπορείς να
+            αλλάξεις γνώμη όποτε θες από τον σύνδεσμο «Ρυθμίσεις cookies» στο υποσέλιδο.
+          </p>
+        </>
+      ) : (
+        <>
+          <H2>Δεν τρέχει κανένα στατιστικό χωρίς τη συγκατάθεσή σου</H2>
+          <p>
+            Μέχρι να πατήσεις «Αποδοχή», δεν καταγράφουμε καμία ενέργειά σου και δεν
+            δημιουργούμε αναγνωριστικό συνεδρίας. Αν πατήσεις «Απόρριψη», τα στατιστικά
+            παραμένουν ανενεργά και διαγράφουμε το τυχόν αναγνωριστικό. Μπορείς να αλλάξεις
+            γνώμη όποτε θες από τον σύνδεσμο «Ρυθμίσεις cookies» στο υποσέλιδο.
+          </p>
+        </>
+      )}
 
       <H2>Τι αποθηκεύεται στη συσκευή σου</H2>
       <table style={{ borderCollapse: 'collapse', width: '100%', margin: '8px 0 4px' }}>
