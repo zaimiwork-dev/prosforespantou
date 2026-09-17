@@ -74,15 +74,23 @@ async function forgetProfile() {
 export function startProfileSync() {
   if (typeof window === 'undefined') return () => {};
 
+  // Declared before the consent listener below, not after. With the flag OFF
+  // this function returns early, so a later «Αποδοχή» used to reach schedule()
+  // while `timer` had never been initialised — a temporal-dead-zone throw
+  // inside the consent callback, caught in a browser check on 2026-09-17.
+  // Production has the flag on, so it never fired there; turning the flag off
+  // would have made every accept throw.
+  let timer = null;
+
   // Erasure must work even with the flag off (a copy may exist from before).
+  // Starting a sync, however, is only meaningful when the flag is on.
   const unsubConsent = onConsentChange((value) => {
     if (value === 'rejected') forgetProfile();
-    else if (value === 'accepted') schedule();
+    else if (value === 'accepted' && profileSyncEnabled()) schedule();
   });
 
   if (!profileSyncEnabled()) return unsubConsent;
 
-  let timer = null;
   function schedule() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; syncNow(); }, DEBOUNCE_MS);

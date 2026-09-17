@@ -42,9 +42,9 @@ export function CookieConsent() {
     // direction — a count of choices, not a record of who chose. Without it a
     // refusal leaves no trace at all and the accept rate stays unknowable.
     trackConsentChoice(value);
-    // A visitor who just refused should not keep carrying a visit id either,
-    // even though it is not consented data.
-    if (value === 'rejected') forgetVisitId();
+    // Either way the visit id has no further purpose: a refusal should not
+    // leave one behind, and an acceptance replaces it with the real `sid`.
+    forgetVisitId();
     setConsent(value);
   };
 
