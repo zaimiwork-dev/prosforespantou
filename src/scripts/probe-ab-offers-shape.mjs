@@ -33,6 +33,8 @@ function url(vars) {
 }
 
 const VARIANTS = [
+  ['size 10, hideUnavailableProducts OFF', { hideUnavailableProducts: false }],
+  ['size 500', { lazyLoadCount: 500 }],
   ['as the adapter asks today', {}],
   ['activatable offers OFF', { includePotentialActivatableOffers: false }],
   ['page size 50', { lazyLoadCount: 50 }],
@@ -40,6 +42,35 @@ const VARIANTS = [
   ['hideProductsWithoutPromo ON', { hideProductsWithoutPromo: true }],
   ['page 2 (pageNumber 1)', { pageNumber: 1 }],
 ];
+
+// Round 2 (same day): round 1 showed size 10 -> 0 products and size 50 -> 11,
+// while CATEGORY at size 50 returns 50. So items are removed AFTER paging.
+// Walk whole listings and count what each page yields, to size the fix.
+async function walk(label, vars, maxPages = 200) {
+  console.log(`
+### walk: ${label}`);
+  const codes = new Set();
+  const perPage = [];
+  let pages = null;
+  for (let page = 0; page < maxPages; page++) {
+    const res = await fetch(url({ ...vars, pageNumber: page }), { headers: AB_API_HEADERS });
+    const j = await res.json();
+    const pl = j.data?.productList;
+    pages ??= pl?.pagination?.totalPages;
+    const prods = pl?.products || [];
+    for (const x of prods) if (x?.code != null) codes.add(String(x.code));
+    perPage.push(prods.length);
+    if (pages != null && page + 1 >= pages) break;
+    await new Promise((r) => setTimeout(r, 900));
+  }
+  console.log(`pages walked: ${perPage.length} of ${pages}; unique codes: ${codes.size}`);
+  console.log(`per page: ${perPage.join(',')}`);
+}
+
+await walk('size 50', { lazyLoadCount: 50 });
+await walk('size 100', { lazyLoadCount: 100 });
+await walk('size 10, first 25 pages', { lazyLoadCount: 10 }, 25);
+await walk('size 50, hideUnavailableProducts OFF', { lazyLoadCount: 50, hideUnavailableProducts: false });
 
 for (const [label, vars] of VARIANTS) {
   console.log(`\n=== ${label} ===`);
