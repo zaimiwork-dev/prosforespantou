@@ -11,7 +11,8 @@
 // How it works:
 //   1. Replays the ProductList GraphQL operation via Apollo persisted-query hash.
 //      No full query string sent — just the SHA-256 the AB frontend uses.
-//   2. Paginates pageNumber 0..N until short page or totalPages reached.
+//   2. Paginates pageNumber 0..N until totalPages is reached. Empty pages in
+//      between are normal since 2026-09-17 — see the loop in run().
 //   3. Filters to PRICE-AFFECTING promos by default. AB's PROMOTION_SEARCH
 //      returns ~70% loyalty-points-only items; we skip those because they
 //      aren't really discounts. Set INCLUDE_POINTS=1 to keep them.
@@ -47,7 +48,11 @@ const ENDPOINT = 'https://www.ab.gr/api/v1/';
 // frontend (ScraperState) wins over this compiled-in fallback, so a rotation
 // heals without a deploy. See lib/ab-persisted-query.mjs.
 let PQ_HASH = KNOWN_PQ_HASH; // ProductList
-const PAGE_SIZE = 10;
+// 50 is the most AB serves per page (asking for 100 returns nothing at all).
+// Since 2026-09-17 the size matters: AB drops items from each promotions page
+// AFTER paging, so at 10 per page most pages came back empty. Measured
+// 2026-09-23 in CI: size 50 → 24 pages, none empty, 599 unique offers.
+const PAGE_SIZE = 50;
 const MAX_PAGES = envInt('MAX_PAGES', 200);
 
 const HEADERS = {
@@ -183,11 +188,22 @@ async function run() {
     for (const p of products) if (p.code != null) byCode.set(String(p.code), p);
     process.stdout.write(`\r   page ${page + 1}/${totalPages ?? '?'} — unique: ${byCode.size}/${totalResults ?? '?'}   `);
     if (totalPages != null && page + 1 >= totalPages) break;
-    if (products.length === 0) break;
+    // An empty page is NOT the end while AB says more pages remain. Since
+    // 2026-09-17 AB removes items from each promotions page after paging —
+    // about half the listing is hidden from a visitor who is not logged in —
+    // so an empty page can sit mid-listing. Stopping at the first one is what
+    // took this adapter from 341 offers to 0 for a week. Without pagination
+    // there is no way to tell, so an empty page still ends the walk.
+    if (products.length === 0 && totalPages == null) break;
     if (byCode.size >= LIMIT) break;
     await pace(PACE_MS, JITTER_MS);
   }
   console.log('');
+  // What AB let us see of what it says it has. ~51% on 2026-09-23; a further
+  // fall shows up here before it shows up as a thin AB on the site.
+  if (totalResults) {
+    console.log(`   visible: ${byCode.size} of ${totalResults} listed promotions (${Math.round((100 * byCode.size) / totalResults)}%)`);
+  }
 
   let items = [...byCode.values()].map(toOfferItem).filter((it) => it && it.name);
   if (items.length > LIMIT) items = items.slice(0, LIMIT);
