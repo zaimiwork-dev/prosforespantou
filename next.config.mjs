@@ -81,9 +81,11 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-      // Reserved for the custom image domain we should move to: the public
-      // r2.dev host is rate-limited by Cloudflare and some Greek resolvers
-      // blackhole it (this dev machine's resolver answers 127.0.0.1).
+      // The custom image domain we are moving to: Cloudflare rate-limits the
+      // public r2.dev host, documents it as not for production, and it sends
+      // no Cache-Control. (An earlier note here said Greek resolvers blackhole
+      // it; that was this dev machine behind a VPN and did not reproduce.)
+      // The move itself: src/scripts/rewrite-image-host.mjs.
       {
         protocol: 'https',
         hostname: 'images.prosforespantou.gr',
