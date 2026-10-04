@@ -32,6 +32,8 @@
 //                    (34 of 3,516 items) and the weekly job stayed green for
 //                    months, which is exactly what this gate exists to catch.
 //   PACE_MS=750      throttle between category fetches
+//   RETRY_COOLDOWN_MS=90000  pause before the one slower retry pass over the
+//                    categories that failed (Wolt rate limits come in bursts)
 
 import 'dotenv/config';
 import dotenv from 'dotenv';
@@ -39,7 +41,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 import { ingestCatalog } from './lib/ingest-catalog.mjs';
-import { envInt, fetchWithBackoff, pace } from './lib/polite-http.mjs';
+import { envInt, fetchWithBackoff, pace, sleep } from './lib/polite-http.mjs';
 import { evaluateGtinRate, formatGtinRate } from '../lib/gtin-coverage.ts';
 
 const VENUE_SLUGS = (process.argv[2] || process.env.WOLT_VENUES || '')
@@ -62,6 +64,7 @@ if (WOLT_BASELINE && VENUE_SLUGS.length > 1) {
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
 const PACE_MS = envInt('PACE_MS', 750);
 const JITTER_MS = envInt('JITTER_MS', 350);
+const RETRY_COOLDOWN_MS = envInt('RETRY_COOLDOWN_MS', 90000);
 const BASE = 'https://consumer-api.wolt.com/consumer-api/consumer-assortment/v1';
 
 const HEADERS = {
@@ -118,39 +121,65 @@ async function fetchVenueItems(venueSlug, itemsByKey) {
   const before = itemsByKey.size;
   let seen = 0;
   let withGtin = 0;
-  let failedCats = 0;
+  async function collect(c) {
+    const url = `${BASE}/venues/slug/${encodeURIComponent(venueSlug)}/assortment/categories/slug/${encodeURIComponent(c.slug)}`;
+    const data = await getJson(url);
+    for (const it of data.items || []) {
+      seen++;
+      if (it.barcode_gtin) withGtin++;
+      // Key by NORMALIZED GTIN so the same product in several stores
+      // collapses to one canonical row; fall back to the Wolt item id so
+      // barcode-less rows still dedupe within a venue. Normalising matters:
+      // measured 2026-09-03, masoutis-makedonias returns GTIN-13 while the
+      // other Masoutis venues return GTIN-14 (leading zero), giving 0/70 raw
+      // overlap on a sample — keying on the raw value made two stores of the
+      // same chain look completely disjoint.
+      const bc = normalizeBarcode(it.barcode_gtin);
+      const key = bc ? `gtin:${bc}` : `id:${it.id}`;
+      if (!itemsByKey.has(key)) itemsByKey.set(key, { ...it, _category: c.name, _venue: venueSlug });
+    }
+  }
+
+  const failed = [];
   let catIdx = 0;
   for (const c of cats) {
     catIdx++;
     try {
-      const url = `${BASE}/venues/slug/${encodeURIComponent(venueSlug)}/assortment/categories/slug/${encodeURIComponent(c.slug)}`;
-      const data = await getJson(url);
-      for (const it of data.items || []) {
-        seen++;
-        if (it.barcode_gtin) withGtin++;
-        // Key by NORMALIZED GTIN so the same product in several stores
-        // collapses to one canonical row; fall back to the Wolt item id so
-        // barcode-less rows still dedupe within a venue. Normalising matters:
-        // measured 2026-09-03, masoutis-makedonias returns GTIN-13 while the
-        // other Masoutis venues return GTIN-14 (leading zero), giving 0/70 raw
-        // overlap on a sample — keying on the raw value made two stores of the
-        // same chain look completely disjoint.
-        const bc = normalizeBarcode(it.barcode_gtin);
-        const key = bc ? `gtin:${bc}` : `id:${it.id}`;
-        if (!itemsByKey.has(key)) itemsByKey.set(key, { ...it, _category: c.name, _venue: venueSlug });
-      }
+      await collect(c);
       process.stdout.write(`\r   category ${catIdx}/${cats.length} - unique items: ${itemsByKey.size}        `);
     } catch (e) {
       // Logged, not escalated: a single category blip costs a handful of items
       // out of thousands, and the aggregate ratio in run() is what actually says
       // whether the walk is unreliable. ingestCatalog treats ANY extraWarning as
       // unhealthy, and 4 venues x ~245 categories is ~1,000 fetches per run.
-      failedCats++;
-      console.log(`\n   Wolt category "${c.slug}" failed (${e.message}); skipped.`);
+      failed.push(c);
+      console.log(`\n   Wolt category "${c.slug}" failed (${e.message}); will retry after the walk.`);
     }
     if (itemsByKey.size >= LIMIT) break;
     await pace(PACE_MS, JITTER_MS);
   }
+
+  // One slower second pass over what failed, after letting Wolt cool down.
+  // Measured 2026-10-04: Wolt answered 429 to a quarter of My Market's
+  // categories (33/132) even with no other Wolt job running, and the backoff
+  // inside a single fetch (seconds) is too short to outlast that. Rate limits
+  // are bursts, so waiting once and retrying at half speed recovers most of it.
+  if (failed.length && itemsByKey.size < LIMIT) {
+    const retried = failed.length;
+    console.log(`\n   ${retried} categories failed on ${venueSlug}; cooling down ${Math.round(RETRY_COOLDOWN_MS / 1000)}s, then one slower pass`);
+    await sleep(RETRY_COOLDOWN_MS);
+    for (const c of [...failed]) {
+      try {
+        await collect(c);
+        failed.splice(failed.indexOf(c), 1);
+      } catch (e) {
+        console.log(`   Wolt category "${c.slug}" failed again (${e.message}); skipped.`);
+      }
+      await pace(PACE_MS * 2, JITTER_MS);
+    }
+    console.log(`   second pass recovered ${retried - failed.length}/${retried}; ${failed.length} still missing`);
+  }
+  const failedCats = failed.length;
   console.log('');
   console.log(`   ${venueSlug}: ${seen} items seen, ${withGtin} with GTIN (${formatGtinRate(seen, withGtin)}), +${itemsByKey.size - before} new to this run`);
   if (Number.isFinite(LIMIT)) warnings.push(`LIMIT=${LIMIT} active; Wolt enrichment run is intentionally partial.`);

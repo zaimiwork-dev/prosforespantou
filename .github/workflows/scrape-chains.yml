@@ -64,10 +64,7 @@ on:
     - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
     - cron: '30 3 * * 0'  # weekly Sun 03:30 UTC — Lidl catalog (e-shop grid)
     - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
-    - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Sklavenitis Wolt barcode enrichment
-    - cron: '30 5 * * 0'  # weekly Sun 05:30 UTC — My Market Wolt barcode enrichment
-    - cron: '30 8 * * 0'  # weekly Sun 08:30 UTC — Masoutis Wolt barcode enrichment
-    - cron: '0 9 * * 0'   # weekly Sun 09:00 UTC — AB Wolt barcode enrichment
+    - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Wolt barcode enrichment, all four chains in sequence (sklavenitis → mymarket → masoutis → ab)
     - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
     - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
     - cron: '0 7 * * 0'   # weekly Sun 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL)
@@ -905,10 +902,18 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           LIMIT: ${{ github.event.inputs.limit }}
 
+  # The four Wolt enrichment jobs run ONE AFTER ANOTHER from a single Sunday
+  # trigger (sklavenitis → mymarket → masoutis → ab). They used to have four
+  # crons, but GitHub starts Sunday schedules hours late and bunches them: on
+  # 2026-10-04 masoutis and ab ran at the same time and all three big chains
+  # came back with Wolt 429s (33/132 categories lost on My Market alone).
+  # `needs` orders them; `!cancelled()` keeps the chain going when an earlier
+  # one fails, and lets a manual dispatch of a single chain run on its own.
   mymarket-canonical:
-    if: github.event.schedule == '30 5 * * 0' || github.event.inputs.chain == 'mymarket-canonical'
+    needs: sklavenitis-canonical
+    if: ${{ !cancelled() && (github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'mymarket-canonical') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -924,7 +929,14 @@ jobs:
           PACE_MS: '1000'
           JITTER_MS: '500'
           WOLT_BASELINE: '0'
+          # Outlast a Wolt 429 inside one fetch: 5s, 10s, 20s, 40s.
+          FETCH_RETRIES: '4'
+          FETCH_BACKOFF_MS: '5000'
       - name: My Market full catalog (site listing -> Product + shelf-price baseline)
+        # Runs even when the Wolt step above fails: it reads mymarket.gr, not
+        # Wolt, so a Wolt rate limit must not cost the week's shelf prices too
+        # (on 2026-10-04 it did — this step was skipped).
+        if: ${{ !cancelled() }}
         # Walks mymarket.gr's product departments from /sitemap/categories-tree,
         # not /offers. Normal cards write shelf-price baselines; current offer
         # cards only create/keep the SKU mapping so promo prices are not stored
@@ -939,9 +951,10 @@ jobs:
           JITTER_MS: '600'
 
   sklavenitis-canonical:
+    # First of the Sunday Wolt chain (see the note above mymarket-canonical).
     if: github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'sklavenitis-canonical'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -968,6 +981,8 @@ jobs:
           JITTER_MS: '500'
           WOLT_BASELINE: '0'
           MIN_GTIN_RATE: '0'
+          FETCH_RETRIES: '4'
+          FETCH_BACKOFF_MS: '5000'
 
   # Masoutis and AB expose NO barcode on their own feeds (see each adapter's
   # header), so Wolt is their only GTIN source — and neither had a scheduled
@@ -982,9 +997,10 @@ jobs:
   # roughly quadrupled the yield of the first. Venues are picked for regional
   # spread and large format for the same reason.
   masoutis-canonical:
-    if: github.event.schedule == '30 8 * * 0' || github.event.inputs.chain == 'masoutis-canonical'
+    needs: mymarket-canonical
+    if: ${{ !cancelled() && (github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'masoutis-canonical') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -1004,11 +1020,14 @@ jobs:
           PACE_MS: '1000'
           JITTER_MS: '500'
           WOLT_BASELINE: '0'
+          FETCH_RETRIES: '4'
+          FETCH_BACKOFF_MS: '5000'
 
   ab-canonical:
-    if: github.event.schedule == '0 9 * * 0' || github.event.inputs.chain == 'ab-canonical'
+    needs: masoutis-canonical
+    if: ${{ !cancelled() && (github.event.schedule == '0 5 * * 0' || github.event.inputs.chain == 'ab-canonical') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -1027,6 +1046,8 @@ jobs:
           PACE_MS: '1000'
           JITTER_MS: '500'
           WOLT_BASELINE: '0'
+          FETCH_RETRIES: '4'
+          FETCH_BACKOFF_MS: '5000'
 
   kritikos-canonical:
     if: github.event.schedule == '0 6 * * 0' || github.event.inputs.chain == 'kritikos-canonical'
