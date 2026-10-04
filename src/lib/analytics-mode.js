@@ -42,10 +42,12 @@ export const ANON_ANALYTICS_ENABLED = process.env.NEXT_PUBLIC_ANON_ANALYTICS ===
 // costs none of the measurement above.
 export const VISIT_ID_ENABLED = process.env.NEXT_PUBLIC_VISIT_ID === '1';
 
-// Banner layout (owner's explicit decision, 2026-09-18). Unset — the repo
-// default — puts «Αποδοχή» and «Απόρριψη» side by side on the first layer.
-// Set to '1' for the layout the owner asked for: «Αποδοχή» alone up front,
-// with declining reachable after «Περισσότερα».
+// Banner layout. Unset — the repo default since 2026-10-04 — is the layout
+// most Greek sites use (surveyed that day; see components/CookieConsent.js):
+// a big green «Αποδοχή», a quieter outline «Απόρριψη» beneath it, «Ρυθμίσεις»
+// as a link. Set to '1' for «Αποδοχή» alone up front with declining reachable
+// only after «Περισσότερα» — the layout asked for on 2026-09-18, which the
+// survey found only 1 of 12 Greek sites using.
 //
 // Be clear about what that second layout is, because the next person to read
 // this will need to know: EU regulators (EDPB guidance, CNIL's Google and
