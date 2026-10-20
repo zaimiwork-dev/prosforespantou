@@ -2,6 +2,8 @@
 // these in the browser over the rows it has loaded, so the app does the same
 // over its accumulated cards — same order, same duplicates removed.
 import { dedupeDeals } from '@shared/dedupe-deals';
+import { interleaveByCategory } from '@shared/interleave-deals';
+import { spreadFamilies } from '@shared/deal-family';
 import type { DealCard } from './api';
 
 // The shared helpers speak the database field names; the card uses shorter
@@ -12,4 +14,14 @@ const unwrap = ({ productName: _n, supermarket: _s, discountedPrice: _p, ...c }:
 
 export function dedupeCards(cards: DealCard[]): DealCard[] {
   return dedupeDeals(cards.map(wrap)).map(unwrap);
+}
+
+// The website's offers page (DealsClient): with the default «hot» sort the
+// accumulated list rotates across departments so none floods the first
+// screen, then same-brand rows are spaced out — every row is kept. Any other
+// sort shows exactly what was asked for, de-duplicated only.
+export function arrangeDeals(cards: DealCard[], sort: string): DealCard[] {
+  const deduped = dedupeDeals(cards.map(wrap));
+  const arranged = sort === 'hot' ? spreadFamilies(interleaveByCategory(deduped) as Wrapped[]) : deduped;
+  return arranged.map(unwrap);
 }
