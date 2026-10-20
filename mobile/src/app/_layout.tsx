@@ -1,8 +1,10 @@
+// Root: a stack with the four tabs at the bottom of it, so screens such as
+// the product page open OVER the tabs with a back arrow (and the Android
+// back gesture) instead of replacing a tab.
 import { useEffect } from 'react';
-import { DefaultTheme, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import AppTabs from '@/components/app-tabs';
 import { Colors } from '@/constants/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -19,7 +21,10 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={theme}>
       <StatusBar style="dark" />
-      <AppTabs />
+      <Stack screenOptions={{ headerTintColor: Colors.brand, headerBackButtonDisplayMode: 'minimal' }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="offer/[id]" options={{ title: 'Προσφορά' }} />
+      </Stack>
     </ThemeProvider>
   );
 }

@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { expiryInfo } from '@shared/expiry-label';
 import type { DealCard as Deal } from '@/lib/api';
 import { useChains } from '@/lib/chains';
@@ -39,7 +40,9 @@ export function DealCardView({
 
   return (
     <Pressable
-      onPress={onPress ? () => onPress(deal) : undefined}
+      // Default: open the product page. A screen passes onPress only when a
+      // tap should do something else (e.g. pick a card into the list).
+      onPress={() => (onPress ? onPress(deal) : router.push({ pathname: '/offer/[id]', params: { id: deal.id } }))}
       accessibilityRole="button"
       accessibilityLabel={`${deal.name}, ${euro(deal.price)}, ${chain?.name ?? deal.chain ?? ''}`}
       style={({ pressed }) => [styles.card, width ? { width } : null, pressed && styles.pressed]}>
