@@ -4,6 +4,10 @@ Owner decisions, 2026-10-20:
 - **A real native app, not the website in a frame.** Built with **Expo (React Native)** in a new `mobile/` folder. It reads the same database through a new public JSON API; the scrapers, matching, comparisons and price history are unchanged.
 - **Google Play first.** iOS later from the same codebase (Apple Developer, $99/yr, when the owner decides).
 - Order stays: **app first, then marketing** (see CONTEXT.md row 41).
+- **Name: «Προσφορές Παντού»** (store title, nothing appended). **Application ID `gr.prosforespantou.app`** — permanent once on Play. Search terms («σούπερ μάρκετ», «σύγκριση τιμών») go in the short description (80 chars, indexed). Researched 10-20: the name is free on Play; «Καλάθι» is taken twice (one a ministry app); the government's **PosoKanei** (`gr.gov.posokanei`, 50K+ downloads, **2.6★**, barcode + basket comparison, launched June 2026) is the real competitor; «προσφορές σούπερ μάρκετ» search results are mostly games plus Kimbino (leaflets, 4.6★).
+- **Look:** same colours, type and icon style as the site, laid out as a native app — bottom tabs Αρχική / Προσφορές / Αναζήτηση / Λίστα, native scrolling and back gesture. No emoji.
+- **No login at launch** — list, favourites and settings live on the device, as on the web.
+- **Team:** Claude (Opus) leads — architecture, tickets, review of every diff, merges. Sonnet 5 agents implement tickets in isolated worktrees, 2–3 at a time. Week 1 (API + scaffold) is built by the lead; agents start in week 2.
 
 This replaces PHASES.md Phase 4.7 (the June Capacitor plan). Why not Capacitor: it wraps the live site (Apple rejects that under guideline 4.2), iOS builds need a Mac, and the owner wants a real app.
 
