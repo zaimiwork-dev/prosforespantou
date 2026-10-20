@@ -11,6 +11,22 @@ Owner decisions, 2026-10-20:
 
 This replaces PHASES.md Phase 4.7 (the June Capacitor plan). Why not Capacitor: it wraps the live site (Apple rejects that under guideline 4.2), iOS builds need a Mac, and the owner wants a real app.
 
+## Status (update with every merge)
+
+**Week 1 — done 2026-10-20 (lead).**
+- App API v1 live on production: `GET /api/v1/home`, `/deals`, `/meta`, `/search`, `/offers/:id` (`src/app/api/v1/`). Contract: `src/lib/api/deal-card.ts` — additive-only within v1. CDN-cached 5 min; any origin may read (public data; needed by the browser preview).
+- `mobile/`: Expo SDK 58 app, root Stack over native tabs (Αρχική / Προσφορές / Αναζήτηση / Λίστα), home screen on live data, cards open `/offer/[id]`. Shares the website's pure rules via `@shared/*` → `../src/lib` (Metro watchFolders). The website's tsc/eslint/vitest exclude `mobile/`; Vercel ignores it.
+- Engineering handbook for the agents: [mobile/TEAM.md](mobile/TEAM.md).
+- Repo needs `git config core.longpaths true` on Windows (a 260+ char file in `public/wolt_images/` broke worktree creation).
+
+**Week 2 — in progress (engineers, Sonnet 5, isolated worktrees):**
+
+| Ticket | Scope | Files | Status |
+|---|---|---|---|
+| APP-201 | Προσφορές tab: chain / department / sort chips, infinite 2-column grid, website ordering via `arrangeDeals` | `(tabs)/deals.tsx`, `components/deals/` | in progress |
+| APP-202 | Αναζήτηση tab: debounced search, suggestions, session recents, chain filter | `(tabs)/search.tsx`, `components/search/` | in progress |
+| APP-203 | Product page: price block, honest dates, comparison incl. shelf rows, 90-day chart (react-native-svg), leaflet link, similar | `offer/[id].tsx`, `components/offer/` | in progress |
+
 ## The one constraint that sets the calendar
 
 A **new personal Google Play account must run a closed test with at least 12 testers, opted in for 14 days in a row, before it can apply for production.** (Organisation accounts are exempt but need a registered business and a D-U-N-S number.) So the plan starts the 14-day clock as early as possible — with a basic but working build at the end of week 3 — and keeps improving the app during the test (updates are allowed; testers must stay opted in).
