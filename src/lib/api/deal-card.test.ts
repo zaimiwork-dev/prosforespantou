@@ -63,6 +63,11 @@ describe('toDealCard', () => {
     expect(c).not.toHaveProperty('chip');
   });
 
+  it('falls back to validFrom when a query did not select updatedAt', () => {
+    const { updatedAt: _u, ...noUpdated } = base;
+    expect(toDealCard(noUpdated).updatedAt).toBe('2026-10-15T00:00:00.000Z');
+  });
+
   it('labels a sponsored slot and carries the weekly-essential tag', () => {
     const c = toDealCard({ ...base, isFeatured: true, essential: { id: 'milk', label: 'Γάλα', chainCount: 4 } });
     expect(c.featured).toEqual({ label: 'Χορηγούμενο' });

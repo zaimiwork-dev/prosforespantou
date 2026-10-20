@@ -24,6 +24,7 @@ export async function GET() {
     });
   } catch (error) {
     Sentry.captureException(error);
+    console.error(`[api/v1] home unavailable:`, error);
     return fail(500, 'home unavailable');
   }
 }

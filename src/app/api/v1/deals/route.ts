@@ -49,6 +49,7 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     Sentry.captureException(error);
+    console.error(`[api/v1] deals unavailable:`, error);
     return fail(500, 'deals unavailable');
   }
 }

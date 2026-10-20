@@ -52,6 +52,16 @@ export async function getSimilarOffers(discountId: string, limit = 8) {
             hotScore: true,
             validFrom: true,
             validUntil: true,
+            // Everything a card needs to render the same as anywhere else:
+            // honest dates, the «κανονικά» baseline, verdict, comparison chip.
+            updatedAt: true,
+            datesFromSource: true,
+            priceVerdict: true,
+            baselinePrice: true,
+            baselineAt: true,
+            impliedPercent: true,
+            comparisonCount: true,
+            isCheapestInCluster: true,
           },
         });
 
@@ -65,6 +75,7 @@ export async function getSimilarOffers(discountId: string, limit = 8) {
           ...d,
           validFrom: d.validFrom.toISOString(),
           validUntil: d.validUntil.toISOString(),
+          updatedAt: d.updatedAt.toISOString(),
         }));
       } catch (error) {
         Sentry.captureException(error);

@@ -32,6 +32,7 @@ export async function GET() {
     });
   } catch (error) {
     Sentry.captureException(error);
+    console.error(`[api/v1] meta unavailable:`, error);
     return fail(500, 'meta unavailable');
   }
 }

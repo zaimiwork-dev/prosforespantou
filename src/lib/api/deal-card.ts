@@ -70,7 +70,10 @@ type Row = {
   validFrom: Date | string;
   validUntil: Date | string;
   datesFromSource?: boolean | null;
-  updatedAt: Date | string;
+  // Optional because not every query selects it (get-similar-offers did not
+  // until 2026-10-20); a missing one falls back to validFrom rather than
+  // failing the whole response.
+  updatedAt?: Date | string | null;
   source?: string | null;
   sources?: string[] | null;
   isFeatured?: boolean | null;
@@ -126,7 +129,7 @@ export function toDealCard(row: Row): DealCard {
     validFrom: iso(row.validFrom),
     validUntil: iso(row.validUntil),
     datesFromSource: Boolean(row.datesFromSource),
-    updatedAt: iso(row.updatedAt),
+    updatedAt: iso(row.updatedAt ?? row.validFrom),
     sources: rawSources.filter((s) => USER_FACING_SOURCES.has(s)),
     featured: row.isFeatured ? { label: row.featuredLabel ?? 'Χορηγούμενο' } : null,
     essential: row.essential ?? null,
