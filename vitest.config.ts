@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // mobile/ is the Expo app: its own runtime, its own tests.
+    exclude: ['**/node_modules/**', 'mobile/**'],
   },
   resolve: {
     alias: {

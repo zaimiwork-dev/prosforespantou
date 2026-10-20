@@ -9,14 +9,20 @@ import { checkRateLimit } from '@/lib/rate-limit';
 // database query per 5 minutes per distinct URL, not one per phone.
 export const CDN_CACHE = 'public, s-maxage=300, stale-while-revalidate=600';
 
+// Public, read-only offer data: any origin may read it. Phones ignore CORS;
+// this is for the browser preview of the app (expo start --web) that the
+// team uses to check screens, and costs nothing — the same data is on the
+// public site.
+const CORS = { 'Access-Control-Allow-Origin': '*' };
+
 export function ok(data: unknown, cache: string | null = CDN_CACHE) {
   return NextResponse.json(data, {
-    headers: cache ? { 'Cache-Control': cache } : { 'Cache-Control': 'no-store' },
+    headers: { ...CORS, 'Cache-Control': cache ?? 'no-store' },
   });
 }
 
 export function fail(status: number, error: string) {
-  return NextResponse.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ error }, { status, headers: { ...CORS, 'Cache-Control': 'no-store' } });
 }
 
 export function clientIp(req: Request): string {
