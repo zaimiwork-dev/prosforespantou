@@ -19,13 +19,19 @@ This replaces PHASES.md Phase 4.7 (the June Capacitor plan). Why not Capacitor: 
 - Engineering handbook for the agents: [mobile/TEAM.md](mobile/TEAM.md).
 - Repo needs `git config core.longpaths true` on Windows (a 260+ char file in `public/wolt_images/` broke worktree creation).
 
-**Week 2 — in progress (engineers, Sonnet 5, isolated worktrees):**
+**Week 2 — done 2026-10-20 (engineers, Sonnet 5, isolated worktrees; lead reviewed and merged):**
 
-| Ticket | Scope | Files | Status |
+| Ticket | Scope | Merged | Review notes |
 |---|---|---|---|
-| APP-201 | Προσφορές tab: chain / department / sort chips, infinite 2-column grid, website ordering via `arrangeDeals` | `(tabs)/deals.tsx`, `components/deals/` | in progress |
-| APP-202 | Αναζήτηση tab: debounced search, suggestions, session recents, chain filter | `(tabs)/search.tsx`, `components/search/` | in progress |
-| APP-203 | Product page: price block, honest dates, comparison incl. shelf rows, 90-day chart (react-native-svg), leaflet link, similar | `offer/[id].tsx`, `components/offer/` | in progress |
+| APP-201 | Προσφορές tab: chain / department / sort chips, infinite 2-column grid, website ordering via `arrangeDeals` | `1715e31` | Clean. 27 sequential pages, no duplicates. Cosmetic: chain chip row keeps its scroll offset after «Καθαρισμός φίλτρων». |
+| APP-202 | Αναζήτηση tab: debounced search, suggestions, session recents, chain filter | `1391f43` | Clean. Engineer kept one FlatList so the field never remounts (keyboard stays up). |
+| APP-203 | Product page: price block, honest dates, comparison incl. shelf rows, 90-day chart (react-native-svg), leaflet link, similar | `972ec5c` | Engineer corrected the ticket (no invented «Έναρξη»). Lead fixed: tied cheapest prices both tagged «Φθηνότερα». |
+
+**Found during review — data/search, not the app (fix on the server, benefits the website too):**
+- Search ranks condensed milk (ΝΟΥΝΟΥ ΣΥΜΠΥΚΝΩΜΕΝΟ) above fresh milk for «γάλα» (`src/lib/search-rank.ts`).
+- Lidl items mis-filed under «Φρούτα & Λαχανικά» (e.g. «Donut μήλο», a frozen VEGETERRA product) — category mapping for Lidl rows.
+
+**Next (week 3):** shopping list (offline, on device), favourites, settings (text size, my stores), first-run onboarding, in-app consent + analytics events, persisted recent searches; first EAS build → Play internal test → closed test opens (needs the owner's Play Console account).
 
 ## The one constraint that sets the calendar
 
