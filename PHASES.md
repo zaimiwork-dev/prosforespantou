@@ -206,6 +206,8 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 ## Phase 4.7 — Capacitor wrap → real iOS/Android app (UPCOMING — gated on completion of the rest of Phase 4)
 
+> **SUPERSEDED 2026-10-20 by [APP_PLAN.md](APP_PLAN.md):** the owner chose a real native app (Expo / React Native, Google Play first) over the Capacitor wrap below. Kept for history.
+
 **Owner alignment (2026-06-04):** Estimated 3-4 weeks to live on both stores. Sequence: finish remaining web items (Phase 3 activation, Phase 4 chain coverage, daily-deals widget, shopping-list pricing) → mobile UX audit → privacy policy + ToS → app icon + splash + screenshots → Capacitor wrap (1-2 days) → Apple/Google review (1-2 weeks).
 
 **Why:** End form per [CONTEXT.md §0](CONTEXT.md#0-product-vision-recorded-2026-05-01-directly-from-owner) is a native app on App Store + Play Store. Native unlocks: push notifications for watch-list alerts, barcode scanner, app-store presence (huge for an elderly audience that finds apps via the store search). The Phase 4.6 cross-chain comparison + Phase 6 price-history features are now shipped, so the app would launch with real differentiators on day 1 of TestFlight.
