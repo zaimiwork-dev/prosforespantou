@@ -34,6 +34,10 @@ const TABLES = ['discounts', 'products', 'pending_matches'];
 // every LIKE must name it. Spelled once, because a lost backslash here turns
 // into ESCAPE '' and silently stops matching bases that contain _ or %.
 const ESCAPE = "escape '\\'";
+// $1 = new base, $2 = 1-based position of the "/" after the old base. Both
+// typed explicitly: an untyped $2 arrived as text and selected Postgres's
+// regex substring() (incident 2026-11-03, see the proof step in main()).
+const REWRITE_SQL = '$1::text || substring(image_url from $2::int)';
 
 const { default: prisma } = await import('../lib/prisma.ts');
 
@@ -127,13 +131,41 @@ async function main() {
   }
   console.log('   ✓ every sampled photo is served by the new host, byte for byte');
 
+  // The SQL itself is proven on a real row before any batch runs: rewrite one
+  // row inside a transaction, read it back, compare with rewriteBase(), roll
+  // back. 2026-11-03 incident: `$2` was bound as TEXT, so Postgres picked the
+  // REGEX form substring(text from pattern) and every URL became
+  // `<newBase>52` or NULL — 64,829 rows. The byte-for-byte check above only
+  // tested the new host, never this statement. Both fixed: explicit ::int and
+  // this proof.
+  for (const t of TABLES) {
+    const [probe] = await prisma.$queryRawUnsafe(
+      `select id, image_url from "${t}" where image_url like $1 ${ESCAPE} limit 1`, like);
+    if (!probe) continue;
+    const expected = rewriteBase(probe.image_url, oldBase, newBase);
+    let got = null;
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`update "${t}" set image_url = ${REWRITE_SQL} where id = $3::uuid`, newBase, oldBase.length + 1, probe.id);
+        [{ image_url: got }] = await tx.$queryRawUnsafe(`select image_url from "${t}" where id = $1::uuid`, probe.id);
+        throw new Error('rollback-probe');
+      });
+    } catch (e) {
+      if (e.message !== 'rollback-probe') throw e;
+    }
+    if (got !== expected) {
+      return fail(`SQL rewrite check failed on ${t}: expected ${expected}, got ${got} — nothing was written.`);
+    }
+  }
+  console.log('   ✓ the UPDATE statement rewrites a real row exactly as expected (rolled back)');
+
   if (!APPLY) { console.log('\nDry run — nothing written. Re-run with APPLY=1 to rewrite.'); return; }
 
   for (const t of TABLES) {
     let total = 0;
     for (;;) {
       const n = await prisma.$executeRawUnsafe(
-        `update "${t}" set image_url = $1 || substring(image_url from $2)
+        `update "${t}" set image_url = ${REWRITE_SQL}
          where id in (select id from "${t}" where image_url like $3 ${ESCAPE} limit ${BATCH})`,
         newBase, oldBase.length + 1, like);
       total += n;
