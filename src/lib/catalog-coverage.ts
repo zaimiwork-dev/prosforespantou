@@ -1,10 +1,11 @@
 const CHAINS = ['ab', 'bazaar', 'kritikos', 'lidl', 'masoutis', 'mymarket', 'sklavenitis'];
 
 // Images self-hosted on a mirror (resilience metric) live on either the legacy
-// Supabase bucket path or Cloudflare R2 (R2_PUBLIC_URL / r2.dev). Everything else
-// still points at a chain CDN and breaks if that host blocks us.
+// Supabase bucket path or Cloudflare R2 (custom domain, R2_PUBLIC_URL, r2.dev).
+// Everything else still points at a chain CDN and breaks if that host blocks us.
 const MIRROR_MARKERS = [
   '/storage/v1/object/public/chain-images/',
+  'https://images.prosforespantou.gr/',
   ...(process.env.R2_PUBLIC_URL ? [process.env.R2_PUBLIC_URL.trim().replace(/\/+$/, '')] : []),
   '.r2.dev/',
 ];
