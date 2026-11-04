@@ -90,7 +90,7 @@ Delivered per [GEMINI_HANDOFF.md](GEMINI_HANDOFF.md):
 
 **Safety guarantees:**
 - Adapter returns `[]` → abort, NOTHING deactivated.
-- Adapter returns < 50% of currently-active when active > 20 → writes happen, deactivation SKIPPED.
+- Adapter returns < 50% of currently-active when active > 20 → writes happen, deactivation SKIPPED — unless the adapter passes `siteTotal` (the list size the chain's own site reports, ≥ 50) and the run holds at least that many items: then the chain shrank its list and deactivation runs (Masoutis web 790 → 290, 2026-10-29).
 - Soft delete only.
 - Source isolation: deactivation always filters `(supermarket, source)`.
 

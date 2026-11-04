@@ -531,7 +531,12 @@ async function fireWatchAlerts(prisma, alertable) {
 // that should ride along into the IngestRun record / Υγεία tab.
 // partial: true means the adapter KNOWS it missed pages/categories. Writes may
 // still happen, but stale deactivation is disabled regardless of item count.
-export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true, extraWarnings = [], partial = false }) {
+// siteTotal: the list size the chain's own site reports for this feed (e.g.
+// Masoutis's PassKey). When the run holds at least that many items, a drop
+// below half of what is live is the chain shrinking its list, not a broken
+// scrape, so SAFETY 2 lets deactivation run. Masoutis web went 790 → 290 on
+// 2026-10-29 and the guard kept ~670 vanished offers live for a week.
+export async function ingestOffers({ chain, source, items, dryRun = false, showUnmatched = true, extraWarnings = [], partial = false, siteTotal = null }) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (source !== 'web' && source !== 'leaflet') throw new Error(`source must be 'web' or 'leaflet', got "${source}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
@@ -592,7 +597,15 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
       where: { supermarket: chain, source, isActive: true },
     });
     const suspiciouslyLow = existingActive > 20 && items.length < existingActive * 0.5;
-    if (suspiciouslyLow) {
+    // Floor of 50: a glitching API that reports a tiny list must not be
+    // able to switch off a whole feed.
+    const provenComplete = !partial && Number.isInteger(siteTotal) && siteTotal >= 50 && items.length >= siteTotal;
+    if (suspiciouslyLow && provenComplete) {
+      report.warnings.push(
+        `Run has ${items.length} items but ${existingActive} are currently active for ${chain}/${source}; ` +
+        `the site itself reports ${siteTotal}, so the list shrank — stale offers WILL be deactivated.`
+      );
+    } else if (suspiciouslyLow) {
       report.healthOk = false;
       report.warnings.push(
         `Run has ${items.length} items but ${existingActive} are currently active for ${chain}/${source}. ` +

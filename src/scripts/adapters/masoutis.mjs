@@ -138,7 +138,7 @@ export async function collectMasoutisOffers({ source = 'web', limit = Infinity, 
 // Programmatic entry — return the ingest report instead of exiting.
 export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit = Infinity, log = console.log } = {}) {
   log(`🛒 Masoutis adapter — source=${source}${dryRun ? ' (DRY_RUN)' : ''}`);
-  const { items, partial } = await collectMasoutisOffers({ source, limit, log });
+  const { items, partial, reportedTotal } = await collectMasoutisOffers({ source, limit, log });
 
   // Mirror rotating promo images only during a real ingest. The read-only
   // coverage audit deliberately skips this write-side work.
@@ -161,6 +161,7 @@ export async function runMasoutisAdapter({ source = 'web', dryRun = false, limit
     dryRun,
     extraWarnings: mirrorWarnings,
     partial,
+    siteTotal: reportedTotal,
   });
 }
 
