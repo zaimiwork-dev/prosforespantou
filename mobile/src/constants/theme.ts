@@ -1,3 +1,5 @@
+import { useSettings } from '@/lib/settings';
+
 // The website's live palette (globals.css, data-theme="fresh") so the app and
 // the site read as one product. Light only for now: the audience is older
 // shoppers and the site has no dark theme to match.
@@ -35,3 +37,16 @@ export const Type = {
   h2: 22,
   h1: 28,
 } as const;
+
+// Type scaled by the shopper's text-size setting (Ρυθμίσεις). 'large' is
+// about 1.2x, like the website's large mode. Android's own font scaling still
+// applies on top, because Text honours it.
+export type TypeScale = Record<keyof typeof Type, number>;
+
+const TYPE_LARGE = Object.fromEntries(
+  Object.entries(Type).map(([k, v]) => [k, Math.round(v * 1.2)]),
+) as TypeScale;
+
+export function useType(): TypeScale {
+  return useSettings().textSize === 'large' ? TYPE_LARGE : Type;
+}

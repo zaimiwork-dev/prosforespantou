@@ -1,7 +1,7 @@
 // Αρχική — the website homepage's three rails (src/app/page.tsx +
 // HomeClient), from GET /api/v1/home: the week's staples at their cheapest,
 // the top offers, and offers ending soon.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,13 +13,19 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { api, type DealCard, type HomeResponse } from '@/lib/api';
 import { dedupeCards } from '@/lib/lists';
 import { DealCardView } from '@/components/deal-card';
-import { Colors, Radius, Space, Type } from '@/constants/theme';
+import { track } from '@/lib/analytics';
+import { Colors, Radius, Space, useType, type TypeScale } from '@/constants/theme';
 
 export default function HomeScreen() {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
+  useFocusEffect(useCallback(() => track('page_view', { page: 'home' }), []));
   const [data, setData] = useState<HomeResponse | null>(null);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,7 +94,20 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.brand} />}>
-        <Text style={styles.h1}>Προσφορές Παντού</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.h1, { flex: 1 }]}>Προσφορές Παντού</Text>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            accessibilityRole="button"
+            accessibilityLabel="Ρυθμίσεις"
+            hitSlop={4}
+            style={({ pressed }) => [styles.gear, pressed && { opacity: 0.6 }]}>
+            <Svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <Circle cx={12} cy={12} r={3} />
+              <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </Svg>
+          </Pressable>
+        </View>
         <Text style={styles.sub}>{data.total.toLocaleString('el-GR')} προσφορές σε 7 σούπερ μάρκετ</Text>
 
         <Rail title="Τα βασικά της εβδομάδας" hint="Στη χαμηλότερη τιμή τους" deals={data.essentials} cardWidth={railCard} />
@@ -107,6 +126,8 @@ export default function HomeScreen() {
 }
 
 function Rail({ title, hint, deals, cardWidth }: { title: string; hint?: string; deals: DealCard[]; cardWidth: number }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   if (deals.length === 0) return null;
   return (
     <View style={styles.rail}>
@@ -126,18 +147,21 @@ function Rail({ title, hint, deals, cardWidth }: { title: string; hint?: string;
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.bg },
-  content: { padding: Space[4], paddingBottom: Space[7] },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg, padding: Space[6] },
-  h1: { fontSize: Type.h1, fontWeight: '800', color: Colors.brand },
-  sub: { fontSize: Type.body, color: Colors.ink2, marginTop: 2, marginBottom: Space[5] },
-  h2: { fontSize: Type.h2, fontWeight: '800', color: Colors.ink, marginBottom: Space[2] },
-  hint: { fontSize: Type.caption, color: Colors.ink3, marginTop: -Space[1], marginBottom: Space[2] },
-  rail: { marginBottom: Space[6] },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[3], marginBottom: Space[6] },
-  errorTitle: { fontSize: Type.title, fontWeight: '700', color: Colors.ink, textAlign: 'center' },
-  errorText: { fontSize: Type.body, color: Colors.ink2, marginTop: Space[2], textAlign: 'center' },
-  retry: { marginTop: Space[5], backgroundColor: Colors.brand, borderRadius: Radius.md, paddingHorizontal: Space[6], paddingVertical: Space[3] },
-  retryText: { color: '#fff', fontSize: Type.bodyLg, fontWeight: '700' },
-});
+const makeStyles = (T: TypeScale) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: Colors.bg },
+    content: { padding: Space[4], paddingBottom: Space[7] },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg, padding: Space[6] },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: Space[2] },
+    gear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    h1: { fontSize: T.h1, fontWeight: '800', color: Colors.brand },
+    sub: { fontSize: T.body, color: Colors.ink2, marginTop: 2, marginBottom: Space[5] },
+    h2: { fontSize: T.h2, fontWeight: '800', color: Colors.ink, marginBottom: Space[2] },
+    hint: { fontSize: T.caption, color: Colors.ink3, marginTop: -Space[1], marginBottom: Space[2] },
+    rail: { marginBottom: Space[6] },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[3], marginBottom: Space[6] },
+    errorTitle: { fontSize: T.title, fontWeight: '700', color: Colors.ink, textAlign: 'center' },
+    errorText: { fontSize: T.body, color: Colors.ink2, marginTop: Space[2], textAlign: 'center' },
+    retry: { marginTop: Space[5], backgroundColor: Colors.brand, borderRadius: Radius.md, paddingHorizontal: Space[6], paddingVertical: Space[3] },
+    retryText: { color: '#fff', fontSize: T.bodyLg, fontWeight: '700' },
+  });

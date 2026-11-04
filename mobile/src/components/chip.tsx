@@ -3,7 +3,7 @@
 // Touch target is at least 44 px tall (older users), selected state is
 // announced to screen readers.
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Colors, Radius, Space, Type } from '@/constants/theme';
+import { Colors, Radius, Space, useType } from '@/constants/theme';
 
 export function Chip({
   label,
@@ -17,6 +17,7 @@ export function Chip({
   // Optional accent (e.g. a chain's colour) used when selected.
   color?: string;
 }) {
+  const T = useType();
   const accent = color ?? Colors.brand;
   return (
     <Pressable
@@ -29,7 +30,7 @@ export function Chip({
         selected && { backgroundColor: accent, borderColor: accent },
         pressed && styles.pressed,
       ]}>
-      <Text style={[styles.label, selected && styles.labelSelected]} numberOfLines={1}>
+      <Text style={[styles.label, { fontSize: T.body }, selected && styles.labelSelected]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -47,6 +48,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   pressed: { opacity: 0.8 },
-  label: { fontSize: Type.body, color: Colors.ink, fontWeight: '600' },
+  label: { color: Colors.ink, fontWeight: '600' },
   labelSelected: { color: '#fff' },
 });
