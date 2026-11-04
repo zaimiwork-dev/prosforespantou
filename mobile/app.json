@@ -35,6 +35,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e27c38db-2422-4180-bea7-63595d85b2d1"
+      }
+    },
+    "owner": "sigmax99"
   }
 }
