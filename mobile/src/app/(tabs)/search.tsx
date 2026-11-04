@@ -13,9 +13,11 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { api, ApiError, type DealCard } from '@/lib/api';
 import { useChains } from '@/lib/chains';
 import { dedupeCards } from '@/lib/lists';
+import { clearRecentSearches, rememberSearch, useRecentSearches } from '@/lib/recent-searches';
 import { DealCardView } from '@/components/deal-card';
 import { Chip } from '@/components/chip';
 import { Colors, Radius, Space, Type } from '@/constants/theme';
@@ -23,13 +25,6 @@ import { Colors, Radius, Space, Type } from '@/constants/theme';
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 350;
 const SUGGESTIONS = ['γάλα', 'καφές', 'ελαιόλαδο', 'φέτα', 'απορρυπαντικό', 'πάνες', 'χαρτί υγείας', 'μπύρα', 'κοτόπουλο', 'ζυμαρικά'];
-
-// Recent searches live in memory for this app session only; persisting them
-// across launches comes in week 3 together with the other saved settings.
-let recentSearches: string[] = [];
-function rememberSearch(text: string) {
-  recentSearches = [text, ...recentSearches.filter((r) => r !== text)].slice(0, 6);
-}
 
 type Status = 'idle' | 'loading' | 'done' | 'error';
 
@@ -40,7 +35,9 @@ export default function SearchScreen() {
   const [results, setResults] = useState<DealCard[]>([]);
   const [searched, setSearched] = useState('');
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
-  const [recent, setRecent] = useState<string[]>(recentSearches);
+  const recent = useRecentSearches();
+  // Set by the favourites list (Λίστα tab) to open a search for a product name.
+  const { q: incoming, t: incomingStamp } = useLocalSearchParams<{ q?: string; t?: string }>();
   const chains = useChains();
   const { width } = useWindowDimensions();
 
@@ -78,7 +75,6 @@ export default function SearchScreen() {
         setResults(dedupeCards(res.deals));
         setStatus('done');
         rememberSearch(q);
-        setRecent(recentSearches);
       } catch (e) {
         if (c.signal.aborted || current.current !== q) return;
         setErrorStatus(e instanceof ApiError ? e.status : null);
@@ -87,6 +83,17 @@ export default function SearchScreen() {
     },
     [cancelPending],
   );
+
+  // Deferred one tick so no state is set synchronously inside the effect.
+  useEffect(() => {
+    if (!incoming) return;
+    const id = setTimeout(() => {
+      setText(incoming);
+      run(incoming, undefined);
+      setChain(undefined);
+    }, 0);
+    return () => clearTimeout(id);
+  }, [incoming, incomingStamp, run]);
 
   const onChangeText = (value: string) => {
     setText(value);
@@ -182,7 +189,17 @@ export default function SearchScreen() {
                 </View>
                 {recent.length > 0 ? (
                   <>
-                    <Text style={[styles.h2, styles.h2Gap]}>Πρόσφατες αναζητήσεις</Text>
+                    <View style={styles.recentHead}>
+                      <Text style={[styles.h2, styles.h2Gap, styles.recentTitle]}>Πρόσφατες αναζητήσεις</Text>
+                      <Pressable
+                        onPress={() => clearRecentSearches()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Καθαρισμός πρόσφατων αναζητήσεων"
+                        hitSlop={8}
+                        style={styles.clearRecent}>
+                        <Text style={styles.clearRecentText}>Καθαρισμός</Text>
+                      </Pressable>
+                    </View>
                     <View style={styles.wrap}>
                       {recent.map((r) => (
                         <Chip key={r} label={r} onPress={() => pick(r)} />
@@ -244,6 +261,10 @@ const styles = StyleSheet.create({
   chains: { paddingHorizontal: Space[4], gap: Space[2] },
   h2: { fontSize: Type.h2, fontWeight: '800', color: Colors.ink, marginTop: Space[3], marginBottom: Space[3] },
   h2Gap: { marginTop: Space[6] },
+  recentHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  recentTitle: { flexShrink: 1 },
+  clearRecent: { minHeight: 44, justifyContent: 'center', paddingLeft: Space[3] },
+  clearRecentText: { fontSize: Type.body, fontWeight: '700', color: Colors.brand },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] },
   count: { fontSize: Type.body, color: Colors.ink2, marginBottom: Space[3] },
   state: { alignItems: 'center', paddingVertical: Space[7] },
