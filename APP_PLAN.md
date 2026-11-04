@@ -31,7 +31,18 @@ This replaces PHASES.md Phase 4.7 (the June Capacitor plan). Why not Capacitor: 
 - Search ranks condensed milk (ΝΟΥΝΟΥ ΣΥΜΠΥΚΝΩΜΕΝΟ) above fresh milk for «γάλα» (`src/lib/search-rank.ts`).
 - Lidl items mis-filed under «Φρούτα & Λαχανικά» (e.g. «Donut μήλο», a frozen VEGETERRA product) — category mapping for Lidl rows.
 
-**Next (week 3):** shopping list (offline, on device), favourites, settings (text size, my stores), first-run onboarding, in-app consent + analytics events, persisted recent searches; first EAS build → Play internal test → closed test opens (needs the owner's Play Console account).
+**Week 3 — 2026-11-04 (engineers, lead reviewed and merged):**
+
+| Ticket | Scope | Merged | Review notes |
+|---|---|---|---|
+| APP-301 | Λίστα tab: on-device list grouped by chain with subtotals, qty, tick, share text (website wording); favourites (website's key rule); «Στη λίστα» + heart on product page; persisted recents | `66e44c3` | Lead fixed: «Έληξε» only when `datesFromSource` (our +14-day default is not an end date). Favourite tap opens a search (live offers), by design. |
+| APP-302 | Settings (text size via `useType()`, my stores), 3-step onboarding with equal-weight consent, `Stack.Protected` gate, analytics client (nothing sent before «Αποδοχή») | `223345d` | Clean. «Τα καταστήματά μου» merges per-chain `/deals` pages client-side — ordering approximate across pages until `/deals` takes `chain=a,b`. No event on rejection (stricter than the web). |
+
+Also: `POST /api/v1/events` (lead) live; EAS project linked (`@sigmax99/prosfores-pantou`); first preview APK build queued 11-04.
+
+**Lead follow-ups:** wire `list_add/list_remove/favorite/unfavorite/search` events; pass `position` from list/search cards; convert list/search/offer screens to `useType()`; `/deals?chain=a,b`.
+
+**Next:** Play internal test → closed test opens (needs the owner's Play Console account — postponed by the owner on 11-04).
 
 ## The one constraint that sets the calendar
 
