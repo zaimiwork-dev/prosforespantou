@@ -7,9 +7,12 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, V
 import { Image } from 'expo-image';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import Svg, { Path } from 'react-native-svg';
 import { expiryInfo } from '@shared/expiry-label';
 import { api, ApiError, type OfferResponse } from '@/lib/api';
 import { useChains } from '@/lib/chains';
+import { favouriteKeyFor, toggleFavourite, useFavourites } from '@/lib/favourites';
+import { addToList, useShoppingList } from '@/lib/shopping-list';
 import { DealCardView } from '@/components/deal-card';
 import { ComparisonSection } from '@/components/offer/comparison-section';
 import { PriceHistoryChart } from '@/components/offer/price-history-chart';
@@ -167,6 +170,8 @@ function OfferContent({ data }: { data: OfferResponse }) {
         </View>
       ) : null}
 
+      <ListActions offer={offer} />
+
       {offer.description ? <Text style={styles.description}>{offer.description}</Text> : null}
 
       {offer.leafletUrl ? (
@@ -209,6 +214,41 @@ function OfferContent({ data }: { data: OfferResponse }) {
         </View>
       ) : null}
     </ScrollView>
+  );
+}
+
+// «Στη λίστα» adds one more each time it is pressed until the shopper changes the
+// quantity on the Λίστα tab; the tick only says the offer is on the list.
+function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
+  const { items } = useShoppingList();
+  const { favourites } = useFavourites();
+  const onList = items.some((i) => i.id === offer.id);
+  const fav = favourites.some((f) => f.key === favouriteKeyFor(offer));
+  return (
+    <View style={styles.actions}>
+      <Pressable
+        style={[styles.listBtn, onList && styles.listBtnOn]}
+        onPress={() => addToList(offer)}
+        accessibilityRole="button"
+        accessibilityLabel={onList ? 'Στη λίστα. Πάτησε για να προσθέσεις άλλο ένα' : 'Πρόσθεσε στη λίστα'}>
+        {onList ? (
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M5 12.5l4.5 4.5L19 7.5" />
+          </Svg>
+        ) : null}
+        <Text style={[styles.listBtnText, onList && { color: Colors.brand }]}>Στη λίστα</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.favBtn, fav && styles.favBtnOn]}
+        onPress={() => toggleFavourite(offer)}
+        accessibilityRole="button"
+        accessibilityState={{ selected: fav }}
+        accessibilityLabel={fav ? 'Αφαίρεση από τα αγαπημένα' : 'Πρόσθεσε στα αγαπημένα'}>
+        <Svg width={26} height={26} viewBox="0 0 24 24" fill={fav ? Colors.accent : 'none'} stroke={fav ? Colors.accent : Colors.ink2} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
+        </Svg>
+      </Pressable>
+    </View>
   );
 }
 
@@ -287,6 +327,32 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   secondaryText: { color: Colors.brand, fontSize: Type.bodyLg, fontWeight: '700' },
+  actions: { flexDirection: 'row', gap: Space[3], marginTop: Space[4] },
+  listBtn: {
+    flex: 1,
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space[2],
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.brand,
+    backgroundColor: Colors.brand,
+  },
+  listBtnOn: { backgroundColor: Colors.surface },
+  listBtnText: { color: '#fff', fontSize: Type.title, fontWeight: '800' },
+  favBtn: {
+    width: 56,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.line2,
+    backgroundColor: Colors.surface,
+  },
+  favBtnOn: { borderColor: Colors.accent, backgroundColor: Colors.discountBg },
   section: { marginTop: Space[6] },
   h2: { fontSize: Type.h2, fontWeight: '800', color: Colors.ink, marginBottom: Space[3] },
 });
