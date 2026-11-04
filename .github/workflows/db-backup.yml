@@ -64,8 +64,11 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
           set -euo pipefail
+          # The secret was saved with a trailing newline (and may carry the
+          # quotes from .env.local); libpq then asks for database "postgres\n".
+          DB_URL=$(printf '%s' "$DIRECT_URL" | tr -d '\r\n' | sed -e 's/^"//' -e 's/"$//')
           FILE="prosfores-$(date -u +%F).dump"
-          /usr/lib/postgresql/17/bin/pg_dump "$DIRECT_URL" --format=custom --schema=public \
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" --format=custom --schema=public \
             --no-owner --no-privileges --file="$FILE"
           # A dump that "succeeded" but lacks the core tables is not a backup.
           LIST=$(/usr/lib/postgresql/17/bin/pg_restore --list "$FILE")
