@@ -94,12 +94,19 @@ export async function collectMasoutisOffers({ source = 'web', limit = Infinity, 
 
   const byItemcode = new Map();
   let stoppedOnShortPage = false;
+  // The site's own pager reads the list size from `PassKey` on the first row of
+  // every page (masoutis.gr main.js: maxItems = r[0].PassKey; pages = max/50+1).
+  // Record it so a mid-run failure that still ends on a short page is caught.
+  let reportedTotal = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const rows = await fetchPage(cred, page, itemcodeFilter);
+    if (page === 1 && rows[0] && Number.isFinite(Number(rows[0].PassKey))) {
+      reportedTotal = Number(rows[0].PassKey);
+    }
     for (const r of rows) {
       if (r.Itemcode != null) byItemcode.set(String(r.Itemcode), r);
     }
-    log(`   page ${page} — ${rows.length} rows — unique items: ${byItemcode.size}`);
+    log(`   page ${page} — ${rows.length} rows — unique items: ${byItemcode.size}${reportedTotal != null ? ` / site reports ${reportedTotal}` : ''}`);
     if (rows.length < PAGE_SIZE) {
       stoppedOnShortPage = true;
       break;
@@ -120,8 +127,12 @@ export async function collectMasoutisOffers({ source = 'web', limit = Infinity, 
   // A full final page at MAX_PAGES means the feed may continue beyond our
   // safety cap. Mark the run partial so stale deactivation is forbidden.
   // Likewise, any finite LIMIT is an intentional partial run.
-  const partial = Number.isFinite(limit) || !stoppedOnShortPage;
-  return { items, partial };
+  // Also partial if we collected fewer unique items than the site says the
+  // list holds (a page came back short/empty mid-run).
+  const shortOfSiteTotal = reportedTotal != null && byItemcode.size < reportedTotal && !Number.isFinite(limit);
+  if (shortOfSiteTotal) log(`   WARNING: collected ${byItemcode.size} of the ${reportedTotal} items the site reports — marking run partial`);
+  const partial = Number.isFinite(limit) || !stoppedOnShortPage || shortOfSiteTotal;
+  return { items, partial, reportedTotal };
 }
 
 // Programmatic entry — return the ingest report instead of exiting.
