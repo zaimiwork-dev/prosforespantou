@@ -10,7 +10,9 @@ import { router } from 'expo-router';
 import { expiryInfo } from '@shared/expiry-label';
 import type { DealCard as Deal } from '@/lib/api';
 import { useChains } from '@/lib/chains';
-import { Colors, Radius, Space, Type } from '@/constants/theme';
+import { Colors, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { track } from '@/lib/analytics';
+import { useSettings } from '@/lib/settings';
 
 const VERDICT_LABEL = { lowest: 'Χαμηλότερη τιμή', good: 'Καλή τιμή' } as const;
 
@@ -20,11 +22,17 @@ export function DealCardView({
   deal,
   width,
   onPress,
+  position,
 }: {
   deal: Deal;
   width?: number;
   onPress?: (deal: Deal) => void;
+  // Slot in the list, sent with the click statistic when the screen knows it.
+  position?: number;
 }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
+  const { myChains } = useSettings();
   const chains = useChains();
   const chain = chains.find((c) => c.id === deal.chain);
   const exp = useMemo(
@@ -42,7 +50,16 @@ export function DealCardView({
     <Pressable
       // Default: open the product page. A screen passes onPress only when a
       // tap should do something else (e.g. pick a card into the list).
-      onPress={() => (onPress ? onPress(deal) : router.push({ pathname: '/offer/[id]', params: { id: deal.id } }))}
+      onPress={() => {
+        track('deal_click', {
+          discountId: deal.id,
+          supermarket: deal.chain ?? undefined,
+          position,
+          context: myChains.length ? (deal.chain && myChains.includes(deal.chain) ? 'mine' : 'other') : undefined,
+        });
+        if (onPress) onPress(deal);
+        else router.push({ pathname: '/offer/[id]', params: { id: deal.id } });
+      }}
       accessibilityRole="button"
       accessibilityLabel={`${deal.name}, ${euro(deal.price)}, ${chain?.name ?? deal.chain ?? ''}`}
       style={({ pressed }) => [styles.card, width ? { width } : null, pressed && styles.pressed]}>
@@ -92,40 +109,41 @@ export function DealCardView({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.line,
-    overflow: 'hidden',
-  },
-  pressed: { opacity: 0.85 },
-  imageWrap: { backgroundColor: Colors.surface2, padding: Space[3] },
-  image: { width: '100%', aspectRatio: 1 },
-  noImage: { backgroundColor: Colors.bgSoft, borderRadius: Radius.md },
-  percent: {
-    position: 'absolute',
-    top: Space[2],
-    left: Space[2],
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  percentText: { color: '#fff', fontWeight: '800', fontSize: Type.caption },
-  body: { padding: Space[3], gap: 3 },
-  chainPill: { alignSelf: 'flex-start', borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
-  chainText: { fontSize: 12, fontWeight: '700' },
-  title: { fontSize: Type.body, fontWeight: '600', color: Colors.ink, lineHeight: 21 },
-  size: { fontSize: Type.caption, color: Colors.ink3 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: Space[2], marginTop: 2 },
-  price: { fontSize: Type.price, fontWeight: '800', color: Colors.ink },
-  was: { fontSize: Type.caption, color: Colors.ink3, textDecorationLine: 'line-through' },
-  baseline: { fontSize: Type.caption, color: Colors.ink3 },
-  unit: { fontSize: Type.caption, color: Colors.ink2 },
-  verdict: { fontSize: Type.caption, color: Colors.good, fontWeight: '700' },
-  chip: { fontSize: Type.caption, color: Colors.ink2 },
-  chipUrgent: { color: Colors.accent, fontWeight: '700' },
-  compare: { fontSize: Type.caption, color: Colors.brand, fontWeight: '600' },
-});
+const makeStyles = (T: TypeScale) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      borderColor: Colors.line,
+      overflow: 'hidden',
+    },
+    pressed: { opacity: 0.85 },
+    imageWrap: { backgroundColor: Colors.surface2, padding: Space[3] },
+    image: { width: '100%', aspectRatio: 1 },
+    noImage: { backgroundColor: Colors.bgSoft, borderRadius: Radius.md },
+    percent: {
+      position: 'absolute',
+      top: Space[2],
+      left: Space[2],
+      backgroundColor: Colors.accent,
+      borderRadius: Radius.sm,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    percentText: { color: '#fff', fontWeight: '800', fontSize: T.caption },
+    body: { padding: Space[3], gap: 3 },
+    chainPill: { alignSelf: 'flex-start', borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
+    chainText: { fontSize: T.caption, fontWeight: '700' },
+    title: { fontSize: T.body, fontWeight: '600', color: Colors.ink, lineHeight: Math.round(T.body * 1.3) },
+    size: { fontSize: T.caption, color: Colors.ink3 },
+    priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: Space[2], marginTop: 2 },
+    price: { fontSize: T.price, fontWeight: '800', color: Colors.ink },
+    was: { fontSize: T.caption, color: Colors.ink3, textDecorationLine: 'line-through' },
+    baseline: { fontSize: T.caption, color: Colors.ink3 },
+    unit: { fontSize: T.caption, color: Colors.ink2 },
+    verdict: { fontSize: T.caption, color: Colors.good, fontWeight: '700' },
+    chip: { fontSize: T.caption, color: Colors.ink2 },
+    chipUrgent: { color: Colors.accent, fontWeight: '700' },
+    compare: { fontSize: T.caption, color: Colors.brand, fontWeight: '600' },
+  });
