@@ -21,6 +21,9 @@ export type ListItem = {
   price: number;
   imageUrl: string | null;
   validUntil: string;
+  // False when validUntil is our ingest default, not a date the chain
+  // published (DealCard contract): such an offer is never shown as ended.
+  datesFromSource: boolean;
   quantity: number;
   checked: boolean;
 };
@@ -76,7 +79,7 @@ function sanitize(raw: unknown): ListItem[] {
 const EMPTY: ListItem[] = [];
 const store = createPersistedStore<ListItem[]>(KEY, EMPTY, sanitize);
 
-export function addToList(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 'title' | 'chain' | 'price' | 'imageUrl' | 'validUntil'>) {
+export function addToList(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 'title' | 'chain' | 'price' | 'imageUrl' | 'validUntil' | 'datesFromSource'>) {
   return store.update((items) => {
     if (items.some((i) => i.id === offer.id)) {
       return items.map((i) => (i.id === offer.id ? { ...i, quantity: i.quantity + 1 } : i));
@@ -91,6 +94,7 @@ export function addToList(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 't
         price: offer.price,
         imageUrl: offer.imageUrl,
         validUntil: offer.validUntil,
+        datesFromSource: offer.datesFromSource,
         quantity: 1,
         checked: false,
       },
@@ -112,7 +116,8 @@ export const toggleChecked = (id: string) =>
 
 export const removeChecked = () => store.update((items) => items.filter((i) => !i.checked));
 
-export const isExpired = (item: Pick<ListItem, 'validUntil'>, now = Date.now()) => {
+export const isExpired = (item: Pick<ListItem, 'validUntil' | 'datesFromSource'>, now = Date.now()) => {
+  if (!item.datesFromSource) return false;
   const t = new Date(item.validUntil).getTime();
   return Number.isFinite(t) && t < now;
 };
