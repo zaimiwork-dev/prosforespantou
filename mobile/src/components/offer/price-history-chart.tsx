@@ -2,21 +2,22 @@
 // 90 days (the website's PriceHistory, minus the touch tooltip). A price holds
 // until the next snapshot, so the line is a staircase, not a slope that would
 // invent prices between two measurements.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { formatShortDate } from '@shared/expiry-label';
 import type { PriceHistory } from '@/lib/api';
-import { Colors, Radius, Space, Type } from '@/constants/theme';
+import { formatPrice } from '@/lib/format';
+import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
 
 const HEIGHT = 150;
 const PAD_X = 8;
 const PAD_Y = 12;
 const LINE = '#009de0';
 
-const euro = (n: number) => `${n.toFixed(2).replace('.', ',')}€`;
-
 export function PriceHistoryChart({ history }: { history: PriceHistory }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [width, setWidth] = useState(0);
   const points = [...history.points].sort((a, b) => +new Date(a.recordedAt) - +new Date(b.recordedAt));
   if (points.length < 2) return null;
@@ -51,7 +52,7 @@ export function PriceHistoryChart({ history }: { history: PriceHistory }) {
     <View
       style={styles.box}
       accessible
-      accessibilityLabel={`Ιστορικό τιμής: χαμηλότερη ${euro(lo)}, υψηλότερη ${euro(hi)}`}>
+      accessibilityLabel={`Ιστορικό τιμής: χαμηλότερη ${formatPrice(lo)}, υψηλότερη ${formatPrice(hi)}`}>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 ? (
           <Svg width={width} height={HEIGHT}>
@@ -71,15 +72,17 @@ export function PriceHistoryChart({ history }: { history: PriceHistory }) {
       </View>
 
       <View style={styles.stats}>
-        <Stat label="Χαμηλότερη" value={euro(lo)} color={Colors.good} />
-        <Stat label="Υψηλότερη" value={euro(hi)} />
-        {usual != null ? <Stat label="Συνήθως" value={euro(usual)} /> : null}
+        <Stat label="Χαμηλότερη" value={formatPrice(lo)} color={Colors.good} />
+        <Stat label="Υψηλότερη" value={formatPrice(hi)} />
+        {usual != null ? <Stat label="Συνήθως" value={formatPrice(usual)} /> : null}
       </View>
     </View>
   );
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -88,18 +91,19 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
   );
 }
 
-const styles = StyleSheet.create({
-  box: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.line,
-    padding: Space[3],
-  },
-  axis: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: PAD_X },
-  axisText: { fontSize: Type.caption, color: Colors.ink3 },
-  stats: { flexDirection: 'row', marginTop: Space[3], gap: Space[2] },
-  stat: { flex: 1 },
-  statLabel: { fontSize: Type.caption, color: Colors.ink3 },
-  statValue: { fontSize: Type.title, fontWeight: '800', color: Colors.ink },
-});
+const makeStyles = (T: TypeScale) =>
+  StyleSheet.create({
+    box: {
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: Colors.line,
+      padding: Space[3],
+    },
+    axis: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: PAD_X },
+    axisText: { ...T.text.caption, color: Colors.ink3Text },
+    stats: { flexDirection: 'row', flexWrap: 'wrap', marginTop: Space[3], gap: Space[3] },
+    stat: { flexGrow: 1, flexBasis: 0, minWidth: Math.round(T.caption * 7.4) },
+    statLabel: { ...T.text.caption, color: Colors.ink3Text },
+    statValue: { fontFamily: Fonts.sans900, fontSize: T.title, lineHeight: T.title + 6, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+  });
