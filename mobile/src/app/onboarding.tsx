@@ -5,12 +5,11 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useChains } from '@/lib/chains';
 import { setConsentChoice } from '@/lib/analytics';
 import { updateSettings, useSettings } from '@/lib/settings';
-import { Chip } from '@/components/chip';
+import { ChainTile, TileGrid } from '@/components/chain-tile';
+import { useChainList } from '@/components/filters/use-chain-list';
 import { Colors, Radius, Space, TypeLarge, type TypeScale } from '@/constants/theme';
-
 
 // Always the large scale here.
 const BIG: TypeScale = TypeLarge;
@@ -21,7 +20,7 @@ export default function Onboarding() {
   const styles = useMemo(() => makeStyles(BIG), []);
   const [step, setStep] = useState(0);
   const { myChains } = useSettings();
-  const chains = useChains();
+  const { chains, failed, retry } = useChainList();
 
   const toggleChain = (id: string) =>
     updateSettings({ myChains: myChains.includes(id) ? myChains.filter((c) => c !== id) : [...myChains, id] });
@@ -38,7 +37,8 @@ export default function Onboarding() {
 
         {step === 0 ? (
           <View style={styles.block}>
-            <Text style={styles.h1}>Προσφορές Παντού</Text>
+            <Text style={styles.h1}>Όλες οι προσφορές,</Text>
+            <Text style={[styles.h1, styles.h1Italic]}>σε ένα μέρος</Text>
             <Text style={styles.text}>Βλέπεις τις προσφορές όλων των σούπερ μάρκετ σε ένα μέρος.</Text>
             <Text style={styles.text}>Βρίσκεις πού κάθε προϊόν είναι φθηνότερο, χωρίς να ψάχνεις φυλλάδια.</Text>
           </View>
@@ -48,14 +48,23 @@ export default function Onboarding() {
           <View style={styles.block}>
             <Text style={styles.h1}>Τα καταστήματά σου</Text>
             <Text style={styles.text}>Διάλεξε πού ψωνίζεις, για να βλέπεις πρώτα τις δικές τους προσφορές. Μπορείς να το προσπεράσεις.</Text>
-            {chains.length === 0 ? (
-              <Text style={styles.muted}>Φόρτωση καταστημάτων…</Text>
-            ) : (
-              <View style={styles.wrap}>
+            {chains.length > 0 ? (
+              <TileGrid>
                 {chains.map((c) => (
-                  <Chip key={c.id} label={c.name} color={c.color} selected={myChains.includes(c.id)} onPress={() => toggleChain(c.id)} />
+                  <ChainTile key={c.id} chain={c} selected={myChains.includes(c.id)} onPress={() => toggleChain(c.id)} />
                 ))}
+              </TileGrid>
+            ) : failed ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.text}>Δεν φορτώθηκαν τα καταστήματα.</Text>
+                {retry ? (
+                  <Pressable style={styles.primary} onPress={retry} accessibilityRole="button">
+                    <Text style={styles.primaryText}>Δοκίμασε ξανά</Text>
+                  </Pressable>
+                ) : null}
               </View>
+            ) : (
+              <Text style={styles.muted}>Φόρτωση καταστημάτων…</Text>
             )}
           </View>
         ) : null}
@@ -115,20 +124,21 @@ const makeStyles = (T: TypeScale) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: Colors.bg },
     content: { padding: Space[6], paddingTop: Space[7], flexGrow: 1 },
-    step: { fontSize: T.caption, color: Colors.ink3, fontWeight: '600', marginBottom: Space[5] },
+    step: { ...T.text.caption, color: Colors.ink3Text, marginBottom: Space[5] },
     block: { gap: Space[4] },
-    h1: { fontSize: T.h1, fontWeight: '800', color: Colors.brand },
-    text: { fontSize: T.bodyLg, color: Colors.ink, lineHeight: Math.round(T.bodyLg * 1.4) },
-    muted: { fontSize: T.body, color: Colors.ink3 },
-    wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] },
+    h1: { ...T.text.hero, color: Colors.ink },
+    h1Italic: { ...T.text.heroItalic, color: Colors.brand, marginTop: -Space[3] },
+    text: { ...T.text.body, color: Colors.ink },
+    muted: { ...T.text.body, color: Colors.ink3Text },
+    errorBox: { gap: Space[3], alignItems: 'flex-start' },
     footer: { padding: Space[6], paddingTop: Space[3], gap: Space[3] },
-    primary: { backgroundColor: Colors.brand, borderRadius: Radius.md, minHeight: 56, alignItems: 'center', justifyContent: 'center' },
-    primaryText: { color: '#fff', fontSize: T.bodyLg, fontWeight: '800' },
+    primary: { backgroundColor: Colors.brand, borderRadius: Radius.pill, minHeight: 56, paddingHorizontal: Space[6], alignItems: 'center', justifyContent: 'center' },
+    primaryText: { ...T.text.button, color: '#fff' },
     links: { flexDirection: 'row', justifyContent: 'space-between' },
-    linkBtn: { minHeight: 48, justifyContent: 'center', paddingHorizontal: Space[2] },
-    linkText: { fontSize: T.body, color: Colors.brand, fontWeight: '700' },
+    linkBtn: { minHeight: 52, justifyContent: 'center', paddingHorizontal: Space[2] },
+    linkText: { ...T.text.bodyStrong, color: Colors.brand },
     // Equal weight on purpose: refusing must be as easy as accepting.
     choices: { flexDirection: 'row', gap: Space[3] },
-    choice: { flex: 1, minHeight: 56, borderRadius: Radius.md, borderWidth: 2, borderColor: Colors.brand, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
-    choiceText: { color: Colors.brand, fontSize: T.bodyLg, fontWeight: '800' },
+    choice: { flex: 1, minHeight: 56, borderRadius: Radius.pill, borderWidth: 2, borderColor: Colors.brand, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+    choiceText: { ...T.text.button, color: Colors.brand },
   });

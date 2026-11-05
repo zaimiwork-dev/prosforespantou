@@ -51,7 +51,8 @@ export type DealSort = 'hot' | 'expiring' | 'discount' | 'newest' | 'price_asc' 
 export type DealsQuery = {
   limit?: number;
   offset?: number;
-  chain?: string;
+  // One id or several: the server ranks and pages `chain=ab,lidl` as ONE query.
+  chain?: string | string[];
   categories?: string[];
   sort?: DealSort;
 };
@@ -100,7 +101,7 @@ export const api = {
       `/deals${query({
         limit: q.limit,
         offset: q.offset,
-        chain: q.chain,
+        chain: Array.isArray(q.chain) ? q.chain.join(',') || undefined : q.chain,
         category: q.categories?.length ? q.categories.join(',') : undefined,
         sort: q.sort,
       })}`,
