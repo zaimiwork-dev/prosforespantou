@@ -42,6 +42,8 @@ Also: `POST /api/v1/events` (lead) live; EAS project linked (`@sigmax99/prosfore
 
 **Lead follow-ups:** wire `list_add/list_remove/favorite/unfavorite/search` events; pass `position` from list/search cards; convert list/search/offer screens to `useType()`; `/deals?chain=a,b`.
 
+**Owner's phone is an iPhone (11-05).** The preview APK (`eas build --profile preview`) is for Android only. The owner follows progress on the **web build**: `npx expo export --platform web --output-dir dist` then `npx eas-cli deploy` (preview URL `prosfores-pantou--<id>.expo.app`; send the new URL after each change). Owner reconfirmed **Android first**; a borrowed Android phone covers Play Console device verification and real-device tests.
+
 **Next:** Play internal test → closed test opens (needs the owner's Play Console account — postponed by the owner on 11-04).
 
 ## The one constraint that sets the calendar
