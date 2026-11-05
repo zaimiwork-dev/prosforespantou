@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useShoppingListStore } from '@/lib/store';
@@ -144,11 +145,11 @@ export function ShoppingList({ isOpen, onClose }) {
                   <div key={g.smId} className="list-group">
                     <div className="list-group-head" style={{ background: sm?.color || 'var(--ink-2)' }}>
                       <span>{sm?.name || g.smId}</span>
-                      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{g.subtotal.toFixed(2)}€</span>
+                      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatPrice(g.subtotal)}</span>
                     </div>
                     {savings >= 0.10 && (
                       <div className="list-group-savings">
-                        <Icon.Info size={14} /> Με αλλαγή καταστήματος σε αυτά τα προϊόντα γλιτώνεις έως <b>{savings.toFixed(2)}€</b>
+                        <Icon.Info size={14} /> Με αλλαγή καταστήματος σε αυτά τα προϊόντα γλιτώνεις έως <b>{formatPrice(savings)}</b>
                       </div>
                     )}
                     <div className="list-group-body">
@@ -174,15 +175,15 @@ export function ShoppingList({ isOpen, onClose }) {
                             </div>
                             <div className="list-item-body">
                               <h4 className="list-item-name">{name}</h4>
-                              <div className="list-item-price">{(price * (item.quantity || 1)).toFixed(2)}€</div>
+                              <div className="list-item-price">{formatPrice(price * (item.quantity || 1))}</div>
                               {alt && alt.savings >= 0.10 && (
                                 <a
                                   href={`/offer/${alt.discountId}`}
                                   className="cheaper-chip"
                                   style={{ borderColor: altSm?.color, color: altSm?.color }}
-                                  title={`${alt.discountedPrice.toFixed(2)}€ στο ${altSm?.name || alt.supermarket}`}
+                                  title={`${formatPrice(alt.discountedPrice)} στο ${altSm?.name || alt.supermarket}`}
                                 >
-                                  Πιο φθηνά στο {altSm?.short || alt.supermarket} · −{alt.savings.toFixed(2)}€
+                                  Πιο φθηνά στο {altSm?.short || alt.supermarket} · −{formatPrice(alt.savings)}
                                 </a>
                               )}
                             </div>
@@ -220,11 +221,11 @@ export function ShoppingList({ isOpen, onClose }) {
           <div className="drawer-foot">
             <div className="drawer-totals">
               <span className="lbl">Συνολικό κόστος</span>
-              <span className="val">{total.toFixed(2)}€</span>
+              <span className="val">{formatPrice(total)}</span>
             </div>
             {totalSavings >= 0.10 && (
               <div className="drawer-savings">
-                Με αλλαγή καταστημάτων η λίστα γίνεται έως <b>{totalSavings.toFixed(2)}€</b> φθηνότερη
+                Με αλλαγή καταστημάτων η λίστα γίνεται έως <b>{formatPrice(totalSavings)}</b> φθηνότερη
               </div>
             )}
             <div className="drawer-actions">

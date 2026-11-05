@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import { SUPERMARKETS } from '@/lib/constants';
 import { formatShortDate } from '@/lib/expiry-label';
 
@@ -73,9 +74,9 @@ export function PriceComparison({ offer, comparison, compact = false }) {
                     Κανονική τιμή{row.asOf ? ` · ελέγχθηκε ${formatShortDate(row.asOf)}` : ''}
                   </span>
                 )}
-                {!isCheapest && diff > 0 && <span className="pc-diff">+{diff.toFixed(2)}€</span>}
+                {!isCheapest && diff > 0 && <span className="pc-diff">+{formatPrice(diff)}</span>}
               </div>
-              <div className="pc-price">{row.price.toFixed(2)}€</div>
+              <div className="pc-price">{formatPrice(row.price)}</div>
             </>
           );
           return row.isCurrent ? (

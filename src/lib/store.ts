@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { SUPERMARKETS } from './constants';
+import { formatPrice } from './format-price';
 
 /**
  * Zustand store for managing the user's shopping list.
@@ -124,21 +125,21 @@ export const useShoppingListStore = create<ShoppingListState>()(
 
         const total = items.reduce((sum, item) => 
           sum + (Number(item.discountedPrice || item.discounted_price) * (item.quantity || 1)), 0
-        ).toFixed(2);
+        );
 
         const itemsList = items.map(item => {
           const sm = SUPERMARKETS.find(s => s.id === (item.supermarket || item.supermarket_id));
           const name = item.product?.name || item.productName || item.product_name;
           const qty = item.quantity || 1;
-          const price = (Number(item.discountedPrice || item.discounted_price) * qty).toFixed(2);
-          return `• ${qty}x ${name} (${sm?.short || 'SM'}) - ${price}€`;
+          const price = formatPrice(Number(item.discountedPrice || item.discounted_price) * qty);
+          return `• ${qty}x ${name} (${sm?.short || 'SM'}) - ${price}`;
         }).join('\n');
 
         return `ΠΡΟΣΦΟΡΕΣ ΠΑΝΤΟΥ — Η λίστα μου
 
 ${itemsList}
 
-Σύνολο: ${total}€
+Σύνολο: ${formatPrice(total)}
 
 Δες περισσότερα στο: ${window.location.origin}`;
       }

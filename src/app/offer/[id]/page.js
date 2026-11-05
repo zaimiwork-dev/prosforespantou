@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { formatPrice } from "@/lib/format-price";
 import { notFound } from "next/navigation";
 import OfferClientContent from "./OfferClientContent";
 import { getPriceComparison } from "@/actions/get-price-comparison";
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }) {
   // SEO honesty: only chain-published end dates reach metadata — a fabricated
   // +14d default in Google results would be a public false promise.
   const expiryStr = offer.datesFromSource && offer.validUntil ? ` έως ${formatDate(offer.validUntil)}` : "";
-  const description = `${offer.productName} στα ${storeName}. Τιμή: ${offer.discountedPrice}€ (${offer.discountPercent}% έκπτωση)${expiryStr}.`;
+  const description = `${offer.productName} στα ${storeName}. Τιμή: ${formatPrice(offer.discountedPrice)} (${offer.discountPercent}% έκπτωση)${expiryStr}.`;
 
   return {
     title,

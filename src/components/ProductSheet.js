@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import Link from 'next/link';
 import { Sheet } from './Sheet';
 import { OfferDetails } from './OfferDetails';
@@ -87,7 +88,7 @@ function ProductSheetInner({ product, onClose, onAdd }) {
   const handleShare = async () => {
     const url = `${window.location.origin}/offer/${product.id}`;
     const price = Number(product.discountedPrice ?? product.discounted_price);
-    const text = `Δες αυτή την προσφορά: ${displayName} στα ${sm?.name || ''} μόνο με ${price.toFixed(2)}€!`;
+    const text = `Δες αυτή την προσφορά: ${displayName} στα ${sm?.name || ''} μόνο με ${formatPrice(price)}!`;
     if (navigator.share) {
       // Unlike the shopping-list share (text-only by design), an offer share
       // needs the deep link — the recipient should land on the offer page.

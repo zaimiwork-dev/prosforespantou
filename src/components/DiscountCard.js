@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import Image from 'next/image';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
@@ -264,12 +265,12 @@ export function DiscountCard({ d, onAdd, onSelect, inCart = false, list, positio
 
         <div className="card-price-row">
           <div className={originalPrice ? "has-discount" : undefined}>
-            <div className="price">{discountedPrice?.toFixed(2)}€</div>
-            {originalPrice && <div className="price-old">{originalPrice.toFixed(2)}€</div>}
-            {unit && <div className="price-unit">{unit.value.toFixed(2)}€/{unit.per}</div>}
+            <div className="price">{formatPrice(discountedPrice)}</div>
+            {originalPrice && <div className="price-old">{formatPrice(originalPrice)}</div>}
+            {unit && <div className="price-unit">{formatUnitPrice(unit.value, unit.per)}</div>}
             {baseline && (
               <div className="price-baseline" title={baselineTitle}>
-                κανονικά ~{baseline.price.toFixed(2)}€
+                κανονικά ~{formatPrice(baseline.price)}
               </div>
             )}
           </div>
