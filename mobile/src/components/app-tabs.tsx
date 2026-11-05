@@ -2,14 +2,20 @@
 // Λίστα. Native tab bar on both platforms; icons are the systems' own line
 // glyphs (Material Symbols / SF Symbols) — no emoji in the product UI.
 import { NativeTabs } from 'expo-router/native-tabs';
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
+import { useShoppingList } from '@/lib/shopping-list';
 
 export default function AppTabs() {
+  const count = useShoppingList().items.length;
   return (
     <NativeTabs
       backgroundColor={Colors.surface}
       tintColor={Colors.brand}
-      labelStyle={{ color: Colors.ink2 }}>
+      // bgSoft pill behind the active icon, red count badge on Λίστα (DESIGN.md «Tab bar»).
+      indicatorColor={Colors.bgSoft}
+      badgeBackgroundColor={Colors.accent}
+      badgeTextColor="#fff"
+      labelStyle={{ color: Colors.ink2, fontFamily: Fonts.sans600, fontSize: 13 }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Αρχική</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
@@ -25,6 +31,7 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="list">
         <NativeTabs.Trigger.Label>Λίστα</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'checklist', selected: 'checklist' }} md="checklist" />
+        <NativeTabs.Trigger.Badge hidden={count === 0}>{count > 99 ? '99+' : String(count)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

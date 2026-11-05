@@ -5,6 +5,9 @@ import { useEffect } from 'react';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
+import { NotoSerifDisplay_400Regular, NotoSerifDisplay_400Regular_Italic } from '@expo-google-fonts/noto-serif-display';
 import { Colors } from '@/constants/theme';
 import { useSettings, useSettingsLoaded } from '@/lib/settings';
 
@@ -16,7 +19,14 @@ const theme = {
 };
 
 export default function RootLayout() {
-  const loaded = useSettingsLoaded();
+  const settingsLoaded = useSettingsLoaded();
+  // Family keys must match Fonts in constants/theme.ts.
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_900Black,
+    NotoSerifDisplay_400Regular, NotoSerifDisplay_400Regular_Italic,
+  });
+  // A font failure must not leave the shopper on a splash forever: fall back to system text.
+  const loaded = settingsLoaded && (fontsLoaded || !!fontError);
   const { onboarded } = useSettings();
   // Keep the splash up until storage is read, so a returning shopper never
   // sees the onboarding flash by.

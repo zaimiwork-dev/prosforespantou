@@ -1,9 +1,9 @@
 // A filter chip — the one used for chains, departments, sorts and search
 // suggestions everywhere in the app, so they all look and behave the same.
-// Touch target is at least 44 px tall (older users), selected state is
-// announced to screen readers.
+// Pill, 44 dp tall (older users), Inter 600 → 700 when selected; the selected
+// state is announced to screen readers.
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Colors, Radius, Space, useType } from '@/constants/theme';
+import { Colors, Fonts, Radius, Space, useType } from '@/constants/theme';
 
 export function Chip({
   label,
@@ -30,7 +30,9 @@ export function Chip({
         selected && { backgroundColor: accent, borderColor: accent },
         pressed && styles.pressed,
       ]}>
-      <Text style={[styles.label, { fontSize: T.body }, selected && styles.labelSelected]} numberOfLines={1}>
+      <Text
+        style={[T.text.chip, styles.label, selected && styles.labelSelected]}
+        numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -48,6 +50,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   pressed: { opacity: 0.8 },
-  label: { color: Colors.ink, fontWeight: '600' },
-  labelSelected: { color: '#fff' },
+  label: { color: Colors.ink },
+  labelSelected: { color: '#fff', fontFamily: Fonts.sans700 },
 });
