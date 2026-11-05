@@ -49,6 +49,7 @@ no heavy shadow. Grid gap 12, screen padding 16.
 The website shows «0.83€» — flagged to the owner; fix on the site separately.
 
 ## Offer card (2-column grid and rails)
+**Changed 2026-11-05 after review:** the chain is a coloured dot + full name on its own line under the photo (on the photo it covered the product; beside the badge it had to be cut to «My …» / «MM»), and the round «+» sits on the photo's bottom-right corner (beside the price it wrapped under «11,60 €» in rail cards). The list below is otherwise current.
 1. Square image on `surface2`, contain-fit.
 2. Strip over the image: **red badge** top-left — «−30%» when a real old price exists,
    else «ΜΟΝΟ» / «SUPER ΤΙΜΗ» as the site does — and a **white chain pill** top-right

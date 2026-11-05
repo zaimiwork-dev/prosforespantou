@@ -6,7 +6,7 @@
 //
 // Works at 2-column grid width (~173 dp) and in rails: pass `width` for a rail,
 // leave it out in a grid cell (the card fills its parent).
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -35,6 +35,7 @@ export function DealCardView({
   position?: number;
 }) {
   const T = useType();
+  const [imageH, setImageH] = useState(0);
   const styles = useMemo(() => makeStyles(T), [T]);
   const { myChains } = useSettings();
   const chains = useChains();
@@ -94,7 +95,7 @@ export function DealCardView({
         accessibilityRole="button"
         accessibilityLabel={`${deal.name}, ${formatPrice(deal.price)}, ${chain?.name ?? deal.chain ?? ''}`}
         style={({ pressed }) => pressed && styles.pressed}>
-        <View style={styles.imageWrap}>
+        <View style={styles.imageWrap} onLayout={(e) => setImageH(e.nativeEvent.layout.height)}>
           {deal.imageUrl ? (
             <Image source={{ uri: deal.imageUrl }} style={styles.image} contentFit="contain" transition={150} />
           ) : (
@@ -106,15 +107,18 @@ export function DealCardView({
                 <Text style={styles.badgeText}>{badge}</Text>
               </View>
             ) : null}
-            <View style={styles.chainPill}>
-              <Text style={[styles.chainText, { color: chain?.color ?? Colors.ink2 }]} numberOfLines={1}>
-                {chainName}
-              </Text>
-            </View>
           </View>
         </View>
 
         <View style={styles.text}>
+          {/* The chain gets its own line under the photo: on the photo it
+              covered the product, and a pill beside the badge had to be cut. */}
+          <View style={styles.chainRow}>
+            <View style={[styles.chainDot, { backgroundColor: chain?.color ?? Colors.ink3 }]} />
+            <Text style={[styles.chainText, { color: chain?.color ?? Colors.ink2 }]} numberOfLines={1}>
+              {chainName}
+            </Text>
+          </View>
           {eyebrow ? (
             <Text style={[styles.eyebrow, eyebrow.urgent && styles.eyebrowUrgent]} numberOfLines={1}>
               {eyebrow.text}
@@ -132,25 +136,29 @@ export function DealCardView({
         </View>
       </Pressable>
 
-      <View style={styles.priceRow}>
-        <Pressable onPress={open} accessible={false} style={styles.priceCol}>
-          <Text style={[styles.price, struck && styles.priceSale]}>
-            {formatPrice(deal.price)}
-          </Text>
-          {struck ? <Text style={[styles.secondary, styles.was]}>{formatPrice(deal.originalPrice!)}</Text> : null}
-        </Pressable>
+      <Pressable onPress={open} accessible={false} style={styles.priceCol}>
+        <Text style={[styles.price, struck && styles.priceSale]} numberOfLines={1}>
+          {formatPrice(deal.price)}
+        </Text>
+        {struck ? <Text style={[styles.secondary, styles.was]}>{formatPrice(deal.originalPrice!)}</Text> : null}
+      </Pressable>
+
+      {/* «+» sits on the photo's bottom-right corner (Wolt/Instacart): beside
+          the price it no longer fit «11,60 €» in a rail card and wrapped. A
+          sibling of the card's Pressable, so a tap never opens the offer. */}
+      {imageH > 0 ? (
         <Pressable
           onPress={() => addToList(deal)}
           accessibilityRole="button"
           accessibilityLabel="Προσθήκη στη λίστα"
           accessibilityState={{ selected: added }}
           hitSlop={4}
-          style={({ pressed }) => [styles.add, added && styles.addDone, pressed && styles.pressed]}>
+          style={({ pressed }) => [styles.add, { top: imageH - ADD_SIZE - Space[2] }, added && styles.addDone, pressed && styles.pressed]}>
           <Svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
             <Path d={added ? 'M5 12.5l4.5 4.5L19 7.5' : 'M12 5v14M5 12h14'} />
           </Svg>
         </Pressable>
-      </View>
+      ) : null}
 
       {(!struck && deal.baseline) || deal.unit ? (
         <Pressable onPress={open} accessible={false} style={styles.notes}>
@@ -192,37 +200,30 @@ const makeStyles = (T: TypeScale) =>
     },
     badge: { flexShrink: 0, backgroundColor: Colors.accent, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
     badgeText: { ...T.text.badge, color: '#fff' },
-    chainPill: {
-      marginLeft: 'auto',
-      flexShrink: 1,
-      minWidth: 0,
-      backgroundColor: Colors.surface,
-      borderRadius: Radius.sm,
-      borderWidth: 1,
-      borderColor: Colors.line,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-    },
-    chainText: { ...T.text.caption, fontFamily: Fonts.sans700 },
+    chainRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    chainDot: { width: 10, height: 10, borderRadius: 5 },
+    chainText: { ...T.text.caption, fontFamily: Fonts.sans700, flexShrink: 1 },
     text: { paddingHorizontal: Space[3], paddingTop: Space[2], gap: 2 },
     eyebrow: { ...T.text.caption, color: Colors.brand },
     eyebrowUrgent: { color: Colors.accent },
     title: { ...T.text.title, color: Colors.ink, minHeight: T.text.title.lineHeight * 2 },
     secondary: { ...T.text.secondary, color: Colors.ink3Text },
-    priceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingLeft: Space[3], paddingRight: Space[2], marginTop: 4 },
-    priceCol: { flexGrow: 1, flexShrink: 0, justifyContent: 'center', minHeight: ADD_SIZE },
+    priceCol: { paddingHorizontal: Space[3], marginTop: 4 },
     price: { ...T.text.price, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
     priceSale: { color: Colors.accent },
     was: { textDecorationLine: 'line-through' },
     add: {
-      // Wraps under the price (right-aligned) when large text leaves no room beside it.
-      marginLeft: 'auto',
+      position: 'absolute',
+      right: Space[2],
       width: ADD_SIZE,
       height: ADD_SIZE,
       borderRadius: ADD_SIZE / 2,
       backgroundColor: Colors.brand,
       alignItems: 'center',
       justifyContent: 'center',
+      // A white ring keeps it readable on any product photo.
+      borderWidth: 2,
+      borderColor: Colors.surface,
     },
     addDone: { backgroundColor: Colors.brand2 },
     notes: { paddingHorizontal: Space[3], gap: 2 },
