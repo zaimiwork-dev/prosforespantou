@@ -1,6 +1,9 @@
 // GET /api/v1/deals — one ranked page of active offers.
 //
-//   ?limit=24 (1–60) &offset=0 &chain=ab &category=<id>[,<id>…] &sort=hot
+//   ?limit=24 (1–60) &offset=0 &chain=ab[,lidl…] &category=<id>[,<id>…] &sort=hot
+//
+// Several chains («Τα καταστήματά μου» in the app) are one ranked query, so
+// paging and order stay right — merging per-chain pages on the phone could not.
 //
 // Pages come back in database rank. Like the website (DealsClient), the APP
 // de-duplicates and spreads its accumulated list with the shared libs
@@ -15,7 +18,7 @@ import { ok, fail, param } from '@/lib/api/respond';
 const Query = z.object({
   limit: z.coerce.number().int().min(1).max(60).default(24),
   offset: z.coerce.number().int().min(0).max(5000).default(0),
-  chain: z.string().regex(/^[a-z]{2,20}$/).optional(),
+  chain: z.string().regex(/^[a-z]{2,20}(,[a-z]{2,20}){0,9}$/).optional(),
   category: z.string().max(400).optional(),
   sort: z.enum(['hot', 'expiring', 'discount', 'newest', 'price_asc', 'price_desc']).default('hot'),
 });
@@ -32,14 +35,16 @@ export async function GET(req: Request) {
   if (!parsed.success) return fail(400, 'invalid query');
   const q = parsed.data;
   const categories = q.category ? q.category.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 8) : [];
+  const chains = q.chain ? [...new Set(q.chain.split(','))] : [];
 
   try {
     const { deals, total } = await getActiveDeals(
       q.limit,
       q.offset,
-      q.chain ?? 'all',
+      chains.length === 1 ? chains[0] : 'all',
       categories.length === 0 ? 'all' : categories.length === 1 ? categories[0] : categories,
       q.sort,
+      chains.length > 1 ? chains : undefined,
     );
     const next = q.offset + deals.length;
     return ok({
