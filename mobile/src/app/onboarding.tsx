@@ -9,18 +9,11 @@ import { useChains } from '@/lib/chains';
 import { setConsentChoice } from '@/lib/analytics';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { Chip } from '@/components/chip';
-import { Colors, Radius, Space, Type, type TypeScale } from '@/constants/theme';
+import { Colors, Radius, Space, TypeLarge, type TypeScale } from '@/constants/theme';
+
 
 // Always the large scale here.
-const BIG: TypeScale = {
-  caption: Type.caption,
-  body: Math.round(Type.body * 1.2),
-  bodyLg: Math.round(Type.bodyLg * 1.2),
-  title: Math.round(Type.title * 1.2),
-  price: Math.round(Type.price * 1.2),
-  h2: Math.round(Type.h2 * 1.2),
-  h1: Math.round(Type.h1 * 1.2),
-};
+const BIG: TypeScale = TypeLarge;
 
 const STEPS = 3;
 

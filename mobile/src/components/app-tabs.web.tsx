@@ -4,7 +4,9 @@
 // like the Android app. A plain bottom tab bar is what the Android build shows.
 import { Tabs } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
-import { Colors } from '@/constants/theme';
+import { StyleSheet, View } from 'react-native';
+import { Colors, Fonts } from '@/constants/theme';
+import { useShoppingList } from '@/lib/shopping-list';
 
 type IconProps = { color: string; size: number };
 
@@ -36,23 +38,33 @@ const icons: Record<string, (p: IconProps) => React.ReactElement> = {
 const titles: Record<string, string> = { index: 'Αρχική', deals: 'Προσφορές', search: 'Αναζήτηση', list: 'Λίστα' };
 
 export default function AppTabs() {
+  const count = useShoppingList().items.length;
   return (
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
         title: titles[route.name],
-        tabBarIcon: ({ color, size }) => icons[route.name]({ color: String(color), size }),
+        // bgSoft pill behind the active icon, like the Android indicator.
+        tabBarIcon: ({ color, size, focused }) => (
+          <View style={[styles.pill, focused && styles.pillActive]}>{icons[route.name]({ color: String(color), size })}</View>
+        ),
         tabBarActiveTintColor: Colors.brand,
         tabBarInactiveTintColor: Colors.ink2,
         // Explicit height and line height: the defaults clip Greek labels at 13px.
         tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.line, height: 72 },
         tabBarItemStyle: { paddingVertical: 6 },
-        tabBarLabelStyle: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+        tabBarLabelStyle: { fontFamily: Fonts.sans600, fontSize: 13, lineHeight: 18 },
+        tabBarBadgeStyle: { backgroundColor: Colors.accent, color: '#fff', fontFamily: Fonts.sans700, fontSize: 12 },
       })}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="deals" />
       <Tabs.Screen name="search" />
-      <Tabs.Screen name="list" />
+      <Tabs.Screen name="list" options={{ tabBarBadge: count > 0 ? (count > 99 ? '99+' : count) : undefined }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  pill: { width: 56, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  pillActive: { backgroundColor: Colors.bgSoft },
+});
