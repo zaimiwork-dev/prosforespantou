@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DealCard } from './api';
+import { track } from './analytics';
 
 const KEY = 'prosfores-pantou:list:v1';
 // Same origin the share text of the website ends with.
@@ -79,10 +80,16 @@ function sanitize(raw: unknown): ListItem[] {
 const EMPTY: ListItem[] = [];
 const store = createPersistedStore<ListItem[]>(KEY, EMPTY, sanitize);
 
-export function addToList(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 'title' | 'chain' | 'price' | 'imageUrl' | 'validUntil' | 'datesFromSource'>) {
+// One statistic per offer that really left the list (the website counts the
+// same way); emitted after the write, from what the updater actually removed.
+const trackRemoved = (gone: ListItem[]) =>
+  gone.forEach((i) => track('list_remove', { discountId: i.id, supermarket: i.chain ?? undefined }));
+
+export function addToList(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 'title' | 'chain' | 'price' | 'imageUrl' | 'validUntil' | 'datesFromSource'>, quantity = 1) {
+  track('list_add', { discountId: offer.id, supermarket: offer.chain ?? undefined });
   return store.update((items) => {
     if (items.some((i) => i.id === offer.id)) {
-      return items.map((i) => (i.id === offer.id ? { ...i, quantity: i.quantity + 1 } : i));
+      return items.map((i) => (i.id === offer.id ? { ...i, quantity: i.quantity + quantity } : i));
     }
     return [
       ...items,
@@ -95,26 +102,46 @@ export function addToList(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 't
         imageUrl: offer.imageUrl,
         validUntil: offer.validUntil,
         datesFromSource: offer.datesFromSource,
-        quantity: 1,
+        quantity,
         checked: false,
       },
     ];
   });
 }
 
-export const removeFromList = (id: string) => store.update((items) => items.filter((i) => i.id !== id));
+export function removeFromList(id: string) {
+  let gone: ListItem[] = [];
+  return store
+    .update((items) => {
+      gone = items.filter((i) => i.id === id);
+      return items.filter((i) => i.id !== id);
+    })
+    .then(() => trackRemoved(gone));
+}
 
-export const changeQuantity = (id: string, delta: number) =>
-  store.update((items) =>
-    items
-      .map((i) => (i.id === id ? { ...i, quantity: i.quantity + delta } : i))
-      .filter((i) => i.quantity > 0),
-  );
+export function changeQuantity(id: string, delta: number) {
+  let gone: ListItem[] = [];
+  return store
+    .update((items) => {
+      const next = items.map((i) => (i.id === id ? { ...i, quantity: i.quantity + delta } : i));
+      gone = next.filter((i) => i.quantity <= 0);
+      return next.filter((i) => i.quantity > 0);
+    })
+    .then(() => trackRemoved(gone));
+}
 
 export const toggleChecked = (id: string) =>
   store.update((items) => items.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i)));
 
-export const removeChecked = () => store.update((items) => items.filter((i) => !i.checked));
+export function removeChecked() {
+  let gone: ListItem[] = [];
+  return store
+    .update((items) => {
+      gone = items.filter((i) => i.checked);
+      return items.filter((i) => !i.checked);
+    })
+    .then(() => trackRemoved(gone));
+}
 
 export const isExpired = (item: Pick<ListItem, 'validUntil' | 'datesFromSource'>, now = Date.now()) => {
   if (!item.datesFromSource) return false;

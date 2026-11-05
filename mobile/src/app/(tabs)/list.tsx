@@ -2,13 +2,15 @@
 // The list is grouped by chain with a subtotal each (as on the website);
 // an offer that has ended stays visible, greyed and marked «Έληξε», because a
 // list silently losing items is worse than one that says so.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { track } from '@/lib/analytics';
 import { useChains } from '@/lib/chains';
+import { formatPrice } from '@/lib/format';
 import { removeFavourite, useFavourites } from '@/lib/favourites';
 import {
   buildShareText,
@@ -21,20 +23,21 @@ import {
   useShoppingList,
   type ListItem,
 } from '@/lib/shopping-list';
-import { Colors, Radius, Space, Type } from '@/constants/theme';
-
-const euro = (n: number) => `${n.toFixed(2).replace('.', ',')}€`;
+import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
 
 type Tab = 'list' | 'favourites';
 
 export default function ListScreen() {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const [tab, setTab] = useState<Tab>('list');
   const { items, loaded } = useShoppingList();
   const { favourites } = useFavourites();
+  useFocusEffect(useCallback(() => track('page_view', { page: 'list' }), []));
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <Text style={styles.h1}>Λίστα</Text>
+      <Text style={styles.h1} accessibilityRole="header">Λίστα</Text>
       <View style={styles.segment} accessibilityRole="tablist">
         <SegmentButton label={`Η λίστα μου${items.length ? ` (${items.length})` : ''}`} selected={tab === 'list'} onPress={() => setTab('list')} />
         <SegmentButton label={`Αγαπημένα${favourites.length ? ` (${favourites.length})` : ''}`} selected={tab === 'favourites'} onPress={() => setTab('favourites')} />
@@ -53,6 +56,8 @@ export default function ListScreen() {
 }
 
 function SegmentButton({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   return (
     <Pressable
       onPress={onPress}
@@ -65,6 +70,8 @@ function SegmentButton({ label, selected, onPress }: { label: string; selected: 
 }
 
 function ShoppingListView({ items }: { items: ListItem[] }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
   const [confirming, setConfirming] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
@@ -124,13 +131,18 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
           const chain = chainOf(g.chain);
           return (
             <View key={g.chain ?? 'none'} style={styles.group}>
-              <View style={[styles.groupHead, { backgroundColor: chain?.color ?? Colors.ink2 }]}>
-                <Text style={styles.groupName}>{chain?.name ?? g.chain ?? 'Άλλο κατάστημα'}</Text>
-                <Text style={styles.groupTotal}>{euro(g.subtotal)}</Text>
+              <View style={styles.groupHead}>
+                <View style={[styles.groupDot, { backgroundColor: chain?.color ?? Colors.ink2 }]} />
+                <Text style={[styles.groupName, { color: chain?.color ?? Colors.ink }]}>
+                  {chain?.name ?? g.chain ?? 'Άλλο κατάστημα'}
+                </Text>
+                <Text style={styles.groupTotal}>{formatPrice(g.subtotal)}</Text>
               </View>
-              {g.items.map((item) => (
-                <ItemRow key={item.id} item={item} />
-              ))}
+              <View style={[styles.groupCard, { borderTopColor: chain?.color ?? Colors.line }]}>
+                {g.items.map((item, i) => (
+                  <ItemRow key={item.id} item={item} first={i === 0} />
+                ))}
+              </View>
             </View>
           );
         })}
@@ -139,7 +151,7 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
       <View style={styles.footer}>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Συνολικό κόστος</Text>
-          <Text style={styles.totalValue}>{euro(total)}</Text>
+          <Text style={styles.totalValue}>{formatPrice(total)}</Text>
         </View>
         {shareFailed ? <Text style={styles.footNote}>Δεν άνοιξε η κοινοποίηση. Δοκίμασε ξανά.</Text> : null}
         <View style={styles.footActions}>
@@ -163,10 +175,12 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
   );
 }
 
-function ItemRow({ item }: { item: ListItem }) {
+function ItemRow({ item, first }: { item: ListItem; first: boolean }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const expired = isExpired(item);
   return (
-    <View style={[styles.item, expired && styles.itemExpired]}>
+    <View style={[styles.item, first && styles.itemFirst, expired && styles.itemExpired]}>
       <Pressable
         onPress={() => toggleChecked(item.id)}
         accessibilityRole="checkbox"
@@ -192,17 +206,12 @@ function ItemRow({ item }: { item: ListItem }) {
         <Text style={[styles.itemName, item.checked && styles.done]} numberOfLines={3}>
           {item.name}
         </Text>
-        {expired ? (
-          <Text style={styles.expired}>Έληξε</Text>
-        ) : (
-          <Text style={[styles.itemPrice, item.checked && styles.done]}>{euro(item.price * item.quantity)}</Text>
-        )}
-        <View style={styles.stepper}>
-          <StepButton label="Μείωση ποσότητας" onPress={() => changeQuantity(item.id, -1)} minus />
-          <Text style={styles.qty} accessibilityLabel={`Ποσότητα ${item.quantity}`}>
-            {item.quantity}
-          </Text>
-          <StepButton label="Αύξηση ποσότητας" onPress={() => changeQuantity(item.id, 1)} />
+        <View style={styles.priceRow}>
+          {expired ? (
+            <Text style={styles.expired}>Έληξε</Text>
+          ) : (
+            <Text style={[styles.itemPrice, item.checked && styles.done]}>{formatPrice(item.price * item.quantity)}</Text>
+          )}
           <Pressable
             onPress={() => removeFromList(item.id)}
             accessibilityRole="button"
@@ -211,12 +220,23 @@ function ItemRow({ item }: { item: ListItem }) {
             <Text style={styles.removeText}>Αφαίρεση</Text>
           </Pressable>
         </View>
+        <View style={styles.stepRow}>
+          <View style={styles.stepper}>
+            <StepButton label="Μείωση ποσότητας" onPress={() => changeQuantity(item.id, -1)} minus />
+            <Text style={styles.qty} accessibilityLabel={`Ποσότητα ${item.quantity}`}>
+              {item.quantity}
+            </Text>
+            <StepButton label="Αύξηση ποσότητας" onPress={() => changeQuantity(item.id, 1)} />
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 function StepButton({ label, onPress, minus = false }: { label: string; onPress: () => void; minus?: boolean }) {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={styles.step}>
       <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.ink} strokeWidth={2.5} strokeLinecap="round">
@@ -227,6 +247,8 @@ function StepButton({ label, onPress, minus = false }: { label: string; onPress:
 }
 
 function FavouritesView() {
+  const T = useType();
+  const styles = useMemo(() => makeStyles(T), [T]);
   const { favourites } = useFavourites();
   const chains = useChains();
 
@@ -274,63 +296,69 @@ function FavouritesView() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.bg },
-  flex: { flex: 1 },
-  h1: { fontSize: Type.h1, fontWeight: '800', color: Colors.brand, paddingHorizontal: Space[4], paddingTop: Space[4], marginBottom: Space[3] },
-  segment: {
-    flexDirection: 'row',
-    marginHorizontal: Space[4],
-    marginBottom: Space[3],
-    backgroundColor: Colors.bgSoft,
-    borderRadius: Radius.md,
-    padding: 4,
-  },
-  segBtn: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.sm },
-  segBtnOn: { backgroundColor: Colors.surface },
-  segText: { fontSize: Type.body, fontWeight: '700', color: Colors.ink2 },
-  segTextOn: { color: Colors.brand },
-  content: { padding: Space[4], paddingBottom: Space[6] },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Space[6] },
-  emptyTitle: { fontSize: Type.title, fontWeight: '800', color: Colors.ink, textAlign: 'center' },
-  emptyText: { fontSize: Type.bodyLg, color: Colors.ink2, textAlign: 'center', marginTop: Space[2], lineHeight: 24 },
-  primary: { marginTop: Space[5], minHeight: 48, justifyContent: 'center', backgroundColor: Colors.brand, borderRadius: Radius.md, paddingHorizontal: Space[6] },
-  primaryText: { color: '#fff', fontSize: Type.bodyLg, fontWeight: '700' },
-  multi: { fontSize: Type.body, color: Colors.ink2, marginBottom: Space[3], lineHeight: 22 },
-  group: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, overflow: 'hidden', marginBottom: Space[4] },
-  groupHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Space[4], paddingVertical: Space[3] },
-  groupName: { color: '#fff', fontSize: Type.title, fontWeight: '800', flexShrink: 1 },
-  groupTotal: { color: '#fff', fontSize: Type.title, fontWeight: '800' },
-  item: { flexDirection: 'row', alignItems: 'flex-start', padding: Space[3], gap: Space[2], borderTopWidth: 1, borderTopColor: Colors.line },
-  itemExpired: { opacity: 0.5 },
-  tapBox: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  box: { width: 26, height: 26, borderRadius: 6, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  boxOn: { backgroundColor: Colors.brand, borderColor: Colors.brand },
-  thumb: { width: 56, height: 56, marginTop: 2 },
-  noThumb: { backgroundColor: Colors.bgSoft, borderRadius: Radius.sm },
-  itemBody: { flex: 1 },
-  itemName: { fontSize: Type.body, fontWeight: '700', color: Colors.ink, lineHeight: 21 },
-  done: { textDecorationLine: 'line-through', color: Colors.ink3 },
-  itemPrice: { fontSize: Type.bodyLg, fontWeight: '800', color: Colors.ink, marginTop: 2 },
-  expired: { fontSize: Type.bodyLg, fontWeight: '800', color: Colors.accent, marginTop: 2 },
-  stepper: { flexDirection: 'row', alignItems: 'center', marginTop: Space[1] },
-  step: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line2, backgroundColor: Colors.surface },
-  qty: { minWidth: 36, textAlign: 'center', fontSize: Type.bodyLg, fontWeight: '800', color: Colors.ink },
-  remove: { minHeight: 44, justifyContent: 'center', marginLeft: 'auto', paddingHorizontal: Space[2] },
-  removeText: { fontSize: Type.body, fontWeight: '700', color: Colors.accent },
-  footer: { backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.line, padding: Space[4] },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: Type.bodyLg, color: Colors.ink2 },
-  totalValue: { fontSize: Type.h2, fontWeight: '800', color: Colors.ink },
-  footNote: { fontSize: Type.body, color: Colors.accent, marginTop: Space[2] },
-  footActions: { flexDirection: 'row', gap: Space[3], marginTop: Space[3] },
-  footBtn: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.md, borderWidth: 2, borderColor: Colors.brand, backgroundColor: Colors.surface, paddingHorizontal: Space[2] },
-  footBtnPrimary: { backgroundColor: Colors.brand },
-  footBtnPrimaryText: { color: '#fff', fontSize: Type.body, fontWeight: '800', textAlign: 'center' },
-  footBtnText: { color: Colors.brand, fontSize: Type.body, fontWeight: '800', textAlign: 'center' },
-  footBtnDanger: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  favRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, marginBottom: Space[3] },
-  favMain: { flex: 1, minHeight: 56, justifyContent: 'center', padding: Space[3] },
-  favChain: { fontSize: Type.caption, color: Colors.ink3, marginTop: 2 },
-  favRemove: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
-});
+const makeStyles = (T: TypeScale) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: Colors.bg },
+    flex: { flex: 1 },
+    h1: { ...T.text.hero, color: Colors.ink, paddingHorizontal: Space[4], paddingTop: Space[4], marginBottom: Space[3] },
+    segment: {
+      flexDirection: 'row',
+      marginHorizontal: Space[4],
+      marginBottom: Space[3],
+      backgroundColor: Colors.bgSoft,
+      borderRadius: Radius.pill,
+      padding: 4,
+    },
+    segBtn: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill, paddingHorizontal: Space[2] },
+    segBtnOn: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line },
+    segText: { ...T.text.chip, fontFamily: Fonts.sans600, color: Colors.ink2, textAlign: 'center' },
+    segTextOn: { fontFamily: Fonts.sans700, color: Colors.brand },
+    content: { padding: Space[4], paddingBottom: Space[6] },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Space[6] },
+    emptyTitle: { ...T.text.h2, color: Colors.ink, textAlign: 'center' },
+    emptyText: { ...T.text.body, color: Colors.ink2, textAlign: 'center', marginTop: Space[2] },
+    primary: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: Colors.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
+    primaryText: { ...T.text.button, color: '#fff' },
+    multi: { ...T.text.secondary, color: Colors.ink3Text, marginBottom: Space[3] },
+    group: { marginBottom: Space[4] },
+    groupHead: { flexDirection: 'row', alignItems: 'center', gap: Space[2], paddingHorizontal: Space[1], paddingBottom: Space[2] },
+    groupDot: { width: 12, height: 12, borderRadius: 6 },
+    groupName: { ...T.text.title, fontFamily: Fonts.sans900, flex: 1 },
+    groupTotal: { ...T.text.title, fontFamily: Fonts.sans900, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    groupCard: { backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, borderTopWidth: 3, overflow: 'hidden' },
+    item: { flexDirection: 'row', alignItems: 'flex-start', padding: Space[3], gap: Space[2], borderTopWidth: 1, borderTopColor: Colors.line },
+    itemFirst: { borderTopWidth: 0 },
+    itemExpired: { opacity: 0.5 },
+    tapBox: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    box: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+    boxOn: { backgroundColor: Colors.brand, borderColor: Colors.brand },
+    thumb: { width: 64, height: 64, marginTop: 2, borderRadius: Radius.sm, backgroundColor: Colors.surface2 },
+    noThumb: { backgroundColor: Colors.bgSoft },
+    itemBody: { flex: 1, minWidth: 0 },
+    itemName: { ...T.text.title, color: Colors.ink },
+    done: { textDecorationLine: 'line-through', color: Colors.ink3Text },
+    itemPrice: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    expired: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, color: Colors.accent },
+    priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+    stepRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: Space[1] },
+    stepper: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 24, backgroundColor: Colors.bgSoft, borderWidth: 1, borderColor: Colors.line },
+    step: { width: 44, height: 46, alignItems: 'center', justifyContent: 'center' },
+    qty: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, minWidth: 28, textAlign: 'center', color: Colors.ink },
+    remove: { minHeight: 44, justifyContent: 'center', paddingLeft: Space[2] },
+    removeText: { ...T.text.bodyStrong, color: Colors.accent },
+    footer: { backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.line, padding: Space[4] },
+    totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    totalLabel: { ...T.text.body, color: Colors.ink2 },
+    totalValue: { ...T.text.price, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    footNote: { ...T.text.body, color: Colors.accent, marginTop: Space[2] },
+    footActions: { flexDirection: 'row', gap: Space[3], marginTop: Space[3] },
+    footBtn: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill, borderWidth: 2, borderColor: Colors.brand, backgroundColor: Colors.surface, paddingHorizontal: Space[3] },
+    footBtnPrimary: { backgroundColor: Colors.brand },
+    footBtnPrimaryText: { ...T.text.button, color: '#fff', textAlign: 'center' },
+    footBtnText: { ...T.text.button, color: Colors.brand, textAlign: 'center' },
+    footBtnDanger: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+    favRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, marginBottom: Space[3] },
+    favMain: { flex: 1, minHeight: 56, justifyContent: 'center', padding: Space[3] },
+    favChain: { ...T.text.secondary, color: Colors.ink3Text, marginTop: 2 },
+    favRemove: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
+  });

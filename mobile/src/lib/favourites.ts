@@ -2,6 +2,7 @@
 // shopping list; keyed like the website so a product means the same thing in both.
 import { useSyncExternalStore } from 'react';
 import type { DealCard } from './api';
+import { track } from './analytics';
 import { createPersistedStore } from './shopping-list';
 
 export type Favourite = {
@@ -27,16 +28,30 @@ function sanitize(raw: unknown): Favourite[] {
 const EMPTY: Favourite[] = [];
 const store = createPersistedStore<Favourite[]>('prosfores-pantou:favourites:v1', EMPTY, sanitize);
 
-export function toggleFavourite(offer: Pick<DealCard, 'productId' | 'name' | 'title' | 'chain'>) {
+export function toggleFavourite(offer: Pick<DealCard, 'id' | 'productId' | 'name' | 'title' | 'chain'>) {
   const key = favouriteKeyFor(offer);
-  return store.update((favs) =>
-    favs.some((f) => f.key === key)
-      ? favs.filter((f) => f.key !== key)
-      : [...favs, { key, productId: offer.productId, name: offer.title || offer.name, chain: offer.chain }],
-  );
+  let added = false;
+  return store
+    .update((favs) => {
+      added = !favs.some((f) => f.key === key);
+      return added
+        ? [...favs, { key, productId: offer.productId, name: offer.title || offer.name, chain: offer.chain }]
+        : favs.filter((f) => f.key !== key);
+    })
+    .then(() => track(added ? 'favorite' : 'unfavorite', { discountId: offer.id, supermarket: offer.chain ?? undefined }));
 }
 
-export const removeFavourite = (key: string) => store.update((favs) => favs.filter((f) => f.key !== key));
+export function removeFavourite(key: string) {
+  let gone: Favourite | undefined;
+  return store
+    .update((favs) => {
+      gone = favs.find((f) => f.key === key);
+      return favs.filter((f) => f.key !== key);
+    })
+    .then(() => {
+      if (gone) track('unfavorite', { supermarket: gone.chain ?? undefined });
+    });
+}
 
 export function useFavourites() {
   const favourites = useSyncExternalStore(store.subscribe, store.get, store.get);
