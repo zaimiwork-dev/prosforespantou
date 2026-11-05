@@ -44,6 +44,8 @@ Also: `POST /api/v1/events` (lead) live; EAS project linked (`@sigmax99/prosfore
 
 **Owner's phone is an iPhone (11-05).** The preview APK (`eas build --profile preview`) is for Android only. The owner follows progress on the **web build**: `npx expo export --platform web --output-dir dist` then `npx eas-cli deploy` (preview URL `prosfores-pantou--<id>.expo.app`; send the new URL after each change). Owner reconfirmed **Android first**; a borrowed Android phone covers Play Console device verification and real-device tests.
 
+**Redesign — 2026-11-05 (owner: «make it look like the site's landing page, but better»).** Design study of 14 apps → [mobile/DESIGN.md](mobile/DESIGN.md) (owner approved; price format «0,83 €» everywhere). Done: WEB-01 (website prices «0,83 €», shared `src/lib/format-price.ts`), APP-401 (Inter + Noto Serif Display, type roles in `useType().text`, `formatPrice`, new offer card with badge strip and round «+», tab bar pill + Λίστα badge), lead: `DealCard.sticker` (chain sticker text, additive) and full chain names on cards. Running in parallel: APP-402 home, APP-403 offers filter sheet + multi-chain query + settings/onboarding, APP-404 product page + list + search + events. Note: `expo lint` can report stale `import/no-unresolved` after installs — `npx eslint src` is the reliable check.
+
 **Next:** Play internal test → closed test opens (needs the owner's Play Console account — postponed by the owner on 11-04).
 
 ## The one constraint that sets the calendar
