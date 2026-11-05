@@ -46,6 +46,7 @@ export async function getSimilarOffers(discountId: string, limit = 8) {
             discountedPrice: true,
             originalPrice: true,
             discountPercent: true,
+            description: true,
             imageUrl: true,
             productId: true,
             source: true,

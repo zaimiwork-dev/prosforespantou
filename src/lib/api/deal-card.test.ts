@@ -17,6 +17,12 @@ const base = {
 };
 
 describe('toDealCard', () => {
+  it('passes the chain sticker text through, but not a long description', () => {
+    expect(toDealCard({ ...base, description: ' SUPER ΤΙΜΗ ' }).sticker).toBe('SUPER ΤΙΜΗ');
+    expect(toDealCard({ ...base, description: 'x'.repeat(25) }).sticker).toBeNull();
+    expect(toDealCard({ ...base, description: null }).sticker).toBeNull();
+  });
+
   it('splits name and size, and prices per litre like the shelf label', () => {
     const c = toDealCard(base);
     expect(c.name).toBe('Γάλα Φρέσκο ΔΕΛΤΑ 1lt');

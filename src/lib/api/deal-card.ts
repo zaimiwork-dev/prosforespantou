@@ -49,6 +49,10 @@ export type DealCard = {
   sources: string[];
   featured: { label: string } | null;
   essential: { id: string; label: string; chainCount: number } | null;
+  // The chain's printed sticker text («SUPER ΤΙΜΗ», «1+1», «-25%»), as the
+  // site's card shows it instead of a generic ΜΟΝΟ; null when absent or too
+  // long to be a sticker (> 24 chars). Added 2026-11-05.
+  sticker: string | null;
 };
 
 type Row = {
@@ -80,6 +84,7 @@ type Row = {
   featuredLabel?: string | null;
   product?: { name?: string | null; imageUrl?: string | null; unitInfo?: string | null } | null;
   essential?: { id: string; label: string; chainCount: number } | null;
+  description?: string | null;
 };
 
 const iso = (v: Date | string) => new Date(v).toISOString();
@@ -93,6 +98,12 @@ export function resolveImage(row: Pick<Row, 'imageUrl' | 'product'>): string | n
   if (raw.startsWith('http')) return raw;
   if (raw.startsWith('/')) return `${SITE_ORIGIN}${raw}`;
   return `${SITE_ORIGIN}/wolt_images/${raw.split('/').pop()}`;
+}
+
+// Same 24-character rule as DiscountCard's sticker badge.
+function stickerOf(description: string | null | undefined): string | null {
+  const s = description?.trim();
+  return s && s.length <= 24 ? s : null;
 }
 
 export function toDealCard(row: Row): DealCard {
@@ -133,5 +144,6 @@ export function toDealCard(row: Row): DealCard {
     sources: rawSources.filter((s) => USER_FACING_SOURCES.has(s)),
     featured: row.isFeatured ? { label: row.featuredLabel ?? 'Χορηγούμενο' } : null,
     essential: row.essential ?? null,
+    sticker: stickerOf(row.description),
   };
 }

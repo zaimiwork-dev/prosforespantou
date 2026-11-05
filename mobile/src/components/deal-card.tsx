@@ -21,9 +21,6 @@ import { useSettings } from '@/lib/settings';
 import { addToList, useShoppingList } from '@/lib/shopping-list';
 
 const ADD_SIZE = 48;
-// Longer chain names would be cut off next to the discount badge in a 173 dp
-// card, so the chain's `short` name is shown instead.
-const LONG_CHAIN_NAME = 8;
 
 export function DealCardView({
   deal,
@@ -39,7 +36,7 @@ export function DealCardView({
 }) {
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
-  const { myChains, textSize } = useSettings();
+  const { myChains } = useSettings();
   const chains = useChains();
   const { items } = useShoppingList();
   const chain = chains.find((c) => c.id === deal.chain);
@@ -55,12 +52,15 @@ export function DealCardView({
     [deal.validFrom, deal.validUntil, deal.updatedAt, deal.datesFromSource],
   );
 
-  const chainName = chain ? (chain.name.length > (textSize === 'large' ? 5 : LONG_CHAIN_NAME) ? chain.short : chain.name) : (deal.chain ?? '');
-  // The site's rule: «−N%» when a real old price exists, else «ΜΟΝΟ». The site
-  // also prints the chain's own sticker text (`description`, e.g. «SUPER ΤΙΜΗ»,
-  // «1+1») instead of ΜΟΝΟ; the API does not send it, so the app can only show
-  // ΜΟΝΟ until the DealCard contract gains that field.
-  const badge = deal.percent ? `−${deal.percent}%` : !deal.originalPrice ? 'ΜΟΝΟ' : null;
+  // Always the full chain name: the 2-letter `short` codes (ΣΚ, MM) mean
+  // nothing to this audience. When badge + name don't fit on one line the
+  // strip wraps and the name drops below the badge (styles.strip).
+  const chainName = chain?.name ?? deal.chain ?? '';
+  // The site's rule: «−N%» when a real old price exists, else the chain's own
+  // sticker text («SUPER ΤΙΜΗ», «1+1»), else «ΜΟΝΟ».
+  const badge = deal.percent
+    ? `−${deal.percent}%`
+    : !deal.originalPrice ? (deal.sticker ?? 'ΜΟΝΟ').toLocaleUpperCase('el') : null;
   const struck = deal.originalPrice != null;
   // At most one chip: an urgent expiry beats the staple label.
   const eyebrow =
@@ -186,6 +186,7 @@ const makeStyles = (T: TypeScale) =>
       left: Space[2],
       right: Space[2],
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'flex-start',
       gap: 6,
     },
