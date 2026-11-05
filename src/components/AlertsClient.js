@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import { createAlert, deleteAlert } from '@/actions/alerts';
 import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { Icon } from './Icons';
@@ -134,7 +135,7 @@ export function AlertsClient({ initialAlerts, token }) {
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{a.keyword}</div>
               <div style={{ fontSize: 12, color: '#666', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {a.maxPrice && <span style={CRIT}><Icon.Wallet size={13} /> Έως {Number(a.maxPrice).toFixed(2)}€</span>}
+                {a.maxPrice && <span style={CRIT}><Icon.Wallet size={13} /> Έως {formatPrice(a.maxPrice)}</span>}
                 {a.category && <span style={CRIT}><Icon.Box size={13} /> {a.category}</span>}
                 {a.supermarkets.length > 0 && <span style={CRIT}><Icon.Store size={13} /> {a.supermarkets.map(s => SUPERMARKETS.find(sm => sm.id === s)?.short).join(', ')}</span>}
                 {!a.maxPrice && !a.category && a.supermarkets.length === 0 && <span>Όλα τα κριτήρια</span>}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import Image from 'next/image';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
@@ -33,7 +34,7 @@ function SimilarCard({ d }) {
       </div>
       <div className="similar-name">{d.productName}</div>
       <div className="similar-foot">
-        <span className="similar-price">{Number(d.discountedPrice).toFixed(2)}€</span>
+        <span className="similar-price">{formatPrice(d.discountedPrice)}</span>
         {sm && <span className="similar-chain" style={{ color: sm.color }}>{sm.short}</span>}
       </div>
     </a>
@@ -144,12 +145,12 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
         <div className="od-price-row">
           <div>
             <div className="od-price-label">Τιμή προσφοράς</div>
-            <div className="od-price">{discountedPrice.toFixed(2)}€</div>
+            <div className="od-price">{formatPrice(discountedPrice)}</div>
           </div>
           {originalPrice && (
             <div>
               <div className="od-price-label">Αρχική</div>
-              <div className="od-price-old">{originalPrice.toFixed(2)}€</div>
+              <div className="od-price-old">{formatPrice(originalPrice)}</div>
             </div>
           )}
         </div>
@@ -164,9 +165,9 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
           const unit = unitPrice(displayName, discountedPrice);
           if (!perPiece && !unit) return null;
           const parts = [];
-          if (perPiece) parts.push(`Η τιμή αφορά ${pack.units} τεμάχια — περίπου ${perPiece}€/τεμ.`);
-          if (unit && unit.per !== 'τεμ.') parts.push(`≈ ${unit.value.toFixed(2)}€/${unit.per}`);
-          else if (unit && !perPiece) parts.push(`≈ ${unit.value.toFixed(2)}€/τεμ.`);
+          if (perPiece) parts.push(`Η τιμή αφορά ${pack.units} τεμάχια — περίπου ${formatUnitPrice(perPiece, 'τεμ.')}`);
+          if (unit && unit.per !== 'τεμ.') parts.push(`≈ ${formatUnitPrice(unit.value, unit.per)}`);
+          else if (unit && !perPiece) parts.push(`≈ ${formatUnitPrice(unit.value, 'τεμ.')}`);
           return (
     <div className="od-pack">
       <Icon.Box size={14} />

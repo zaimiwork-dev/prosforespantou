@@ -17,6 +17,7 @@
 
 import { Resend } from 'resend';
 import * as Sentry from '@sentry/nextjs';
+import { formatPrice } from './format-price';
 
 const FROM = process.env.EMAIL_FROM || 'Prosfores Pantou <onboarding@resend.dev>';
 const REPLY_TO = process.env.EMAIL_REPLY_TO;
@@ -140,8 +141,8 @@ interface AlertMatch {
 
 export async function sendAlertEmail(m: AlertMatch) {
   const priceLine = m.originalPrice && m.originalPrice > m.discountedPrice
-    ? `${m.discountedPrice.toFixed(2)}€ (από ${m.originalPrice.toFixed(2)}€${m.discountPercent ? `, -${m.discountPercent}%` : ''})`
-    : `${m.discountedPrice.toFixed(2)}€`;
+    ? `${formatPrice(m.discountedPrice)} (από ${formatPrice(m.originalPrice)}${m.discountPercent ? `, -${m.discountPercent}%` : ''})`
+    : `${formatPrice(m.discountedPrice)}`;
 
   const text = `Βρέθηκε προσφορά για "${m.keyword}":
 
@@ -158,9 +159,9 @@ ${m.supermarketName} — ${priceLine}
     <div style="border:1px solid #ececf0;border-radius:12px;padding:16px;margin:0 0 20px">
       <div style="font-size:11px;font-weight:800;color:#009de0;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">${escapeHtml(m.supermarketName)}</div>
       <div style="font-size:15px;font-weight:700;margin-bottom:10px">${escapeHtml(m.productName)}</div>
-      <div style="font-size:24px;font-weight:900;color:#1c1e24">${m.discountedPrice.toFixed(2)}€</div>
+      <div style="font-size:24px;font-weight:900;color:#1c1e24">${formatPrice(m.discountedPrice)}</div>
       ${m.originalPrice && m.originalPrice > m.discountedPrice ? `
-        <div style="font-size:13px;color:#8b929c"><span style="text-decoration:line-through">${m.originalPrice.toFixed(2)}€</span>${m.discountPercent ? ` <strong style="color:#ff3b30">−${m.discountPercent}%</strong>` : ''}</div>
+        <div style="font-size:13px;color:#8b929c"><span style="text-decoration:line-through">${formatPrice(m.originalPrice)}</span>${m.discountPercent ? ` <strong style="color:#ff3b30">−${m.discountPercent}%</strong>` : ''}</div>
       ` : ''}
     </div>
     <p style="margin:0 0 20px;text-align:center">

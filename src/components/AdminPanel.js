@@ -19,6 +19,7 @@ import { bulkApprovePendingMatches } from "@/actions/admin/bulk-approve-pending-
 import { setFeatured } from "@/actions/admin/set-featured";
 import { getIngestHealth } from "@/actions/admin/get-ingest-health";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
+import { formatPrice } from "@/lib/format-price";
 
 const emptyLeafletForm = {
   supermarket: "ab",
@@ -817,7 +818,7 @@ export function AdminPanel({ onBack }) {
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{row.rawName}</div>
                           <div style={{ fontSize: 11, color: G.muted }}>
-                            {row.rawPrice}€ · {row.supermarket} · AI {Math.round(row.aiConfidence)}%
+                            {formatPrice(row.rawPrice)} · {row.supermarket} · AI {Math.round(row.aiConfidence)}%
                           </div>
                           <div style={{ fontSize: 11, color: canApprove ? "#2d6a4f" : G.red, marginTop: 4 }}>
                             {canApprove
@@ -1020,7 +1021,7 @@ export function AdminPanel({ onBack }) {
                         <tr key={d.id} style={{ borderTop: "1px solid #eee" }}>
                           <td style={{ padding: 12 }}>{d.productName}</td>
                           <td style={{ padding: 12 }}>{d.category}</td>
-                          <td style={{ padding: 12 }}>{d.discountedPrice}€</td>
+                          <td style={{ padding: 12 }}>{formatPrice(d.discountedPrice)}</td>
                           <td style={{ padding: 12 }}>{d.supermarket}</td>
                           <td style={{ padding: 12 }}>
                             <button

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import Image from 'next/image';
 import Link from 'next/link';
 import { SUPERMARKETS } from '@/lib/constants';
@@ -109,14 +110,14 @@ export function ProductCard({ p, onSelect }) {
         <div className="card-price-row">
           {offer ? (
             <div className={offer.originalPrice ? 'has-discount' : undefined}>
-              <div className="price">{offer.discountedPrice?.toFixed(2)}€</div>
-              {offer.originalPrice && <div className="price-old">{offer.originalPrice.toFixed(2)}€</div>}
+              <div className="price">{formatPrice(offer.discountedPrice)}</div>
+              {offer.originalPrice && <div className="price-old">{formatPrice(offer.originalPrice)}</div>}
             </div>
           ) : p.shelf ? (
             // Not on offer — show the last-known shelf price with the date we
             // recorded it, instead of a priceless "Κατάλογος" label.
             <div>
-              <div className="price catalog-shelf-price">{Number(p.shelf.price).toFixed(2)}€</div>
+              <div className="price catalog-shelf-price">{formatPrice(p.shelf.price)}</div>
               <div className="catalog-shelf-date">τιμή ραφιού {formatShortDate(p.shelf.recordedAt)}</div>
             </div>
           ) : (

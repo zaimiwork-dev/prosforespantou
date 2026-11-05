@@ -13,6 +13,7 @@
 // lows, stay silent on mediocre prices, and never show a fake-positive.
 
 import { useState } from 'react';
+import { formatPrice, formatNumberEl } from '@/lib/format-price';
 import { isPositiveVerdict } from '@/lib/price-verdict';
 import { formatShortDate } from '@/lib/expiry-label';
 import { Icon } from './Icons';
@@ -99,7 +100,7 @@ export function PriceHistory({ history, compact = false }) {
   const tipIsMin = tipIdx === minIdx;
   const tipX = x(tipIdx);
   const tipPrice = prices[tipIdx];
-  const tipLabel = `${tipPrice.toFixed(2)}€ · ${formatShortDate(points[tipIdx].recordedAt)}${tipIsMin ? ' · χαμηλότερη' : ''}`;
+  const tipLabel = `${formatPrice(tipPrice)} · ${formatShortDate(points[tipIdx].recordedAt)}${tipIsMin ? ' · χαμηλότερη' : ''}`;
   const tipW = tipLabel.length * 6.4 + 14;
   const tipBoxX = Math.max(2, Math.min(W - tipW - 2, tipX - tipW / 2));
 
@@ -130,13 +131,13 @@ export function PriceHistory({ history, compact = false }) {
           onPointerDown={(e) => pickNearest(e.clientX, e.currentTarget)}
           onPointerLeave={() => setActive(null)}
           role="img"
-          aria-label={`Ιστορικό τιμής: χαμηλότερη ${lo.toFixed(2)} ευρώ, υψηλότερη ${hi.toFixed(2)} ευρώ`}
+          aria-label={`Ιστορικό τιμής: χαμηλότερη ${formatNumberEl(lo)} ευρώ, υψηλότερη ${formatNumberEl(hi)} ευρώ`}
         >
           {/* low/high guide lines + € labels */}
           <line x1={PAD_X} x2={W - PAD_X} y1={y(hi)} y2={y(hi)} stroke="var(--line)" strokeDasharray="3 4" />
           <line x1={PAD_X} x2={W - PAD_X} y1={y(lo)} y2={y(lo)} stroke="#10b981" strokeOpacity="0.45" strokeDasharray="3 4" />
-          <text x={PAD_X - 5} y={y(hi) + 3.5} textAnchor="end" fontSize="10" fill="var(--ink-3)">{hi.toFixed(2)}€</text>
-          <text x={PAD_X - 5} y={y(lo) + 3.5} textAnchor="end" fontSize="10" fill="#059669">{lo.toFixed(2)}€</text>
+          <text x={PAD_X - 5} y={y(hi) + 3.5} textAnchor="end" fontSize="10" fill="var(--ink-3)">{formatPrice(hi)}</text>
+          <text x={PAD_X - 5} y={y(lo) + 3.5} textAnchor="end" fontSize="10" fill="#059669">{formatPrice(lo)}</text>
 
           <path d={area} fill="#009de0" fillOpacity="0.07" />
           <path d={d} fill="none" stroke="#009de0" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
@@ -166,16 +167,16 @@ export function PriceHistory({ history, compact = false }) {
         </svg>
 
         <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.45, marginTop: 6 }}>
-          Χαμηλότερη: <strong style={{ color: 'var(--ink)' }}>{lo.toFixed(2)}€</strong>
+          Χαμηλότερη: <strong style={{ color: 'var(--ink)' }}>{formatPrice(lo)}</strong>
           {' · '}
           {/* Prefer the real shelf price over an average that blends shelf and
               promo snapshots — that average describes neither, since the mix
               just reflects when the scrapers happened to run. Fall back to the
               average only while a chain has no shelf baseline yet. */}
           {normalPrice != null ? (
-            <>Κανονική τιμή: <strong style={{ color: 'var(--ink)' }}>{normalPrice.toFixed(2)}€</strong></>
+            <>Κανονική τιμή: <strong style={{ color: 'var(--ink)' }}>{formatPrice(normalPrice)}</strong></>
           ) : (
-            <>Μέση: <strong style={{ color: 'var(--ink)' }}>{avg?.toFixed(2) ?? min?.toFixed(2)}€</strong></>
+            <>Μέση: <strong style={{ color: 'var(--ink)' }}>{formatPrice(avg ?? min)}</strong></>
           )}
           {percentAboveMin > 0 && (
             <>
