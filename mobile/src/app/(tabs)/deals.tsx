@@ -16,7 +16,7 @@ import {
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { api, type DealCard, type MetaResponse } from '@/lib/api';
+import { api, type DealCard, type DealSort, type MetaResponse } from '@/lib/api';
 import { arrangeDeals } from '@/lib/lists';
 import { DealCardView } from '@/components/deal-card';
 import { track } from '@/lib/analytics';
@@ -33,8 +33,12 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 
 // The home screen links here with ?chain=<id> or ?category=<id>; otherwise
 // the shopper starts on «Τα καταστήματά μου» when they picked stores.
-function initialFilters(chain?: string, category?: string): Filters {
-  if (chain || category) return { ...NO_FILTERS, chains: chain ? [chain] : [], categories: category ? [category] : [] };
+const asSort = (v?: string): DealSort | undefined => SORTS.find((s) => s.id === v)?.id;
+
+function initialFilters(chain?: string, category?: string, sort?: DealSort): Filters {
+  if (chain || category || sort) {
+    return { ...NO_FILTERS, chains: chain ? [chain] : [], categories: category ? [category] : [], sort: sort ?? NO_FILTERS.sort };
+  }
   return { ...NO_FILTERS, mine: getSettings().myChains.length > 0 };
 }
 
@@ -45,11 +49,13 @@ export default function DealsScreen() {
   const { chains } = useChainList();
   const { myChains } = useSettings();
   const listRef = useRef<FlatList<DealCard>>(null);
-  const params = useLocalSearchParams<{ chain?: string; category?: string }>();
+  const params = useLocalSearchParams<{ chain?: string; category?: string; sort?: string }>();
   const pChain = one(params.chain);
   const pCategory = one(params.category);
+  // «Όλες» on the home screen's «Τελειώνουν σύντομα» rail sends ?sort=expiring.
+  const pSort = asSort(one(params.sort));
 
-  const [filters, setFilters] = useState<Filters>(() => initialFilters(pChain, pCategory));
+  const [filters, setFilters] = useState<Filters>(() => initialFilters(pChain, pCategory, pSort));
   const [sheet, setSheet] = useState<null | 'filters' | 'sort'>(null);
   const mineKey = myChains.join(',');
   const chainKey = useMemo(() => effectiveChains(filters, mineKey ? mineKey.split(',') : []).join(','), [filters, mineKey]);
@@ -79,14 +85,14 @@ export default function DealsScreen() {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, []);
 
-  // A new ?chain / ?category from the home screen replaces the filters
+  // A new ?chain / ?category / ?sort from the home screen replaces the filters
   // (state adjusted during render, the supported alternative to an effect).
-  const paramKey = `${pChain ?? ''}|${pCategory ?? ''}`;
+  const paramKey = `${pChain ?? ''}|${pCategory ?? ''}|${pSort ?? ''}`;
   const [seenParams, setSeenParams] = useState(paramKey);
   if (seenParams !== paramKey) {
     setSeenParams(paramKey);
-    if (pChain || pCategory) {
-      setFilters(initialFilters(pChain, pCategory));
+    if (pChain || pCategory || pSort) {
+      setFilters(initialFilters(pChain, pCategory, pSort));
       setStatus('loading');
       setRaw([]);
       setNextOffset(null);
