@@ -1,6 +1,9 @@
 // GET /api/v1/offers/:id — the product page: the offer, the same item at
 // other chains (offers and «Κανονική τιμή» shelf rows), this chain's 90-day
-// price history, and similar offers. Same calls as src/app/offer/[id].
+// price history, a full-history price `timeline` (SRV-01, added 2026-11-12:
+// shelf steps + promo points, see lib/price-timeline; `history` is unchanged
+// because installed apps read it and its window feeds the stored verdict),
+// and similar offers. Same calls as src/app/offer/[id].
 //
 // Like the website, an offer that has ended still answers (shared links,
 // saved lists) — but with `active: false`, so the app can say «Έληξε»
@@ -11,6 +14,7 @@ import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 import { getPriceComparison } from '@/actions/get-price-comparison';
 import { getPriceHistory } from '@/actions/get-price-history';
+import { getPriceTimeline } from '@/actions/get-price-timeline';
 import { getSimilarOffers } from '@/actions/get-similar-offers';
 import { SUPERMARKETS } from '@/lib/constants';
 import { toDealCard } from '@/lib/api/deal-card';
@@ -33,23 +37,32 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const offer = await getOffer(id);
     if (!offer) return fail(404, 'offer not found');
 
-    const [comparison, history, similar] = await Promise.all([
+    const nowMs = Date.now();
+    const active = offer.isActive && new Date(offer.validUntil).getTime() > nowMs;
+    const [comparison, history, timeline, similar] = await Promise.all([
       getPriceComparison(id),
       getPriceHistory(offer.productId, {
         days: 90,
         supermarket: offer.supermarket,
         currentPrice: Number(offer.discountedPrice),
       }),
+      getPriceTimeline(offer.productId, {
+        supermarket: offer.supermarket,
+        // Discount has no first-seen column. validFrom is the earliest start we
+        // can stand behind (re-stamped by runs when dates are not the chain's,
+        // which only understates how long the offer has run - never overstates).
+        offer: { price: Number(offer.discountedPrice), firstSeenAt: offer.validFrom, active },
+      }),
       getSimilarOffers(id),
     ]);
 
-    const now = Date.now();
+    const now = nowMs;
     const chain = SUPERMARKETS.find((s) => s.id === offer.supermarket);
     return ok({
       offer: {
         ...toDealCard(offer),
         description: offer.description ?? null,
-        active: offer.isActive && new Date(offer.validUntil).getTime() > now,
+        active,
         leafletUrl: chain?.leafletUrl ?? null,
       },
       // Offer rows become cards; shelf rows stay a plain chain + price, the
@@ -60,6 +73,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
           : { type: 'offer', deal: toDealCard(r as never) },
       ),
       history,
+      timeline,
       similar: (similar as never[]).map(toDealCard),
     });
   } catch (error) {
