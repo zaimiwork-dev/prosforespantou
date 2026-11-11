@@ -16,10 +16,12 @@ export default defineConfig({
   root: dir('.'),
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
   resolve: {
-    // The app's two import aliases (tsconfig paths): '@/…' and '@shared/…'.
+    // The app's two import aliases (tsconfig paths): '@/…' and '@shared/…',
+    // and a stand-in for react-native itself (see test/react-native-stub.ts).
     alias: [
       { find: /^@shared\//, replacement: dir('../src/lib/') },
       { find: /^@\//, replacement: dir('./src/') },
+      { find: /^react-native$/, replacement: dir('./test/react-native-stub.ts') },
     ],
   },
 });
