@@ -38,16 +38,15 @@
     "@types/react": "~19.3.0",
     "eslint": "^9.39.5",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.0"
+    "vitest": "^4.1.12"
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "vitest run"
+    "test": "node scripts/test.mjs"
   },
   "private": true
 }
