@@ -23,6 +23,14 @@ then [../APP_PLAN.md](../APP_PLAN.md).
 9. **Comments say why, not what.** Match the surrounding style.
 10. **Windows:** the Bash tool mangles backslashes in heredocs. Create and edit files with the Write/Edit tools.
 
+## Workspace (changed 2026-11-11)
+
+The lead creates your worktree by hand and names it in the ticket (`.claude/worktrees/eng-<ticket>`, branch `eng/<ticket>`). The folder you start in is the LEAD's checkout — never edit or run git/npm there. Start every shell command with `cd "C:/Users/Work/prosforespantou-next/.claude/worktrees/eng-<ticket>"` (upper-case `C:` — a lower-case drive letter breaks the test runner and the sandbox), and give file tools paths inside your worktree.
+
+Checks that are reliable: `npx tsc --noEmit`, `npx eslint src` (not `expo lint` — it reports stale import errors after installs), `npm test` (vitest, pure logic; `react-native` is a stub there, see `test/react-native-stub.ts`), `npx expo export` for android and web.
+
+Use the foundation listed in DESIGN.md «Foundation» (`useApi`, skeletons, toast, haptics, recently-viewed, interest, impressions). A module-level store must expose immutable snapshots through `useSyncExternalStore` — the React Compiler memoises anything else.
+
 ## Before you report — all of these, every time
 
 Run in `mobile/` of your worktree (run `npm install` there first; `node_modules` is not shared between worktrees):

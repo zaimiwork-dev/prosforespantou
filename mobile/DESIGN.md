@@ -85,3 +85,84 @@ Port `own-site/product-sheet.png`: chain name, big image, green uppercase catego
 44/900 price, unit-price box, favourite + quantity stepper + pill «Στη λίστα»,
 freshness line («Ενημερώθηκε …»), then the comparison table — Trolley-style: one row
 per chain, price right-aligned and bold, the cheapest row raised as a white card.
+
+---
+
+# v2 — discovery and trust (2026-11-12)
+
+Owner, 2026-11-10: «find what they want fast and not only by searching — they scroll
+and see things they like»; «price history with actual real data»; «as refined as
+possible», taking the patterns of the biggest apps. What we take, and from whom:
+
+| Pattern | Seen in | Where it goes here |
+|---|---|---|
+| Home = a stack of rails, one reason each, «Όλες» to the full list | Wolt, efood, Amazon | Home (server-driven: `GET /api/v1/feed`) |
+| Aisle shortcuts at the top | Wolt, efood | Category chips row under the search |
+| «Recently viewed», «because you looked at…» | Amazon | «Είδες πρόσφατα» rail; interest-ordered department rails |
+| Grey placeholders while loading, never a blank screen | all of them | `ui/skeleton` |
+| «Added · Undo» bar instead of a silent state change | Wolt, Gmail | `ui/toast` |
+| Regular price as a line, promotions as marks; facts in words | Keepa, Skroutz, Trolley | Product page «Ιστορικό τιμής» |
+
+**Not taken, on purpose:** a «most popular» ranking. On 2026-11-11 there were 19 offer
+clicks from 5 visitors in 30 days. The server shows «Δημοφιλή τώρα» only past a real
+traffic threshold; the app just draws the rails it is sent.
+
+## Foundation (APP-500a/b) — use it, do not rebuild it
+- Data: `useApi(key, fetcher)` (`lib/use-api.ts`) — cached, works offline, `stale` flag →
+  `<StaleBanner>`. No hand-written fetch effects in screens.
+- Loading: `ui/skeleton` (`RailSkeleton`, `GridSkeleton`, `DealCardSkeleton`), not spinners.
+- Feedback: `showToast` (`ui/toast`), `tap()`/`success()` (`lib/haptics`).
+- On-device signals: `recordView` (`lib/recently-viewed`), `noteInterest` /
+  `topInterests` (`lib/interest`, consent-gated inside), `useImpressionTracker(page)`
+  (`lib/impressions`, consent-gated inside).
+- Cards: `DealCardView` already carries badge, chain line, price, one honest tag, «+».
+
+## Home v2 (top to bottom)
+1. Header: «Π» mark, settings, list badge (unchanged).
+2. Hero headline + trust line — kept (it is the brand), spacing tightened so the first
+   rail starts on the first screen of a 390×844 phone.
+3. Search pill — sticks to the top once the hero scrolls away.
+4. Category chips: horizontal, line icon + short label, tap → Προσφορές with that
+   department. Replaces the category grid at the bottom of the page.
+5. Chain strip (logos + counts).
+6. «Είδες πρόσφατα» — only when the shopper has opened offers; compact cards
+   (thumbnail, name, price), newest first, tap opens the offer.
+7. The feed's sections in the SERVER's order. Each: serif title, grey subtitle when
+   present, «Όλες →» when `seeAll` is not null (→ Προσφορές with those parameters),
+   a horizontal rail of `DealCardView` (two cards and a peek). The vertical list is
+   virtualised (20+ rails): rails below the fold mount as they approach.
+8. The green banner sits after the fourth rail.
+9. Last: a full-width «Δες όλες τις N προσφορές» button.
+- Request: `api.feed({ chains: settings.myChains, cats: topInterests(3).categories })`
+  through `useApi` (key includes both lists). Pull to refresh. Skeleton = hero +
+  three `RailSkeleton`s. Offline → cached feed + `StaleBanner`.
+- Impressions: every rail uses `useImpressionTracker('home:' + section.id)`.
+- An unknown section id is just another rail. No rail is hard-coded in the app.
+
+## Product page v2
+- On load: `recordView(offer)`, `noteInterest('view', …)`. Adding to the list and the
+  heart call `noteInterest('list_add' | 'favourite', …)`. Skeleton instead of a spinner.
+- **«Ιστορικό τιμής»** is built on `timeline` (`PriceTimeline`, server lib
+  `src/lib/price-timeline.ts` — read its header):
+  - no `timeline`, or `quality` 'none' → nothing.
+  - `quality` 'thin' → one line: «Παρακολουθούμε αυτή την τιμή από {ημ/νία}.»
+  - `reliable === false` → one line, no chart, no numbers: «Δεν έχουμε ακόμα
+    αξιόπιστο ιστορικό τιμής για αυτό το προϊόν.»
+  - otherwise the chart: time from `since` to today. **Shelf** steps = one solid
+    stepped line («Κανονική τιμή», ink colour). **Promos** = red dots; a short
+    horizontal red segment only when `until` is known or the promo is `ongoing`
+    (never draw a promo as lasting until the next point). The price on screen is the
+    last, larger dot. Two or three horizontal gridlines with price labels. Range
+    chips 1Μ / 3Μ / 6Μ / Όλα (default Όλα). Press-and-drag shows a marker with date,
+    price and «Κανονική τιμή» or «Προσφορά».
+  - Facts under the chart, in words, each only when true (max three):
+    «Η χαμηλότερη τιμή από {μήνας}» (green pill, `stats.currentIsLowest`);
+    «Χαμηλότερη που έχουμε δει: {τιμή} ({ημ/νία})»; «Κανονική τιμή: {shelfNow}»;
+    «Η κανονική τιμή ανέβηκε/έπεσε {|shelfChangePct|}% από {μήνας}» (only when
+    |pct| ≥ 1); «Σε προσφορά {promoCount} φορές από {μήνας}» (only when ≥ 2).
+  - Footnote: «Παρακολουθούμε την τιμή από {ημ/νία}.»
+  - No percentage is computed in the app. The only «% off» the app prints is the
+    server's (`offer.percent`, `offer.baseline`).
+- **Comparison:** unchanged table. When there are no rows: a quiet line «Δεν βρήκαμε
+  το ίδιο προϊόν σε άλλο κατάστημα ακόμα» and a secondary button «Ψάξε παρόμοια» →
+  Search with the product title.

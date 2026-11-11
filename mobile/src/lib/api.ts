@@ -2,8 +2,9 @@
 // The response types are imported from the server's own contract file, so a
 // field rename there fails this app's type-check instead of a phone.
 import type { DealCard } from '@shared/api/deal-card';
+import type { PriceTimeline } from '@shared/price-timeline';
 
-export type { DealCard };
+export type { DealCard, PriceTimeline };
 
 // EXPO_PUBLIC_API_URL points a dev build at a preview deployment or a local
 // server (e.g. http://192.168.1.20:3000); production builds use the live site.
@@ -95,8 +96,25 @@ export type OfferResponse = {
   offer: DealCard & { description: string | null; active: boolean; leafletUrl: string | null };
   comparison: ComparisonRow[];
   history: PriceHistory;
+  // Shelf price as steps + promos as points, full history (lib/price-timeline
+  // on the server). Optional: a response cached before 2026-11-12 has none.
+  // Draw a chart only when `timeline.reliable && timeline.quality === 'ok'`.
+  timeline?: PriceTimeline;
   similar: DealCard[];
 };
+
+// GET /api/v1/feed — the home screen as ordered rails. Titles, order and which
+// rails exist are the server's decision; the app draws whatever it is given
+// and treats unknown `id`s like any other rail. `seeAll` = parameters for the
+// Προσφορές tab's «Όλες» link (null: no link).
+export type FeedSection = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  seeAll: { chain?: string; category?: string; sort?: DealSort } | null;
+  deals: DealCard[];
+};
+export type FeedResponse = { total: number; sections: FeedSection[] };
 
 function query(params: Record<string, string | number | undefined>): string {
   const q = Object.entries(params)
@@ -108,6 +126,9 @@ function query(params: Record<string, string | number | undefined>): string {
 
 export const api = {
   home: (signal?: AbortSignal) => get<HomeResponse>('/home', signal),
+  // chains = the shopper's stores, cats = their top departments (lib/interest).
+  feed: (q: { chains?: string[]; cats?: string[] } = {}, signal?: AbortSignal) =>
+    get<FeedResponse>(`/feed${query({ chains: q.chains?.join(',') || undefined, cats: q.cats?.join(',') || undefined })}`, signal),
   meta: (signal?: AbortSignal) => get<MetaResponse>('/meta', signal),
   deals: (q: DealsQuery = {}, signal?: AbortSignal) =>
     get<DealsResponse>(
