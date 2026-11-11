@@ -1,61 +1,28 @@
 // Chain names, colours and logos come from the server (/api/v1/meta), not a
 // copy in the app, so a new chain reaches installed apps without an update.
-// Fetched once per app session; cards render the chain id until it arrives.
-// A failed fetch is surfaced (error + retry) instead of swallowed, so screens
-// can stop showing «Φόρτωση…» forever.
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+// Cached on the device (useApi), so it is there offline; cards render the chain
+// id until it arrives. A failed fetch with nothing cached is surfaced (error +
+// retry), so screens can stop showing «Φόρτωση…» forever.
+import { useMemo } from 'react';
 import { api, type Chain, type MetaResponse } from './api';
-
-// An immutable snapshot, replaced on every change: React (and the React
-// Compiler) only notice a store change when the snapshot object is new.
-type Snapshot = { meta: MetaResponse | null; failed: boolean };
-let snap: Snapshot = { meta: null, failed: false };
-let inflight: Promise<void> | null = null;
-const listeners = new Set<() => void>();
-
-function set(next: Snapshot) {
-  snap = next;
-  listeners.forEach((l) => l());
-}
-
-function load(): Promise<void> {
-  if (snap.meta) return Promise.resolve();
-  if (!inflight) {
-    inflight = api
-      .meta()
-      .then((meta) => set({ meta, failed: false }))
-      .catch(() => set({ meta: null, failed: true }))
-      .finally(() => {
-        inflight = null;
-      });
-  }
-  return inflight;
-}
-
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => {
-    listeners.delete(l);
-  };
-};
-const getSnapshot = () => snap;
+import { useApi } from './use-api';
 
 export type MetaState = {
   meta: MetaResponse | null;
+  // True only when there is nothing to show (a stale copy is not an error here;
+  // screens that want to say so read useApi('meta') / the stale banner).
   error: boolean;
   retry: () => void;
 };
 
+// Chains and categories change once a week: a long ttl keeps the strip stable
+// and saves requests; the cached copy still serves offline at any age.
+const META_TTL_MS = 30 * 60 * 1000;
+const fetchMeta = (signal: AbortSignal) => api.meta(signal);
+
 export function useMeta(): MetaState {
-  const { meta, failed } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  useEffect(() => {
-    void load();
-  }, []);
-  const retry = useCallback(() => {
-    if (snap.failed) set({ meta: null, failed: false });
-    void load();
-  }, []);
-  return { meta, error: failed, retry };
+  const { data, error, refresh } = useApi('meta', fetchMeta, { ttlMs: META_TTL_MS });
+  return { meta: data ?? null, error: error && !data, retry: refresh };
 }
 
 // Still an array of chains for existing callers; `error` and `retry` ride

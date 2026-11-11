@@ -1,16 +1,18 @@
 // Αρχική — the website's landing page in the app (HomeClient + Hero): hero and
 // search, chain strip, the three rails from GET /api/v1/home, the banner and
 // the category tiles (GET /api/v1/meta). Layout pieces live in components/home.
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, type HomeResponse } from '@/lib/api';
+import { api } from '@/lib/api';
+import { useApi } from '@/lib/use-api';
 import { dedupeCards } from '@/lib/lists';
 import { useMeta } from '@/lib/chains';
 import { useShoppingList } from '@/lib/shopping-list';
 import { track } from '@/lib/analytics';
-import { Colors, Space } from '@/constants/theme';
+import { StaleBanner } from '@/components/ui/stale-banner';
+import { Colors, Radius, Space, useType } from '@/constants/theme';
 import {
   CategoryGrid,
   ChainStrip,
@@ -25,61 +27,34 @@ import {
 
 export default function HomeScreen() {
   useFocusEffect(useCallback(() => track('page_view', { page: 'home' }), []));
-  const [data, setData] = useState<HomeResponse | null>(null);
-  const [error, setError] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
   const { meta, error: metaError, retry: retryMeta } = useMeta();
   const { items } = useShoppingList();
+  const home = useApi('home', fetchHome);
+  const { refresh } = home;
 
-  const apply = useCallback((home: HomeResponse) => {
-    setData({ ...home, top: dedupeCards(home.top), endingSoon: dedupeCards(home.endingSoon) });
-  }, []);
+  // The rails show each product once; derived here, not stored, so the cache
+  // keeps the server's answer as it came.
+  const data = useMemo(
+    () => (home.data ? { ...home.data, top: dedupeCards(home.data.top), endingSoon: dedupeCards(home.data.endingSoon) } : null),
+    [home.data],
+  );
 
-  // Retry and pull-to-refresh (event handlers, so resetting the error first
-  // is fine there).
-  const load = useCallback(async () => {
-    try {
-      setError(false);
-      apply(await api.home());
-    } catch {
-      setError(true);
-    }
-  }, [apply]);
-
-  // First load: state changes only when the request settles, and not at all
-  // if the screen unmounted meanwhile.
-  useEffect(() => {
-    const ctrl = new AbortController();
-    api
-      .home(ctrl.signal)
-      .then(apply)
-      .catch(() => {
-        if (!ctrl.signal.aborted) setError(true);
-      });
-    return () => ctrl.abort();
-  }, [apply]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
-
-  const onRetry = useCallback(() => {
-    if (error) void load();
+  const onRefresh = useCallback(() => {
+    refresh();
     if (metaError) retryMeta();
-  }, [error, load, metaError, retryMeta]);
+  }, [refresh, metaError, retryMeta]);
 
-  if (error || metaError) {
+  // Nothing to show and nothing cached: the only full-screen failure.
+  if (!data && home.error) {
     return (
       <SafeAreaView style={styles.screen}>
-        <HomeError onRetry={onRetry} />
+        <HomeError onRetry={refresh} />
       </SafeAreaView>
     );
   }
 
-  if (!data || !meta) {
+  if (!data) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.brand} />
@@ -94,12 +69,14 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.brand} />}>
+        refreshControl={<RefreshControl refreshing={home.refreshing} onRefresh={onRefresh} tintColor={Colors.brand} />}>
+        {home.stale ? <StaleBanner updatedAt={home.updatedAt} onRetry={refresh} /> : null}
         <HomeHeader listCount={listCount} />
-        <HomeHero total={data.total} chainCount={meta.chains.length} />
+        <HomeHero total={data.total} chainCount={meta?.chains.length ?? 0} />
         <SearchPill />
         <View style={{ height: Space[5] }} />
-        <ChainStrip chains={meta.chains} />
+        {meta ? <ChainStrip chains={meta.chains} /> : null}
+        {metaError ? <MetaFallback onRetry={retryMeta} /> : null}
 
         <Rail title="Τα βασικά της εβδομάδας" hint="Φθηνότερη προσφορά, ανά κιλό ή λίτρο" deals={data.essentials} width={cardWidth} />
         <Rail
@@ -118,14 +95,44 @@ export default function HomeScreen() {
         />
 
         <PromoBanner total={data.total} />
-        <CategoryGrid categories={meta.categories} />
+        {meta ? <CategoryGrid categories={meta.categories} /> : null}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+const fetchHome = (signal: AbortSignal) => api.home(signal);
+
+// /meta failed but /home loaded: the page still works, only the chain strip and
+// category tiles are missing — say so in one row instead of blocking the screen.
+function MetaFallback({ onRetry }: { onRetry: () => void }) {
+  const T = useType();
+  return (
+    <View style={styles.fallback}>
+      <Text style={[T.text.caption, { flexShrink: 1, color: Colors.ink2 }]}>Δεν φορτώθηκαν τα καταστήματα</Text>
+      <Pressable onPress={onRetry} accessibilityRole="button" style={styles.fallbackBtn}>
+        <Text style={[T.text.caption, { color: Colors.brand, textDecorationLine: 'underline' }]}>Δοκίμασε ξανά</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg },
   content: { padding: Space[4], paddingBottom: Space[7] * 2 },
+  fallback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    columnGap: Space[3],
+    minHeight: 44,
+    paddingHorizontal: Space[3],
+    marginBottom: Space[3],
+    backgroundColor: Colors.bgSoft,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  fallbackBtn: { minHeight: 44, justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg },
 });

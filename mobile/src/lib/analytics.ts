@@ -1,6 +1,7 @@
 // Anonymous usage statistics, mirroring the website's track-event schema
 // (src/actions/track-event.ts). Nothing is sent unless the shopper accepted;
 // failures are swallowed — analytics must never break or slow the app.
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from './api';
 import { getSettings, updateSettings } from './settings';
@@ -68,7 +69,7 @@ async function send(eventType: EventType, fields: EventFields) {
     await fetch(`${API_BASE}/api/v1/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventType, ...fields, ...(id ? { sessionId: id } : {}), platform: 'android' }),
+      body: JSON.stringify({ eventType, ...fields, ...(id ? { sessionId: id } : {}), platform: Platform.OS }),
       signal: ctrl.signal,
     });
   } catch {

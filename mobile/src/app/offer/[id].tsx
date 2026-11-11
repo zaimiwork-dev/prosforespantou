@@ -2,7 +2,7 @@
 // PriceHistory) from GET /api/v1/offers/:id, laid out per DESIGN.md «Product
 // page». The server answers for ended offers too (shared links, saved lists)
 // with active:false, so an old price is never shown as if it were current.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -11,10 +11,12 @@ import Svg, { Path } from 'react-native-svg';
 import { expiryInfo, formatFullDate } from '@shared/expiry-label';
 import { api, ApiError, type OfferResponse } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { useApi } from '@/lib/use-api';
 import { useChains } from '@/lib/chains';
 import { favouriteKeyFor, toggleFavourite, useFavourites } from '@/lib/favourites';
 import { formatPrice, formatUnitPrice } from '@/lib/format';
 import { addToList, useShoppingList } from '@/lib/shopping-list';
+import { StaleBanner } from '@/components/ui/stale-banner';
 import { DealCardView } from '@/components/deal-card';
 import { ComparisonSection } from '@/components/offer/comparison-section';
 import { PriceHistoryChart } from '@/components/offer/price-history-chart';
@@ -22,40 +24,27 @@ import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constan
 
 const VERDICT_LABEL = { lowest: 'Χαμηλότερη τιμή', good: 'Καλή τιμή' } as const;
 
-type Result = { key: string; data: OfferResponse | null; status: number | null };
-
 export default function OfferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
-  const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<Result | null>(null);
-  const key = `${id}:${attempt}`;
-
-  // State is stamped with the request it belongs to, so a new id (tapping a
-  // comparison row reuses nothing) or a retry reads as loading without any
-  // synchronous setState in the effect.
-  useEffect(() => {
-    const ctrl = new AbortController();
-    api
-      .offer(id, ctrl.signal)
-      .then((data) => setResult({ key, data, status: null }))
-      .catch((e) => {
-        if (!ctrl.signal.aborted) setResult({ key, data: null, status: e instanceof ApiError ? e.status : 0 });
-      });
-    return () => ctrl.abort();
-  }, [id, key]);
-
-  const current = result?.key === key ? result : null;
-  const data = current?.data ?? null;
+  // A 404 is an answer («no such offer»), not a connection problem: remember
+  // which id it was for, so the error view can say so and not offer a retry.
+  const [missingId, setMissingId] = useState<string | null>(null);
+  const { data, error, refresh, stale, updatedAt } = useApi<OfferResponse>(`offer:${id}`, (signal) =>
+    api.offer(id, signal).catch((e) => {
+      if (e instanceof ApiError && e.status === 404) setMissingId(id);
+      throw e;
+    }),
+  );
   const chainName = data ? chains.find((c) => c.id === data.offer.chain)?.name : undefined;
   const headerOptions = {
     title: chainName ?? 'Προσφορά',
     headerTitleStyle: { fontFamily: Fonts.sans700, fontSize: T.title, color: Colors.ink },
   };
 
-  if (!current) {
+  if (!data && !error) {
     return (
       <View style={styles.center}>
         <Stack.Screen options={headerOptions} />
@@ -65,7 +54,7 @@ export default function OfferScreen() {
   }
 
   if (!data) {
-    const notFound = current.status === 404;
+    const notFound = missingId === id;
     return (
       <View style={styles.center}>
         <Stack.Screen options={headerOptions} />
@@ -79,7 +68,7 @@ export default function OfferScreen() {
             <Text style={styles.primaryText}>Πίσω</Text>
           </Pressable>
         ) : (
-          <Pressable style={styles.primary} onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button">
+          <Pressable style={styles.primary} onPress={refresh} accessibilityRole="button">
             <Text style={styles.primaryText}>Δοκίμασε ξανά</Text>
           </Pressable>
         )}
@@ -90,12 +79,12 @@ export default function OfferScreen() {
   return (
     <>
       <Stack.Screen options={headerOptions} />
-      <OfferContent data={data} />
+      <OfferContent data={data} banner={stale ? <StaleBanner updatedAt={updatedAt} onRetry={refresh} /> : null} />
     </>
   );
 }
 
-function OfferContent({ data }: { data: OfferResponse }) {
+function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode }) {
   const { offer, comparison, history, similar } = data;
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
@@ -134,6 +123,7 @@ function OfferContent({ data }: { data: OfferResponse }) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      {banner}
       {muted ? (
         <View style={styles.ended} accessibilityRole="alert">
           <Text style={styles.endedText}>Η προσφορά έχει λήξει</Text>
