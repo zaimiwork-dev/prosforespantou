@@ -18,9 +18,25 @@ import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constan
 import { track } from '@/lib/analytics';
 import { formatPrice, formatUnitPrice } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
-import { addToList, useShoppingList } from '@/lib/shopping-list';
+import { addToList, changeQuantity, useShoppingList } from '@/lib/shopping-list';
+import { tap } from '@/lib/haptics';
+import { Tag } from '@/components/ui/tag';
+import { showToast } from '@/components/ui/toast';
 
 const ADD_SIZE = 48;
+
+// One honest line, first match wins. Same facts as the website card's chips;
+// nothing here is invented.
+function tagFor(deal: Deal): { text: string; tone: 'good' | 'neutral' } | null {
+  if (deal.isCheapest && deal.compareChains >= 2) {
+    const others = deal.compareChains - 1;
+    return { text: others === 1 ? 'Φθηνότερο από 1 άλλο' : `Φθηνότερο από ${others} άλλα`, tone: 'good' };
+  }
+  if (deal.verdict === 'lowest') return { text: 'Χαμηλότερη τιμή', tone: 'good' };
+  if (deal.verdict === 'good') return { text: 'Καλή τιμή', tone: 'good' };
+  if (deal.compareChains >= 2) return { text: `Σε ${deal.compareChains} καταστήματα`, tone: 'neutral' };
+  return null;
+}
 
 export function DealCardView({
   deal,
@@ -70,6 +86,19 @@ export function DealCardView({
       : deal.essential?.label
         ? { text: deal.essential.label, urgent: false }
         : null;
+
+  const tag = tagFor(deal);
+
+  const add = () => {
+    tap();
+    const have = items.find((i) => i.id === deal.id);
+    void addToList(deal);
+    showToast({
+      message: have ? `Στη λίστα: ${have.quantity + 1} τεμάχια` : 'Προστέθηκε στη λίστα',
+      actionLabel: 'Αναίρεση',
+      onAction: () => void changeQuantity(deal.id, -1),
+    });
+  };
 
   const open = () => {
     track('deal_click', {
@@ -143,12 +172,18 @@ export function DealCardView({
         {struck ? <Text style={[styles.secondary, styles.was]}>{formatPrice(deal.originalPrice!)}</Text> : null}
       </Pressable>
 
+      {tag ? (
+        <Pressable onPress={open} accessible={false} style={styles.tagRow}>
+          <Tag text={tag.text} tone={tag.tone} />
+        </Pressable>
+      ) : null}
+
       {/* «+» sits on the photo's bottom-right corner (Wolt/Instacart): beside
           the price it no longer fit «11,60 €» in a rail card and wrapped. A
           sibling of the card's Pressable, so a tap never opens the offer. */}
       {imageH > 0 ? (
         <Pressable
-          onPress={() => addToList(deal)}
+          onPress={add}
           accessibilityRole="button"
           accessibilityLabel="Προσθήκη στη λίστα"
           accessibilityState={{ selected: added }}
@@ -226,5 +261,6 @@ const makeStyles = (T: TypeScale) =>
       borderColor: Colors.surface,
     },
     addDone: { backgroundColor: Colors.brand2 },
+    tagRow: { paddingHorizontal: Space[2], marginTop: Space[1] },
     notes: { paddingHorizontal: Space[3], gap: 2 },
   });

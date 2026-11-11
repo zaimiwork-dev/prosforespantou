@@ -60,6 +60,10 @@ function subscribe(l: () => void) {
   };
 }
 
+// For non-React modules that must react to a settings change (the interest
+// profile erases itself when consent is withdrawn).
+export const subscribeSettings = subscribe;
+
 export function useSettings(): Settings {
   return useSyncExternalStore(subscribe, () => state, () => DEFAULTS);
 }
