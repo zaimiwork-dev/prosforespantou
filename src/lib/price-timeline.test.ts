@@ -266,3 +266,80 @@ describe('quality, since, daysTracked', () => {
     expect(t.promos[0].at).toBe(now.toISOString());
   });
 });
+
+describe('reliable', () => {
+  const shelfAndOffer = (shelfPrice: number, offerPrice: number, mixedSkus = false) =>
+    build({
+      snapshots: [
+        { price: shelfPrice, kind: 'normal', recordedAt: daysAgo(60) },
+        { price: offerPrice, kind: 'mono', recordedAt: daysAgo(5) },
+      ],
+      offer: { price: offerPrice, firstSeenAt: daysAgo(5), active: true },
+      mixedSkus,
+    });
+
+  it('is true for an ordinary offer under its shelf price', () => {
+    const t = shelfAndOffer(4.29, 1.72);
+    expect(t.reliable).toBe(true);
+    expect(t.stats.currentIsLowest).toBe(true);
+  });
+
+  it('is false when several SKUs of the chain share the product: no «lowest» claim', () => {
+    const t = shelfAndOffer(4.29, 1.72, true);
+    expect(t.reliable).toBe(false);
+    expect(t.stats.currentIsLowest).toBe(false);
+  });
+
+  it('is false when the shelf price is more than 3x away from the price on screen', () => {
+    expect(shelfAndOffer(20.31, 6.59).reliable).toBe(false);
+    expect(shelfAndOffer(2, 6.59).reliable).toBe(false);
+  });
+
+  it('is false after a suspect shelf jump', () => {
+    const t = build({
+      snapshots: [
+        { price: 1.2, kind: 'normal', recordedAt: daysAgo(90) },
+        { price: 12, kind: 'normal', recordedAt: daysAgo(30) },
+      ],
+    });
+    expect(t.stats.suspect).toBe(true);
+    expect(t.reliable).toBe(false);
+  });
+});
+
+describe('foreign points', () => {
+  it('drops a promo more than 3x away from the shelf price of its day', () => {
+    const t = build({
+      snapshots: [
+        { price: 9.95, kind: 'normal', recordedAt: daysAgo(120) },
+        { price: 2.99, kind: null, recordedAt: daysAgo(100) }, // another product, filed here before a re-mapping
+        { price: 7.49, kind: 'strikethrough', recordedAt: daysAgo(3) },
+      ],
+      offer: { price: 7.49, firstSeenAt: daysAgo(3), active: true },
+    });
+    expect(t.promos.map((p) => p.price)).toEqual([7.49]);
+    expect(t.stats.lowest?.price).toBe(7.49);
+  });
+
+  it('keeps a genuine deep discount (−60 % is 2.5x, inside the band)', () => {
+    const t = build({
+      snapshots: [
+        { price: 4.29, kind: 'normal', recordedAt: daysAgo(120) },
+        { price: 1.72, kind: 'strikethrough', recordedAt: daysAgo(3) },
+      ],
+      offer: { price: 1.72, firstSeenAt: daysAgo(3), active: true },
+    });
+    expect(t.promos).toHaveLength(1);
+  });
+
+  it('uses the price on screen as the reference when there is no shelf price', () => {
+    const t = build({
+      snapshots: [
+        { price: 0.5, kind: 'mono', recordedAt: daysAgo(50) },
+        { price: 2.1, kind: 'mono', recordedAt: daysAgo(20) },
+      ],
+      offer: { price: 2, firstSeenAt: daysAgo(2), active: true },
+    });
+    expect(t.promos.map((p) => p.price)).toEqual([2.1, 2]);
+  });
+});

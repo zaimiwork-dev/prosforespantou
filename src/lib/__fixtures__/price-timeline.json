@@ -1,1873 +1,1884 @@
 [
- {
-  "label": "0: mymarket - promo-only mono",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 3.18,
-     "kind": null,
-     "recordedAt": "2026-06-08T11:27:41.714Z"
+  {
+    "label": "0: mymarket - promo-only mono",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 3.18,
+          "kind": null,
+          "recordedAt": "2026-06-08T11:27:41.714Z"
+        },
+        {
+          "price": 3.24,
+          "kind": "mono",
+          "recordedAt": "2026-08-10T01:09:58.518Z"
+        },
+        {
+          "price": 3.18,
+          "kind": "mono",
+          "recordedAt": "2026-08-19T00:57:15.439Z"
+        },
+        {
+          "price": 3.54,
+          "kind": "mono",
+          "recordedAt": "2026-09-02T01:59:04.210Z"
+        },
+        {
+          "price": 3.18,
+          "kind": "mono",
+          "recordedAt": "2026-09-03T02:07:45.666Z"
+        },
+        {
+          "price": 3.54,
+          "kind": "mono",
+          "recordedAt": "2026-09-07T02:06:18.927Z"
+        },
+        {
+          "price": 3.21,
+          "kind": "mono",
+          "recordedAt": "2026-09-16T02:37:23.262Z"
+        },
+        {
+          "price": 3.51,
+          "kind": "mono",
+          "recordedAt": "2026-10-01T03:09:57.428Z"
+        },
+        {
+          "price": 3.21,
+          "kind": "mono",
+          "recordedAt": "2026-10-15T02:36:47.862Z"
+        },
+        {
+          "price": 3.48,
+          "kind": "mono",
+          "recordedAt": "2026-11-02T03:38:10.023Z"
+        },
+        {
+          "price": 3.54,
+          "kind": "mono",
+          "recordedAt": "2026-11-05T04:17:38.310Z"
+        },
+        {
+          "price": 3.51,
+          "kind": "mono",
+          "recordedAt": "2026-11-11T03:46:43.726Z"
+        }
+      ],
+      "offer": {
+        "price": 3.51,
+        "firstSeenAt": "2026-11-11T03:46:43.490Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
     },
-    {
-     "price": 3.24,
-     "kind": "mono",
-     "recordedAt": "2026-08-10T01:09:58.518Z"
-    },
-    {
-     "price": 3.18,
-     "kind": "mono",
-     "recordedAt": "2026-08-19T00:57:15.439Z"
-    },
-    {
-     "price": 3.54,
-     "kind": "mono",
-     "recordedAt": "2026-09-02T01:59:04.210Z"
-    },
-    {
-     "price": 3.18,
-     "kind": "mono",
-     "recordedAt": "2026-09-03T02:07:45.666Z"
-    },
-    {
-     "price": 3.54,
-     "kind": "mono",
-     "recordedAt": "2026-09-07T02:06:18.927Z"
-    },
-    {
-     "price": 3.21,
-     "kind": "mono",
-     "recordedAt": "2026-09-16T02:37:23.262Z"
-    },
-    {
-     "price": 3.51,
-     "kind": "mono",
-     "recordedAt": "2026-10-01T03:09:57.428Z"
-    },
-    {
-     "price": 3.21,
-     "kind": "mono",
-     "recordedAt": "2026-10-15T02:36:47.862Z"
-    },
-    {
-     "price": 3.48,
-     "kind": "mono",
-     "recordedAt": "2026-11-02T03:38:10.023Z"
-    },
-    {
-     "price": 3.54,
-     "kind": "mono",
-     "recordedAt": "2026-11-05T04:17:38.310Z"
-    },
-    {
-     "price": 3.51,
-     "kind": "mono",
-     "recordedAt": "2026-11-11T03:46:43.726Z"
+    "expected": {
+      "since": "2026-06-08T11:27:41.714Z",
+      "daysTracked": 156,
+      "shelf": [],
+      "promos": [
+        {
+          "at": "2026-06-08T11:27:41.714Z",
+          "until": null,
+          "price": 3.18,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-10T01:09:58.518Z",
+          "until": null,
+          "price": 3.24,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-19T00:57:15.439Z",
+          "until": null,
+          "price": 3.18,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-02T01:59:04.210Z",
+          "until": null,
+          "price": 3.54,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-03T02:07:45.666Z",
+          "until": null,
+          "price": 3.18,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-07T02:06:18.927Z",
+          "until": null,
+          "price": 3.54,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-16T02:37:23.262Z",
+          "until": null,
+          "price": 3.21,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-01T03:09:57.428Z",
+          "until": null,
+          "price": 3.51,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-15T02:36:47.862Z",
+          "until": null,
+          "price": 3.21,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-02T03:38:10.023Z",
+          "until": null,
+          "price": 3.48,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-05T04:17:38.310Z",
+          "until": null,
+          "price": 3.54,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-11T03:46:43.726Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 3.51,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": null,
+        "shelfFirst": null,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 3.18,
+          "at": "2026-06-08T11:27:41.714Z"
+        },
+        "highest": {
+          "price": 3.54,
+          "at": "2026-09-02T01:59:04.210Z"
+        },
+        "promoCount": 12,
+        "currentPrice": 3.51,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "offer": {
-    "price": 3.51,
-    "firstSeenAt": "2026-11-11T03:46:43.490Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-06-08T11:27:41.714Z",
-   "daysTracked": 156,
-   "shelf": [],
-   "promos": [
-    {
-     "at": "2026-06-08T11:27:41.714Z",
-     "until": null,
-     "price": 3.18,
-     "kind": "legacy",
-     "ongoing": false
+  {
+    "label": "2: mymarket - shelf + 25 promos",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 7.66,
+          "kind": null,
+          "recordedAt": "2026-06-08T12:48:27.628Z"
+        },
+        {
+          "price": 6.71,
+          "kind": null,
+          "recordedAt": "2026-06-10T02:36:45.611Z"
+        },
+        {
+          "price": 4.26,
+          "kind": null,
+          "recordedAt": "2026-06-10T10:39:07.757Z"
+        },
+        {
+          "price": 3.97,
+          "kind": "mono",
+          "recordedAt": "2026-06-25T02:50:00.683Z"
+        },
+        {
+          "price": 4.87,
+          "kind": "mono",
+          "recordedAt": "2026-06-29T02:44:16.452Z"
+        },
+        {
+          "price": 4.26,
+          "kind": "mono",
+          "recordedAt": "2026-07-22T01:47:53.687Z"
+        },
+        {
+          "price": 6.71,
+          "kind": "mono",
+          "recordedAt": "2026-07-22T01:49:20.768Z"
+        },
+        {
+          "price": 4.08,
+          "kind": "mono",
+          "recordedAt": "2026-07-31T01:53:08.328Z"
+        },
+        {
+          "price": 6.42,
+          "kind": "mono",
+          "recordedAt": "2026-07-31T01:54:09.994Z"
+        },
+        {
+          "price": 3.96,
+          "kind": "mono",
+          "recordedAt": "2026-08-03T02:07:11.962Z"
+        },
+        {
+          "price": 6.23,
+          "kind": "mono",
+          "recordedAt": "2026-08-03T02:08:10.757Z"
+        },
+        {
+          "price": 4.87,
+          "kind": "mono",
+          "recordedAt": "2026-08-06T02:03:23.497Z"
+        },
+        {
+          "price": 7.66,
+          "kind": "mono",
+          "recordedAt": "2026-08-06T02:04:33.846Z"
+        },
+        {
+          "price": 4.69,
+          "kind": "mono",
+          "recordedAt": "2026-08-14T01:34:21.365Z"
+        },
+        {
+          "price": 7.38,
+          "kind": "mono",
+          "recordedAt": "2026-08-14T01:35:19.877Z"
+        },
+        {
+          "price": 4.26,
+          "kind": "mono",
+          "recordedAt": "2026-08-19T01:02:30.512Z"
+        },
+        {
+          "price": 6.71,
+          "kind": "mono",
+          "recordedAt": "2026-08-19T01:03:49.099Z"
+        },
+        {
+          "price": 3.96,
+          "kind": "mono",
+          "recordedAt": "2026-09-03T02:12:31.341Z"
+        },
+        {
+          "price": 6.09,
+          "kind": "normal",
+          "recordedAt": "2026-09-06T09:54:29.859Z"
+        },
+        {
+          "price": 4.08,
+          "kind": "mono",
+          "recordedAt": "2026-09-16T02:42:18.990Z"
+        },
+        {
+          "price": 3.96,
+          "kind": "mono",
+          "recordedAt": "2026-09-24T02:23:49.386Z"
+        },
+        {
+          "price": 4.08,
+          "kind": "mono",
+          "recordedAt": "2026-09-28T02:45:12.862Z"
+        },
+        {
+          "price": 3.96,
+          "kind": "mono",
+          "recordedAt": "2026-09-30T03:13:45.234Z"
+        },
+        {
+          "price": 4.87,
+          "kind": "mono",
+          "recordedAt": "2026-10-15T02:39:37.138Z"
+        },
+        {
+          "price": 4.04,
+          "kind": "mono",
+          "recordedAt": "2026-10-26T02:27:22.678Z"
+        },
+        {
+          "price": 4.69,
+          "kind": "mono",
+          "recordedAt": "2026-11-05T04:19:42.414Z"
+        }
+      ],
+      "offer": {
+        "price": 4.69,
+        "firstSeenAt": "2026-11-11T03:48:20.487Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
     },
-    {
-     "at": "2026-08-10T01:09:58.518Z",
-     "until": null,
-     "price": 3.24,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-19T00:57:15.439Z",
-     "until": null,
-     "price": 3.18,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-02T01:59:04.210Z",
-     "until": null,
-     "price": 3.54,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-03T02:07:45.666Z",
-     "until": null,
-     "price": 3.18,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-07T02:06:18.927Z",
-     "until": null,
-     "price": 3.54,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-16T02:37:23.262Z",
-     "until": null,
-     "price": 3.21,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-01T03:09:57.428Z",
-     "until": null,
-     "price": 3.51,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-15T02:36:47.862Z",
-     "until": null,
-     "price": 3.21,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-02T03:38:10.023Z",
-     "until": null,
-     "price": 3.48,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-05T04:17:38.310Z",
-     "until": null,
-     "price": 3.54,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-11T03:46:43.726Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 3.51,
-     "kind": "mono",
-     "ongoing": true
+    "expected": {
+      "since": "2026-06-08T12:48:27.628Z",
+      "daysTracked": 156,
+      "shelf": [
+        {
+          "from": "2026-09-06T09:54:29.859Z",
+          "to": "2026-11-08T12:39:50.752Z",
+          "price": 6.09
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-06-08T12:48:27.628Z",
+          "until": null,
+          "price": 7.66,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-10T02:36:45.611Z",
+          "until": null,
+          "price": 6.71,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-10T10:39:07.757Z",
+          "until": null,
+          "price": 4.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-25T02:50:00.683Z",
+          "until": null,
+          "price": 3.97,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-29T02:44:16.452Z",
+          "until": null,
+          "price": 4.87,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-22T01:47:53.687Z",
+          "until": null,
+          "price": 4.26,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-22T01:49:20.768Z",
+          "until": null,
+          "price": 6.71,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-31T01:53:08.328Z",
+          "until": null,
+          "price": 4.08,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-31T01:54:09.994Z",
+          "until": null,
+          "price": 6.42,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-03T02:07:11.962Z",
+          "until": null,
+          "price": 3.96,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-03T02:08:10.757Z",
+          "until": null,
+          "price": 6.23,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-06T02:03:23.497Z",
+          "until": null,
+          "price": 4.87,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-06T02:04:33.846Z",
+          "until": null,
+          "price": 7.66,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-14T01:34:21.365Z",
+          "until": null,
+          "price": 4.69,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-14T01:35:19.877Z",
+          "until": null,
+          "price": 7.38,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-19T01:02:30.512Z",
+          "until": null,
+          "price": 4.26,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-19T01:03:49.099Z",
+          "until": null,
+          "price": 6.71,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-03T02:12:31.341Z",
+          "until": null,
+          "price": 3.96,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-16T02:42:18.990Z",
+          "until": null,
+          "price": 4.08,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-24T02:23:49.386Z",
+          "until": null,
+          "price": 3.96,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-28T02:45:12.862Z",
+          "until": null,
+          "price": 4.08,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-30T03:13:45.234Z",
+          "until": null,
+          "price": 3.96,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-15T02:39:37.138Z",
+          "until": null,
+          "price": 4.87,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-26T02:27:22.678Z",
+          "until": null,
+          "price": 4.04,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-05T04:19:42.414Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 4.69,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": 6.09,
+        "shelfFirst": 6.09,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 3.96,
+          "at": "2026-08-03T02:07:11.962Z"
+        },
+        "highest": {
+          "price": 7.66,
+          "at": "2026-06-08T12:48:27.628Z"
+        },
+        "promoCount": 25,
+        "currentPrice": 4.69,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "stats": {
-    "shelfNow": null,
-    "shelfFirst": null,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 3.18,
-     "at": "2026-06-08T11:27:41.714Z"
-    },
-    "highest": {
-     "price": 3.54,
-     "at": "2026-09-02T01:59:04.210Z"
-    },
-    "promoCount": 12,
-    "currentPrice": 3.51,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "2: mymarket - shelf + 25 promos",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 7.66,
-     "kind": null,
-     "recordedAt": "2026-06-08T12:48:27.628Z"
-    },
-    {
-     "price": 6.71,
-     "kind": null,
-     "recordedAt": "2026-06-10T02:36:45.611Z"
-    },
-    {
-     "price": 4.26,
-     "kind": null,
-     "recordedAt": "2026-06-10T10:39:07.757Z"
-    },
-    {
-     "price": 3.97,
-     "kind": "mono",
-     "recordedAt": "2026-06-25T02:50:00.683Z"
-    },
-    {
-     "price": 4.87,
-     "kind": "mono",
-     "recordedAt": "2026-06-29T02:44:16.452Z"
-    },
-    {
-     "price": 4.26,
-     "kind": "mono",
-     "recordedAt": "2026-07-22T01:47:53.687Z"
-    },
-    {
-     "price": 6.71,
-     "kind": "mono",
-     "recordedAt": "2026-07-22T01:49:20.768Z"
-    },
-    {
-     "price": 4.08,
-     "kind": "mono",
-     "recordedAt": "2026-07-31T01:53:08.328Z"
-    },
-    {
-     "price": 6.42,
-     "kind": "mono",
-     "recordedAt": "2026-07-31T01:54:09.994Z"
-    },
-    {
-     "price": 3.96,
-     "kind": "mono",
-     "recordedAt": "2026-08-03T02:07:11.962Z"
-    },
-    {
-     "price": 6.23,
-     "kind": "mono",
-     "recordedAt": "2026-08-03T02:08:10.757Z"
-    },
-    {
-     "price": 4.87,
-     "kind": "mono",
-     "recordedAt": "2026-08-06T02:03:23.497Z"
-    },
-    {
-     "price": 7.66,
-     "kind": "mono",
-     "recordedAt": "2026-08-06T02:04:33.846Z"
-    },
-    {
-     "price": 4.69,
-     "kind": "mono",
-     "recordedAt": "2026-08-14T01:34:21.365Z"
-    },
-    {
-     "price": 7.38,
-     "kind": "mono",
-     "recordedAt": "2026-08-14T01:35:19.877Z"
-    },
-    {
-     "price": 4.26,
-     "kind": "mono",
-     "recordedAt": "2026-08-19T01:02:30.512Z"
-    },
-    {
-     "price": 6.71,
-     "kind": "mono",
-     "recordedAt": "2026-08-19T01:03:49.099Z"
-    },
-    {
-     "price": 3.96,
-     "kind": "mono",
-     "recordedAt": "2026-09-03T02:12:31.341Z"
-    },
-    {
-     "price": 6.09,
-     "kind": "normal",
-     "recordedAt": "2026-09-06T09:54:29.859Z"
-    },
-    {
-     "price": 4.08,
-     "kind": "mono",
-     "recordedAt": "2026-09-16T02:42:18.990Z"
-    },
-    {
-     "price": 3.96,
-     "kind": "mono",
-     "recordedAt": "2026-09-24T02:23:49.386Z"
-    },
-    {
-     "price": 4.08,
-     "kind": "mono",
-     "recordedAt": "2026-09-28T02:45:12.862Z"
-    },
-    {
-     "price": 3.96,
-     "kind": "mono",
-     "recordedAt": "2026-09-30T03:13:45.234Z"
-    },
-    {
-     "price": 4.87,
-     "kind": "mono",
-     "recordedAt": "2026-10-15T02:39:37.138Z"
-    },
-    {
-     "price": 4.04,
-     "kind": "mono",
-     "recordedAt": "2026-10-26T02:27:22.678Z"
-    },
-    {
-     "price": 4.69,
-     "kind": "mono",
-     "recordedAt": "2026-11-05T04:19:42.414Z"
-    }
-   ],
-   "offer": {
-    "price": 4.69,
-    "firstSeenAt": "2026-11-11T03:48:20.487Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-06-08T12:48:27.628Z",
-   "daysTracked": 156,
-   "shelf": [
-    {
-     "from": "2026-09-06T09:54:29.859Z",
-     "to": "2026-11-08T12:39:50.752Z",
-     "price": 6.09
+  {
+    "label": "3: mymarket - two shelf steps, price fell",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 1.53,
+          "kind": null,
+          "recordedAt": "2026-06-10T10:17:27.868Z"
+        },
+        {
+          "price": 1.83,
+          "kind": null,
+          "recordedAt": "2026-06-10T10:22:17.847Z"
+        },
+        {
+          "price": 1.53,
+          "kind": null,
+          "recordedAt": "2026-06-11T02:28:42.422Z"
+        },
+        {
+          "price": 2.29,
+          "kind": "mono",
+          "recordedAt": "2026-07-10T01:42:01.507Z"
+        },
+        {
+          "price": 3.65,
+          "kind": "normal",
+          "recordedAt": "2026-07-12T07:58:01.183Z"
+        },
+        {
+          "price": 2.14,
+          "kind": "mono",
+          "recordedAt": "2026-07-22T01:34:35.913Z"
+        },
+        {
+          "price": 2.56,
+          "kind": "mono",
+          "recordedAt": "2026-07-22T01:37:24.152Z"
+        },
+        {
+          "price": 2.29,
+          "kind": "mono",
+          "recordedAt": "2026-08-19T00:46:24.900Z"
+        },
+        {
+          "price": 2.74,
+          "kind": "mono",
+          "recordedAt": "2026-08-19T00:50:13.335Z"
+        },
+        {
+          "price": 1.98,
+          "kind": "mono",
+          "recordedAt": "2026-09-02T01:51:50.452Z"
+        },
+        {
+          "price": 2.37,
+          "kind": "mono",
+          "recordedAt": "2026-09-02T01:54:38.528Z"
+        },
+        {
+          "price": 2.14,
+          "kind": "mono",
+          "recordedAt": "2026-10-02T03:00:37.147Z"
+        },
+        {
+          "price": 1.98,
+          "kind": "mono",
+          "recordedAt": "2026-10-15T02:23:12.187Z"
+        },
+        {
+          "price": 2.19,
+          "kind": "mono",
+          "recordedAt": "2026-10-15T02:27:28.258Z"
+        },
+        {
+          "price": 2.37,
+          "kind": "mono",
+          "recordedAt": "2026-11-02T03:24:03.634Z"
+        },
+        {
+          "price": 3.05,
+          "kind": "normal",
+          "recordedAt": "2026-11-08T12:39:48.772Z"
+        },
+        {
+          "price": 2.19,
+          "kind": "mono",
+          "recordedAt": "2026-11-11T03:39:59.220Z"
+        }
+      ],
+      "offer": {
+        "price": 2.19,
+        "firstSeenAt": "2026-11-11T03:39:58.985Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
+    },
+    "expected": {
+      "since": "2026-06-10T10:17:27.868Z",
+      "daysTracked": 154,
+      "shelf": [
+        {
+          "from": "2026-07-12T07:58:01.183Z",
+          "to": "2026-11-08T12:39:48.772Z",
+          "price": 3.65
+        },
+        {
+          "from": "2026-11-08T12:39:48.772Z",
+          "to": "2026-11-08T12:39:50.752Z",
+          "price": 3.05
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-06-10T10:17:27.868Z",
+          "until": null,
+          "price": 1.53,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-10T10:22:17.847Z",
+          "until": null,
+          "price": 1.83,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-11T02:28:42.422Z",
+          "until": null,
+          "price": 1.53,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-10T01:42:01.507Z",
+          "until": null,
+          "price": 2.29,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-22T01:34:35.913Z",
+          "until": null,
+          "price": 2.14,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-22T01:37:24.152Z",
+          "until": null,
+          "price": 2.56,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-19T00:46:24.900Z",
+          "until": null,
+          "price": 2.29,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-19T00:50:13.335Z",
+          "until": null,
+          "price": 2.74,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-02T01:51:50.452Z",
+          "until": null,
+          "price": 1.98,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-02T01:54:38.528Z",
+          "until": null,
+          "price": 2.37,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-02T03:00:37.147Z",
+          "until": null,
+          "price": 2.14,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-15T02:23:12.187Z",
+          "until": null,
+          "price": 1.98,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-15T02:27:28.258Z",
+          "until": null,
+          "price": 2.19,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-02T03:24:03.634Z",
+          "until": null,
+          "price": 2.37,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-11T03:39:59.220Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 2.19,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": 3.05,
+        "shelfFirst": 3.65,
+        "shelfChangePct": -16.4,
+        "shelfChanges": 1,
+        "lowest": {
+          "price": 1.53,
+          "at": "2026-06-10T10:17:27.868Z"
+        },
+        "highest": {
+          "price": 3.65,
+          "at": "2026-07-12T07:58:01.183Z"
+        },
+        "promoCount": 15,
+        "currentPrice": 2.19,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "promos": [
-    {
-     "at": "2026-06-08T12:48:27.628Z",
-     "until": null,
-     "price": 7.66,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-10T02:36:45.611Z",
-     "until": null,
-     "price": 6.71,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-10T10:39:07.757Z",
-     "until": null,
-     "price": 4.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-25T02:50:00.683Z",
-     "until": null,
-     "price": 3.97,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-29T02:44:16.452Z",
-     "until": null,
-     "price": 4.87,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-22T01:47:53.687Z",
-     "until": null,
-     "price": 4.26,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-22T01:49:20.768Z",
-     "until": null,
-     "price": 6.71,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-31T01:53:08.328Z",
-     "until": null,
-     "price": 4.08,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-31T01:54:09.994Z",
-     "until": null,
-     "price": 6.42,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-03T02:07:11.962Z",
-     "until": null,
-     "price": 3.96,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-03T02:08:10.757Z",
-     "until": null,
-     "price": 6.23,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-06T02:03:23.497Z",
-     "until": null,
-     "price": 4.87,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-06T02:04:33.846Z",
-     "until": null,
-     "price": 7.66,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-14T01:34:21.365Z",
-     "until": null,
-     "price": 4.69,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-14T01:35:19.877Z",
-     "until": null,
-     "price": 7.38,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-19T01:02:30.512Z",
-     "until": null,
-     "price": 4.26,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-19T01:03:49.099Z",
-     "until": null,
-     "price": 6.71,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-03T02:12:31.341Z",
-     "until": null,
-     "price": 3.96,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-16T02:42:18.990Z",
-     "until": null,
-     "price": 4.08,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-24T02:23:49.386Z",
-     "until": null,
-     "price": 3.96,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-28T02:45:12.862Z",
-     "until": null,
-     "price": 4.08,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-30T03:13:45.234Z",
-     "until": null,
-     "price": 3.96,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-15T02:39:37.138Z",
-     "until": null,
-     "price": 4.87,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-26T02:27:22.678Z",
-     "until": null,
-     "price": 4.04,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-05T04:19:42.414Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 4.69,
-     "kind": "mono",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": 6.09,
-    "shelfFirst": 6.09,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 3.96,
-     "at": "2026-08-03T02:07:11.962Z"
-    },
-    "highest": {
-     "price": 7.66,
-     "at": "2026-06-08T12:48:27.628Z"
-    },
-    "promoCount": 25,
-    "currentPrice": 4.69,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "3: mymarket - two shelf steps, price fell",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 1.53,
-     "kind": null,
-     "recordedAt": "2026-06-10T10:17:27.868Z"
-    },
-    {
-     "price": 1.83,
-     "kind": null,
-     "recordedAt": "2026-06-10T10:22:17.847Z"
-    },
-    {
-     "price": 1.53,
-     "kind": null,
-     "recordedAt": "2026-06-11T02:28:42.422Z"
-    },
-    {
-     "price": 2.29,
-     "kind": "mono",
-     "recordedAt": "2026-07-10T01:42:01.507Z"
-    },
-    {
-     "price": 3.65,
-     "kind": "normal",
-     "recordedAt": "2026-07-12T07:58:01.183Z"
-    },
-    {
-     "price": 2.14,
-     "kind": "mono",
-     "recordedAt": "2026-07-22T01:34:35.913Z"
-    },
-    {
-     "price": 2.56,
-     "kind": "mono",
-     "recordedAt": "2026-07-22T01:37:24.152Z"
-    },
-    {
-     "price": 2.29,
-     "kind": "mono",
-     "recordedAt": "2026-08-19T00:46:24.900Z"
-    },
-    {
-     "price": 2.74,
-     "kind": "mono",
-     "recordedAt": "2026-08-19T00:50:13.335Z"
-    },
-    {
-     "price": 1.98,
-     "kind": "mono",
-     "recordedAt": "2026-09-02T01:51:50.452Z"
-    },
-    {
-     "price": 2.37,
-     "kind": "mono",
-     "recordedAt": "2026-09-02T01:54:38.528Z"
-    },
-    {
-     "price": 2.14,
-     "kind": "mono",
-     "recordedAt": "2026-10-02T03:00:37.147Z"
-    },
-    {
-     "price": 1.98,
-     "kind": "mono",
-     "recordedAt": "2026-10-15T02:23:12.187Z"
-    },
-    {
-     "price": 2.19,
-     "kind": "mono",
-     "recordedAt": "2026-10-15T02:27:28.258Z"
-    },
-    {
-     "price": 2.37,
-     "kind": "mono",
-     "recordedAt": "2026-11-02T03:24:03.634Z"
-    },
-    {
-     "price": 3.05,
-     "kind": "normal",
-     "recordedAt": "2026-11-08T12:39:48.772Z"
-    },
-    {
-     "price": 2.19,
-     "kind": "mono",
-     "recordedAt": "2026-11-11T03:39:59.220Z"
-    }
-   ],
-   "offer": {
-    "price": 2.19,
-    "firstSeenAt": "2026-11-11T03:39:58.985Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-06-10T10:17:27.868Z",
-   "daysTracked": 154,
-   "shelf": [
-    {
-     "from": "2026-07-12T07:58:01.183Z",
-     "to": "2026-11-08T12:39:48.772Z",
-     "price": 3.65
+  {
+    "label": "5: kritikos - strikethrough, one shelf",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 3.9,
+          "kind": "normal",
+          "recordedAt": "2026-06-13T09:09:21.894Z"
+        },
+        {
+          "price": 2.49,
+          "kind": "mono",
+          "recordedAt": "2026-06-29T07:01:23.217Z"
+        },
+        {
+          "price": 3.9,
+          "kind": "mono",
+          "recordedAt": "2026-07-08T05:36:31.116Z"
+        },
+        {
+          "price": 2.49,
+          "kind": "mono",
+          "recordedAt": "2026-08-27T12:44:48.859Z"
+        },
+        {
+          "price": 2.34,
+          "kind": "strikethrough",
+          "recordedAt": "2026-09-14T07:51:13.001Z"
+        },
+        {
+          "price": 3.9,
+          "kind": "mono",
+          "recordedAt": "2026-09-21T07:57:04.469Z"
+        },
+        {
+          "price": 2.53,
+          "kind": "mono",
+          "recordedAt": "2026-10-01T08:45:31.460Z"
+        },
+        {
+          "price": 3.9,
+          "kind": "mono",
+          "recordedAt": "2026-10-22T07:33:28.757Z"
+        }
+      ],
+      "offer": {
+        "price": 3.9,
+        "firstSeenAt": "2026-11-11T09:13:23.159Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-11T09:29:18.223Z"
     },
-    {
-     "from": "2026-11-08T12:39:48.772Z",
-     "to": "2026-11-08T12:39:50.752Z",
-     "price": 3.05
+    "expected": {
+      "since": "2026-06-13T09:09:21.894Z",
+      "daysTracked": 151,
+      "shelf": [
+        {
+          "from": "2026-06-13T09:09:21.894Z",
+          "to": "2026-11-11T09:29:18.223Z",
+          "price": 3.9
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-06-29T07:01:23.217Z",
+          "until": null,
+          "price": 2.49,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-08T05:36:31.116Z",
+          "until": null,
+          "price": 3.9,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-08-27T12:44:48.859Z",
+          "until": null,
+          "price": 2.49,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-14T07:51:13.001Z",
+          "until": null,
+          "price": 2.34,
+          "kind": "strikethrough",
+          "ongoing": false
+        },
+        {
+          "at": "2026-09-21T07:57:04.469Z",
+          "until": null,
+          "price": 3.9,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-01T08:45:31.460Z",
+          "until": null,
+          "price": 2.53,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-22T07:33:28.757Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 3.9,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": 3.9,
+        "shelfFirst": 3.9,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 2.34,
+          "at": "2026-09-14T07:51:13.001Z"
+        },
+        "highest": {
+          "price": 3.9,
+          "at": "2026-06-13T09:09:21.894Z"
+        },
+        "promoCount": 7,
+        "currentPrice": 3.9,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "promos": [
-    {
-     "at": "2026-06-10T10:17:27.868Z",
-     "until": null,
-     "price": 1.53,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-10T10:22:17.847Z",
-     "until": null,
-     "price": 1.83,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-11T02:28:42.422Z",
-     "until": null,
-     "price": 1.53,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-10T01:42:01.507Z",
-     "until": null,
-     "price": 2.29,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-22T01:34:35.913Z",
-     "until": null,
-     "price": 2.14,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-22T01:37:24.152Z",
-     "until": null,
-     "price": 2.56,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-19T00:46:24.900Z",
-     "until": null,
-     "price": 2.29,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-19T00:50:13.335Z",
-     "until": null,
-     "price": 2.74,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-02T01:51:50.452Z",
-     "until": null,
-     "price": 1.98,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-02T01:54:38.528Z",
-     "until": null,
-     "price": 2.37,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-02T03:00:37.147Z",
-     "until": null,
-     "price": 2.14,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-15T02:23:12.187Z",
-     "until": null,
-     "price": 1.98,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-15T02:27:28.258Z",
-     "until": null,
-     "price": 2.19,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-02T03:24:03.634Z",
-     "until": null,
-     "price": 2.37,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-11T03:39:59.220Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 2.19,
-     "kind": "mono",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": 3.05,
-    "shelfFirst": 3.65,
-    "shelfChangePct": -16.4,
-    "shelfChanges": 1,
-    "lowest": {
-     "price": 1.53,
-     "at": "2026-06-10T10:17:27.868Z"
-    },
-    "highest": {
-     "price": 3.65,
-     "at": "2026-07-12T07:58:01.183Z"
-    },
-    "promoCount": 15,
-    "currentPrice": 2.19,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "5: kritikos - strikethrough, one shelf",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 3.9,
-     "kind": "normal",
-     "recordedAt": "2026-06-13T09:09:21.894Z"
-    },
-    {
-     "price": 2.49,
-     "kind": "mono",
-     "recordedAt": "2026-06-29T07:01:23.217Z"
-    },
-    {
-     "price": 3.9,
-     "kind": "mono",
-     "recordedAt": "2026-07-08T05:36:31.116Z"
-    },
-    {
-     "price": 2.49,
-     "kind": "mono",
-     "recordedAt": "2026-08-27T12:44:48.859Z"
-    },
-    {
-     "price": 2.34,
-     "kind": "strikethrough",
-     "recordedAt": "2026-09-14T07:51:13.001Z"
-    },
-    {
-     "price": 3.9,
-     "kind": "mono",
-     "recordedAt": "2026-09-21T07:57:04.469Z"
-    },
-    {
-     "price": 2.53,
-     "kind": "mono",
-     "recordedAt": "2026-10-01T08:45:31.460Z"
-    },
-    {
-     "price": 3.9,
-     "kind": "mono",
-     "recordedAt": "2026-10-22T07:33:28.757Z"
-    }
-   ],
-   "offer": {
-    "price": 3.9,
-    "firstSeenAt": "2026-11-11T09:13:23.159Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-11T09:29:18.223Z"
   },
-  "expected": {
-   "since": "2026-06-13T09:09:21.894Z",
-   "daysTracked": 151,
-   "shelf": [
-    {
-     "from": "2026-06-13T09:09:21.894Z",
-     "to": "2026-11-11T09:29:18.223Z",
-     "price": 3.9
+  {
+    "label": "7: masoutis - masoutis promo only",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 2.18,
+          "kind": null,
+          "recordedAt": "2026-05-07T10:38:11.472Z"
+        },
+        {
+          "price": 3.95,
+          "kind": null,
+          "recordedAt": "2026-05-07T10:39:46.943Z"
+        },
+        {
+          "price": 5.14,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:17.704Z"
+        },
+        {
+          "price": 3.3,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:20.669Z"
+        },
+        {
+          "price": 2.97,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:23.527Z"
+        },
+        {
+          "price": 3.95,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:26.174Z"
+        },
+        {
+          "price": 4.05,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:29.029Z"
+        },
+        {
+          "price": 2.75,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:31.859Z"
+        },
+        {
+          "price": 1.49,
+          "kind": null,
+          "recordedAt": "2026-05-08T17:59:34.687Z"
+        },
+        {
+          "price": 3.95,
+          "kind": null,
+          "recordedAt": "2026-05-26T10:07:24.132Z"
+        },
+        {
+          "price": 5.14,
+          "kind": null,
+          "recordedAt": "2026-05-28T13:51:04.757Z"
+        },
+        {
+          "price": 3.3,
+          "kind": null,
+          "recordedAt": "2026-05-28T13:51:05.406Z"
+        },
+        {
+          "price": 2.97,
+          "kind": null,
+          "recordedAt": "2026-05-28T13:51:06.156Z"
+        },
+        {
+          "price": 3.95,
+          "kind": null,
+          "recordedAt": "2026-05-28T13:51:06.912Z"
+        },
+        {
+          "price": 4.05,
+          "kind": null,
+          "recordedAt": "2026-05-28T13:51:07.547Z"
+        },
+        {
+          "price": 2.75,
+          "kind": null,
+          "recordedAt": "2026-05-28T13:51:08.135Z"
+        },
+        {
+          "price": 5.14,
+          "kind": "mono",
+          "recordedAt": "2026-06-25T10:10:48.065Z"
+        },
+        {
+          "price": 4.45,
+          "kind": null,
+          "recordedAt": "2026-07-02T09:31:35.816Z"
+        },
+        {
+          "price": 4.85,
+          "kind": "mono",
+          "recordedAt": "2026-07-05T22:46:16.582Z"
+        },
+        {
+          "price": 4.45,
+          "kind": null,
+          "recordedAt": "2026-07-06T09:42:52.332Z"
+        },
+        {
+          "price": 3.32,
+          "kind": "mono",
+          "recordedAt": "2026-10-01T10:21:27.933Z"
+        }
+      ],
+      "offer": {
+        "price": 3.32,
+        "firstSeenAt": "2026-11-05T10:12:11.290Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T13:58:19.388Z"
+    },
+    "expected": {
+      "since": "2026-05-07T10:38:11.472Z",
+      "daysTracked": 188,
+      "shelf": [],
+      "promos": [
+        {
+          "at": "2026-05-07T10:38:11.472Z",
+          "until": null,
+          "price": 2.18,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-07T10:39:46.943Z",
+          "until": null,
+          "price": 3.95,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:17.704Z",
+          "until": null,
+          "price": 5.14,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:20.669Z",
+          "until": null,
+          "price": 3.3,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:23.527Z",
+          "until": null,
+          "price": 2.97,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:26.174Z",
+          "until": null,
+          "price": 3.95,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:29.029Z",
+          "until": null,
+          "price": 4.05,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:31.859Z",
+          "until": null,
+          "price": 2.75,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-08T17:59:34.687Z",
+          "until": null,
+          "price": 1.49,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-26T10:07:24.132Z",
+          "until": null,
+          "price": 3.95,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-28T13:51:04.757Z",
+          "until": null,
+          "price": 5.14,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-28T13:51:05.406Z",
+          "until": null,
+          "price": 3.3,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-28T13:51:06.156Z",
+          "until": null,
+          "price": 2.97,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-28T13:51:06.912Z",
+          "until": null,
+          "price": 3.95,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-28T13:51:07.547Z",
+          "until": null,
+          "price": 4.05,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-05-28T13:51:08.135Z",
+          "until": null,
+          "price": 2.75,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-25T10:10:48.065Z",
+          "until": null,
+          "price": 5.14,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-02T09:31:35.816Z",
+          "until": null,
+          "price": 4.45,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-05T22:46:16.582Z",
+          "until": null,
+          "price": 4.85,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-06T09:42:52.332Z",
+          "until": null,
+          "price": 4.45,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-01T10:21:27.933Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 3.32,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": null,
+        "shelfFirst": null,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 1.49,
+          "at": "2026-05-08T17:59:34.687Z"
+        },
+        "highest": {
+          "price": 5.14,
+          "at": "2026-05-08T17:59:17.704Z"
+        },
+        "promoCount": 21,
+        "currentPrice": 3.32,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "promos": [
-    {
-     "at": "2026-06-29T07:01:23.217Z",
-     "until": null,
-     "price": 2.49,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-08T05:36:31.116Z",
-     "until": null,
-     "price": 3.9,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-08-27T12:44:48.859Z",
-     "until": null,
-     "price": 2.49,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-14T07:51:13.001Z",
-     "until": null,
-     "price": 2.34,
-     "kind": "strikethrough",
-     "ongoing": false
-    },
-    {
-     "at": "2026-09-21T07:57:04.469Z",
-     "until": null,
-     "price": 3.9,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-01T08:45:31.460Z",
-     "until": null,
-     "price": 2.53,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-22T07:33:28.757Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 3.9,
-     "kind": "mono",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": 3.9,
-    "shelfFirst": 3.9,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 2.34,
-     "at": "2026-09-14T07:51:13.001Z"
-    },
-    "highest": {
-     "price": 3.9,
-     "at": "2026-06-13T09:09:21.894Z"
-    },
-    "promoCount": 7,
-    "currentPrice": 3.9,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "7: masoutis - masoutis promo only",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 2.18,
-     "kind": null,
-     "recordedAt": "2026-05-07T10:38:11.472Z"
-    },
-    {
-     "price": 3.95,
-     "kind": null,
-     "recordedAt": "2026-05-07T10:39:46.943Z"
-    },
-    {
-     "price": 5.14,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:17.704Z"
-    },
-    {
-     "price": 3.3,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:20.669Z"
-    },
-    {
-     "price": 2.97,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:23.527Z"
-    },
-    {
-     "price": 3.95,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:26.174Z"
-    },
-    {
-     "price": 4.05,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:29.029Z"
-    },
-    {
-     "price": 2.75,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:31.859Z"
-    },
-    {
-     "price": 1.49,
-     "kind": null,
-     "recordedAt": "2026-05-08T17:59:34.687Z"
-    },
-    {
-     "price": 3.95,
-     "kind": null,
-     "recordedAt": "2026-05-26T10:07:24.132Z"
-    },
-    {
-     "price": 5.14,
-     "kind": null,
-     "recordedAt": "2026-05-28T13:51:04.757Z"
-    },
-    {
-     "price": 3.3,
-     "kind": null,
-     "recordedAt": "2026-05-28T13:51:05.406Z"
-    },
-    {
-     "price": 2.97,
-     "kind": null,
-     "recordedAt": "2026-05-28T13:51:06.156Z"
-    },
-    {
-     "price": 3.95,
-     "kind": null,
-     "recordedAt": "2026-05-28T13:51:06.912Z"
-    },
-    {
-     "price": 4.05,
-     "kind": null,
-     "recordedAt": "2026-05-28T13:51:07.547Z"
-    },
-    {
-     "price": 2.75,
-     "kind": null,
-     "recordedAt": "2026-05-28T13:51:08.135Z"
-    },
-    {
-     "price": 5.14,
-     "kind": "mono",
-     "recordedAt": "2026-06-25T10:10:48.065Z"
-    },
-    {
-     "price": 4.45,
-     "kind": null,
-     "recordedAt": "2026-07-02T09:31:35.816Z"
-    },
-    {
-     "price": 4.85,
-     "kind": "mono",
-     "recordedAt": "2026-07-05T22:46:16.582Z"
-    },
-    {
-     "price": 4.45,
-     "kind": null,
-     "recordedAt": "2026-07-06T09:42:52.332Z"
-    },
-    {
-     "price": 3.32,
-     "kind": "mono",
-     "recordedAt": "2026-10-01T10:21:27.933Z"
-    }
-   ],
-   "offer": {
-    "price": 3.32,
-    "firstSeenAt": "2026-11-05T10:12:11.290Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T13:58:19.388Z"
   },
-  "expected": {
-   "since": "2026-05-07T10:38:11.472Z",
-   "daysTracked": 188,
-   "shelf": [],
-   "promos": [
-    {
-     "at": "2026-05-07T10:38:11.472Z",
-     "until": null,
-     "price": 2.18,
-     "kind": "legacy",
-     "ongoing": false
+  {
+    "label": "11: mymarket - offer price differs from newest promo",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-06T02:22:53.932Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-06-06T02:49:08.822Z"
+        },
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-07T02:13:02.806Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-06-07T02:16:55.299Z"
+        },
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-08T02:16:56.315Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-06-08T02:19:28.998Z"
+        },
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-09T01:54:58.453Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-06-09T01:58:34.608Z"
+        },
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-09T18:53:17.810Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-06-09T18:55:34.515Z"
+        },
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-10T02:05:53.615Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-06-10T02:09:09.302Z"
+        },
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-11T02:19:06.635Z"
+        },
+        {
+          "price": 0.81,
+          "kind": "mono",
+          "recordedAt": "2026-06-19T03:06:17.035Z"
+        },
+        {
+          "price": 0.98,
+          "kind": "mono",
+          "recordedAt": "2026-06-25T02:21:48.925Z"
+        },
+        {
+          "price": 1.26,
+          "kind": null,
+          "recordedAt": "2026-07-02T08:13:27.839Z"
+        },
+        {
+          "price": 1.09,
+          "kind": "strikethrough",
+          "recordedAt": "2026-07-03T01:43:50.107Z"
+        },
+        {
+          "price": 1.35,
+          "kind": "mono",
+          "recordedAt": "2026-07-03T01:46:22.835Z"
+        },
+        {
+          "price": 0.98,
+          "kind": "mono",
+          "recordedAt": "2026-07-04T01:40:31.148Z"
+        },
+        {
+          "price": 1.26,
+          "kind": "mono",
+          "recordedAt": "2026-07-04T01:42:21.627Z"
+        },
+        {
+          "price": 0.8,
+          "kind": "mono",
+          "recordedAt": "2026-10-14T02:37:30.128Z"
+        },
+        {
+          "price": 1.08,
+          "kind": "mono",
+          "recordedAt": "2026-10-14T02:40:40.342Z"
+        },
+        {
+          "price": 1.09,
+          "kind": "normal",
+          "recordedAt": "2026-11-01T12:11:21.489Z"
+        },
+        {
+          "price": 0.98,
+          "kind": "mono",
+          "recordedAt": "2026-11-02T03:14:43.813Z"
+        },
+        {
+          "price": 1.26,
+          "kind": "mono",
+          "recordedAt": "2026-11-02T03:18:29.447Z"
+        }
+      ],
+      "offer": {
+        "price": 0.98,
+        "firstSeenAt": "2026-11-11T03:34:38.622Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
     },
-    {
-     "at": "2026-05-07T10:39:46.943Z",
-     "until": null,
-     "price": 3.95,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:17.704Z",
-     "until": null,
-     "price": 5.14,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:20.669Z",
-     "until": null,
-     "price": 3.3,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:23.527Z",
-     "until": null,
-     "price": 2.97,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:26.174Z",
-     "until": null,
-     "price": 3.95,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:29.029Z",
-     "until": null,
-     "price": 4.05,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:31.859Z",
-     "until": null,
-     "price": 2.75,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-08T17:59:34.687Z",
-     "until": null,
-     "price": 1.49,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-26T10:07:24.132Z",
-     "until": null,
-     "price": 3.95,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-28T13:51:04.757Z",
-     "until": null,
-     "price": 5.14,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-28T13:51:05.406Z",
-     "until": null,
-     "price": 3.3,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-28T13:51:06.156Z",
-     "until": null,
-     "price": 2.97,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-28T13:51:06.912Z",
-     "until": null,
-     "price": 3.95,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-28T13:51:07.547Z",
-     "until": null,
-     "price": 4.05,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-05-28T13:51:08.135Z",
-     "until": null,
-     "price": 2.75,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-25T10:10:48.065Z",
-     "until": null,
-     "price": 5.14,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-02T09:31:35.816Z",
-     "until": null,
-     "price": 4.45,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-05T22:46:16.582Z",
-     "until": null,
-     "price": 4.85,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-06T09:42:52.332Z",
-     "until": null,
-     "price": 4.45,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-01T10:21:27.933Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 3.32,
-     "kind": "mono",
-     "ongoing": true
+    "expected": {
+      "since": "2026-06-06T02:22:53.932Z",
+      "daysTracked": 158,
+      "shelf": [
+        {
+          "from": "2026-11-01T12:11:21.489Z",
+          "to": "2026-11-08T12:39:50.752Z",
+          "price": 1.09
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-06-06T02:22:53.932Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-06T02:49:08.822Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-07T02:13:02.806Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-07T02:16:55.299Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-08T02:16:56.315Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-08T02:19:28.998Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-09T01:54:58.453Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-09T01:58:34.608Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-09T18:53:17.810Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-09T18:55:34.515Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-10T02:05:53.615Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-10T02:09:09.302Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-11T02:19:06.635Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-19T03:06:17.035Z",
+          "until": null,
+          "price": 0.81,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-06-25T02:21:48.925Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-02T08:13:27.839Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "legacy",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-03T01:43:50.107Z",
+          "until": null,
+          "price": 1.09,
+          "kind": "strikethrough",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-03T01:46:22.835Z",
+          "until": null,
+          "price": 1.35,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-04T01:40:31.148Z",
+          "until": null,
+          "price": 0.98,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-07-04T01:42:21.627Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-14T02:37:30.128Z",
+          "until": null,
+          "price": 0.8,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-10-14T02:40:40.342Z",
+          "until": null,
+          "price": 1.08,
+          "kind": "mono",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-02T03:14:43.813Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 0.98,
+          "kind": "mono",
+          "ongoing": true
+        },
+        {
+          "at": "2026-11-02T03:18:29.447Z",
+          "until": null,
+          "price": 1.26,
+          "kind": "mono",
+          "ongoing": false
+        }
+      ],
+      "stats": {
+        "shelfNow": 1.09,
+        "shelfFirst": 1.09,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 0.8,
+          "at": "2026-10-14T02:37:30.128Z"
+        },
+        "highest": {
+          "price": 1.35,
+          "at": "2026-07-03T01:46:22.835Z"
+        },
+        "promoCount": 24,
+        "currentPrice": 0.98,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "stats": {
-    "shelfNow": null,
-    "shelfFirst": null,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 1.49,
-     "at": "2026-05-08T17:59:34.687Z"
-    },
-    "highest": {
-     "price": 5.14,
-     "at": "2026-05-08T17:59:17.704Z"
-    },
-    "promoCount": 21,
-    "currentPrice": 3.32,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "11: mymarket - offer price differs from newest promo",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-06T02:22:53.932Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-06-06T02:49:08.822Z"
-    },
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-07T02:13:02.806Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-06-07T02:16:55.299Z"
-    },
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-08T02:16:56.315Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-06-08T02:19:28.998Z"
-    },
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-09T01:54:58.453Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-06-09T01:58:34.608Z"
-    },
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-09T18:53:17.810Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-06-09T18:55:34.515Z"
-    },
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-10T02:05:53.615Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-06-10T02:09:09.302Z"
-    },
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-11T02:19:06.635Z"
-    },
-    {
-     "price": 0.81,
-     "kind": "mono",
-     "recordedAt": "2026-06-19T03:06:17.035Z"
-    },
-    {
-     "price": 0.98,
-     "kind": "mono",
-     "recordedAt": "2026-06-25T02:21:48.925Z"
-    },
-    {
-     "price": 1.26,
-     "kind": null,
-     "recordedAt": "2026-07-02T08:13:27.839Z"
-    },
-    {
-     "price": 1.09,
-     "kind": "strikethrough",
-     "recordedAt": "2026-07-03T01:43:50.107Z"
-    },
-    {
-     "price": 1.35,
-     "kind": "mono",
-     "recordedAt": "2026-07-03T01:46:22.835Z"
-    },
-    {
-     "price": 0.98,
-     "kind": "mono",
-     "recordedAt": "2026-07-04T01:40:31.148Z"
-    },
-    {
-     "price": 1.26,
-     "kind": "mono",
-     "recordedAt": "2026-07-04T01:42:21.627Z"
-    },
-    {
-     "price": 0.8,
-     "kind": "mono",
-     "recordedAt": "2026-10-14T02:37:30.128Z"
-    },
-    {
-     "price": 1.08,
-     "kind": "mono",
-     "recordedAt": "2026-10-14T02:40:40.342Z"
-    },
-    {
-     "price": 1.09,
-     "kind": "normal",
-     "recordedAt": "2026-11-01T12:11:21.489Z"
-    },
-    {
-     "price": 0.98,
-     "kind": "mono",
-     "recordedAt": "2026-11-02T03:14:43.813Z"
-    },
-    {
-     "price": 1.26,
-     "kind": "mono",
-     "recordedAt": "2026-11-02T03:18:29.447Z"
-    }
-   ],
-   "offer": {
-    "price": 0.98,
-    "firstSeenAt": "2026-11-11T03:34:38.622Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-06-06T02:22:53.932Z",
-   "daysTracked": 158,
-   "shelf": [
-    {
-     "from": "2026-11-01T12:11:21.489Z",
-     "to": "2026-11-08T12:39:50.752Z",
-     "price": 1.09
+  {
+    "label": "20: bazaar - bazaar shelf 1.30-1.04-1.30 then strikethrough",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 1.3,
+          "kind": "normal",
+          "recordedAt": "2026-06-18T10:07:21.894Z"
+        },
+        {
+          "price": 1.04,
+          "kind": "normal",
+          "recordedAt": "2026-08-16T07:57:22.307Z"
+        },
+        {
+          "price": 1.3,
+          "kind": "normal",
+          "recordedAt": "2026-09-06T11:48:29.955Z"
+        },
+        {
+          "price": 1.04,
+          "kind": "strikethrough",
+          "recordedAt": "2026-11-04T09:45:21.951Z"
+        }
+      ],
+      "offer": {
+        "price": 1.04,
+        "firstSeenAt": "2026-11-11T09:48:03.890Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T14:30:18.109Z"
+    },
+    "expected": {
+      "since": "2026-06-18T10:07:21.894Z",
+      "daysTracked": 146,
+      "shelf": [
+        {
+          "from": "2026-06-18T10:07:21.894Z",
+          "to": "2026-08-16T07:57:22.307Z",
+          "price": 1.3
+        },
+        {
+          "from": "2026-08-16T07:57:22.307Z",
+          "to": "2026-09-06T11:48:29.955Z",
+          "price": 1.04
+        },
+        {
+          "from": "2026-09-06T11:48:29.955Z",
+          "to": "2026-11-08T14:30:18.109Z",
+          "price": 1.3
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-11-04T09:45:21.951Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 1.04,
+          "kind": "strikethrough",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": 1.3,
+        "shelfFirst": 1.3,
+        "shelfChangePct": 0,
+        "shelfChanges": 2,
+        "lowest": {
+          "price": 1.04,
+          "at": "2026-08-16T07:57:22.307Z"
+        },
+        "highest": {
+          "price": 1.3,
+          "at": "2026-06-18T10:07:21.894Z"
+        },
+        "promoCount": 1,
+        "currentPrice": 1.04,
+        "currentIsLowest": true,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "promos": [
-    {
-     "at": "2026-06-06T02:22:53.932Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-06T02:49:08.822Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-07T02:13:02.806Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-07T02:16:55.299Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-08T02:16:56.315Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-08T02:19:28.998Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-09T01:54:58.453Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-09T01:58:34.608Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-09T18:53:17.810Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-09T18:55:34.515Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-10T02:05:53.615Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-10T02:09:09.302Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-11T02:19:06.635Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-19T03:06:17.035Z",
-     "until": null,
-     "price": 0.81,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-06-25T02:21:48.925Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-02T08:13:27.839Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "legacy",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-03T01:43:50.107Z",
-     "until": null,
-     "price": 1.09,
-     "kind": "strikethrough",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-03T01:46:22.835Z",
-     "until": null,
-     "price": 1.35,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-04T01:40:31.148Z",
-     "until": null,
-     "price": 0.98,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-07-04T01:42:21.627Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-14T02:37:30.128Z",
-     "until": null,
-     "price": 0.8,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-10-14T02:40:40.342Z",
-     "until": null,
-     "price": 1.08,
-     "kind": "mono",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-02T03:14:43.813Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 0.98,
-     "kind": "mono",
-     "ongoing": true
-    },
-    {
-     "at": "2026-11-02T03:18:29.447Z",
-     "until": null,
-     "price": 1.26,
-     "kind": "mono",
-     "ongoing": false
-    }
-   ],
-   "stats": {
-    "shelfNow": 1.09,
-    "shelfFirst": 1.09,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 0.8,
-     "at": "2026-10-14T02:37:30.128Z"
-    },
-    "highest": {
-     "price": 1.35,
-     "at": "2026-07-03T01:46:22.835Z"
-    },
-    "promoCount": 24,
-    "currentPrice": 0.98,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "20: bazaar - bazaar shelf 1.30-1.04-1.30 then strikethrough",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 1.3,
-     "kind": "normal",
-     "recordedAt": "2026-06-18T10:07:21.894Z"
-    },
-    {
-     "price": 1.04,
-     "kind": "normal",
-     "recordedAt": "2026-08-16T07:57:22.307Z"
-    },
-    {
-     "price": 1.3,
-     "kind": "normal",
-     "recordedAt": "2026-09-06T11:48:29.955Z"
-    },
-    {
-     "price": 1.04,
-     "kind": "strikethrough",
-     "recordedAt": "2026-11-04T09:45:21.951Z"
-    }
-   ],
-   "offer": {
-    "price": 1.04,
-    "firstSeenAt": "2026-11-11T09:48:03.890Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T14:30:18.109Z"
   },
-  "expected": {
-   "since": "2026-06-18T10:07:21.894Z",
-   "daysTracked": 146,
-   "shelf": [
-    {
-     "from": "2026-06-18T10:07:21.894Z",
-     "to": "2026-08-16T07:57:22.307Z",
-     "price": 1.3
+  {
+    "label": "21: mymarket - shelf drop and strikethrough",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 6.86,
+          "kind": "normal",
+          "recordedAt": "2026-06-17T00:22:22.938Z"
+        },
+        {
+          "price": 6.52,
+          "kind": "normal",
+          "recordedAt": "2026-09-06T09:54:29.859Z"
+        },
+        {
+          "price": 5.22,
+          "kind": "strikethrough",
+          "recordedAt": "2026-10-14T02:42:43.466Z"
+        },
+        {
+          "price": 5.54,
+          "kind": "mono",
+          "recordedAt": "2026-11-11T03:34:52.096Z"
+        }
+      ],
+      "offer": {
+        "price": 5.54,
+        "firstSeenAt": "2026-11-11T03:34:51.857Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
     },
-    {
-     "from": "2026-08-16T07:57:22.307Z",
-     "to": "2026-09-06T11:48:29.955Z",
-     "price": 1.04
-    },
-    {
-     "from": "2026-09-06T11:48:29.955Z",
-     "to": "2026-11-08T14:30:18.109Z",
-     "price": 1.3
+    "expected": {
+      "since": "2026-06-17T00:22:22.938Z",
+      "daysTracked": 147,
+      "shelf": [
+        {
+          "from": "2026-06-17T00:22:22.938Z",
+          "to": "2026-09-06T09:54:29.859Z",
+          "price": 6.86
+        },
+        {
+          "from": "2026-09-06T09:54:29.859Z",
+          "to": "2026-11-08T12:39:50.752Z",
+          "price": 6.52
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-10-14T02:42:43.466Z",
+          "until": null,
+          "price": 5.22,
+          "kind": "strikethrough",
+          "ongoing": false
+        },
+        {
+          "at": "2026-11-11T03:34:52.096Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 5.54,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": 6.52,
+        "shelfFirst": 6.86,
+        "shelfChangePct": -5,
+        "shelfChanges": 1,
+        "lowest": {
+          "price": 5.22,
+          "at": "2026-10-14T02:42:43.466Z"
+        },
+        "highest": {
+          "price": 6.86,
+          "at": "2026-06-17T00:22:22.938Z"
+        },
+        "promoCount": 2,
+        "currentPrice": 5.54,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "promos": [
-    {
-     "at": "2026-11-04T09:45:21.951Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 1.04,
-     "kind": "strikethrough",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": 1.3,
-    "shelfFirst": 1.3,
-    "shelfChangePct": 0,
-    "shelfChanges": 2,
-    "lowest": {
-     "price": 1.04,
-     "at": "2026-08-16T07:57:22.307Z"
-    },
-    "highest": {
-     "price": 1.3,
-     "at": "2026-06-18T10:07:21.894Z"
-    },
-    "promoCount": 1,
-    "currentPrice": 1.04,
-    "currentIsLowest": true,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "21: mymarket - shelf drop and strikethrough",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 6.86,
-     "kind": "normal",
-     "recordedAt": "2026-06-17T00:22:22.938Z"
-    },
-    {
-     "price": 6.52,
-     "kind": "normal",
-     "recordedAt": "2026-09-06T09:54:29.859Z"
-    },
-    {
-     "price": 5.22,
-     "kind": "strikethrough",
-     "recordedAt": "2026-10-14T02:42:43.466Z"
-    },
-    {
-     "price": 5.54,
-     "kind": "mono",
-     "recordedAt": "2026-11-11T03:34:52.096Z"
-    }
-   ],
-   "offer": {
-    "price": 5.54,
-    "firstSeenAt": "2026-11-11T03:34:51.857Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-06-17T00:22:22.938Z",
-   "daysTracked": 147,
-   "shelf": [
-    {
-     "from": "2026-06-17T00:22:22.938Z",
-     "to": "2026-09-06T09:54:29.859Z",
-     "price": 6.86
+  {
+    "label": "36: mymarket - two snapshots",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 3.68,
+          "kind": "normal",
+          "recordedAt": "2026-10-11T12:00:56.505Z"
+        },
+        {
+          "price": 1.84,
+          "kind": "mono",
+          "recordedAt": "2026-11-11T03:49:37.297Z"
+        }
+      ],
+      "offer": {
+        "price": 1.84,
+        "firstSeenAt": "2026-11-11T03:49:36.984Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
     },
-    {
-     "from": "2026-09-06T09:54:29.859Z",
-     "to": "2026-11-08T12:39:50.752Z",
-     "price": 6.52
+    "expected": {
+      "since": "2026-10-11T12:00:56.505Z",
+      "daysTracked": 31,
+      "shelf": [
+        {
+          "from": "2026-10-11T12:00:56.505Z",
+          "to": "2026-11-08T12:39:50.752Z",
+          "price": 3.68
+        }
+      ],
+      "promos": [
+        {
+          "at": "2026-11-11T03:49:37.297Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 1.84,
+          "kind": "mono",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": 3.68,
+        "shelfFirst": 3.68,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 1.84,
+          "at": "2026-11-11T03:49:37.297Z"
+        },
+        "highest": {
+          "price": 3.68,
+          "at": "2026-10-11T12:00:56.505Z"
+        },
+        "promoCount": 1,
+        "currentPrice": 1.84,
+        "currentIsLowest": true,
+        "suspect": false
+      },
+      "quality": "ok",
+      "reliable": true
     }
-   ],
-   "promos": [
-    {
-     "at": "2026-10-14T02:42:43.466Z",
-     "until": null,
-     "price": 5.22,
-     "kind": "strikethrough",
-     "ongoing": false
-    },
-    {
-     "at": "2026-11-11T03:34:52.096Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 5.54,
-     "kind": "mono",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": 6.52,
-    "shelfFirst": 6.86,
-    "shelfChangePct": -5,
-    "shelfChanges": 1,
-    "lowest": {
-     "price": 5.22,
-     "at": "2026-10-14T02:42:43.466Z"
-    },
-    "highest": {
-     "price": 6.86,
-     "at": "2026-06-17T00:22:22.938Z"
-    },
-    "promoCount": 2,
-    "currentPrice": 5.54,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "36: mymarket - two snapshots",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 3.68,
-     "kind": "normal",
-     "recordedAt": "2026-10-11T12:00:56.505Z"
-    },
-    {
-     "price": 1.84,
-     "kind": "mono",
-     "recordedAt": "2026-11-11T03:49:37.297Z"
-    }
-   ],
-   "offer": {
-    "price": 1.84,
-    "firstSeenAt": "2026-11-11T03:49:36.984Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-10-11T12:00:56.505Z",
-   "daysTracked": 31,
-   "shelf": [
-    {
-     "from": "2026-10-11T12:00:56.505Z",
-     "to": "2026-11-08T12:39:50.752Z",
-     "price": 3.68
-    }
-   ],
-   "promos": [
-    {
-     "at": "2026-11-11T03:49:37.297Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 1.84,
-     "kind": "mono",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": 3.68,
-    "shelfFirst": 3.68,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 1.84,
-     "at": "2026-11-11T03:49:37.297Z"
+  {
+    "label": "46: mymarket - single snapshot",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [
+        {
+          "price": 0.98,
+          "kind": null,
+          "recordedAt": "2026-06-07T02:53:42.987Z"
+        }
+      ],
+      "offer": {
+        "price": 0.98,
+        "firstSeenAt": "2026-11-11T03:40:44.990Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
     },
-    "highest": {
-     "price": 3.68,
-     "at": "2026-10-11T12:00:56.505Z"
-    },
-    "promoCount": 1,
-    "currentPrice": 1.84,
-    "currentIsLowest": true,
-    "suspect": false
-   },
-   "quality": "ok"
-  }
- },
- {
-  "label": "46: mymarket - single snapshot",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [
-    {
-     "price": 0.98,
-     "kind": null,
-     "recordedAt": "2026-06-07T02:53:42.987Z"
+    "expected": {
+      "since": "2026-06-07T02:53:42.987Z",
+      "daysTracked": 157,
+      "shelf": [],
+      "promos": [
+        {
+          "at": "2026-06-07T02:53:42.987Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 0.98,
+          "kind": "legacy",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": null,
+        "shelfFirst": null,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 0.98,
+          "at": "2026-06-07T02:53:42.987Z"
+        },
+        "highest": {
+          "price": 0.98,
+          "at": "2026-06-07T02:53:42.987Z"
+        },
+        "promoCount": 1,
+        "currentPrice": 0.98,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "thin",
+      "reliable": true
     }
-   ],
-   "offer": {
-    "price": 0.98,
-    "firstSeenAt": "2026-11-11T03:40:44.990Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
   },
-  "expected": {
-   "since": "2026-06-07T02:53:42.987Z",
-   "daysTracked": 157,
-   "shelf": [],
-   "promos": [
-    {
-     "at": "2026-06-07T02:53:42.987Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 0.98,
-     "kind": "legacy",
-     "ongoing": true
+  {
+    "label": "54: mymarket - no snapshots at all",
+    "now": "2026-11-11T17:00:00.000Z",
+    "input": {
+      "snapshots": [],
+      "offer": {
+        "price": 5.09,
+        "firstSeenAt": "2026-11-11T03:52:47.444Z",
+        "active": true
+      },
+      "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
+    },
+    "expected": {
+      "since": "2026-11-11T03:52:47.444Z",
+      "daysTracked": 0,
+      "shelf": [],
+      "promos": [
+        {
+          "at": "2026-11-11T03:52:47.444Z",
+          "until": "2026-11-11T17:00:00.000Z",
+          "price": 5.09,
+          "kind": "legacy",
+          "ongoing": true
+        }
+      ],
+      "stats": {
+        "shelfNow": null,
+        "shelfFirst": null,
+        "shelfChangePct": null,
+        "shelfChanges": 0,
+        "lowest": {
+          "price": 5.09,
+          "at": "2026-11-11T03:52:47.444Z"
+        },
+        "highest": {
+          "price": 5.09,
+          "at": "2026-11-11T03:52:47.444Z"
+        },
+        "promoCount": 1,
+        "currentPrice": 5.09,
+        "currentIsLowest": false,
+        "suspect": false
+      },
+      "quality": "thin",
+      "reliable": true
     }
-   ],
-   "stats": {
-    "shelfNow": null,
-    "shelfFirst": null,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 0.98,
-     "at": "2026-06-07T02:53:42.987Z"
-    },
-    "highest": {
-     "price": 0.98,
-     "at": "2026-06-07T02:53:42.987Z"
-    },
-    "promoCount": 1,
-    "currentPrice": 0.98,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "thin"
   }
- },
- {
-  "label": "54: mymarket - no snapshots at all",
-  "now": "2026-11-11T17:00:00.000Z",
-  "input": {
-   "snapshots": [],
-   "offer": {
-    "price": 5.09,
-    "firstSeenAt": "2026-11-11T03:52:47.444Z",
-    "active": true
-   },
-   "shelfFeedAliveAt": "2026-11-08T12:39:50.752Z"
-  },
-  "expected": {
-   "since": "2026-11-11T03:52:47.444Z",
-   "daysTracked": 0,
-   "shelf": [],
-   "promos": [
-    {
-     "at": "2026-11-11T03:52:47.444Z",
-     "until": "2026-11-11T17:00:00.000Z",
-     "price": 5.09,
-     "kind": "legacy",
-     "ongoing": true
-    }
-   ],
-   "stats": {
-    "shelfNow": null,
-    "shelfFirst": null,
-    "shelfChangePct": null,
-    "shelfChanges": 0,
-    "lowest": {
-     "price": 5.09,
-     "at": "2026-11-11T03:52:47.444Z"
-    },
-    "highest": {
-     "price": 5.09,
-     "at": "2026-11-11T03:52:47.444Z"
-    },
-    "promoCount": 1,
-    "currentPrice": 5.09,
-    "currentIsLowest": false,
-    "suspect": false
-   },
-   "quality": "thin"
-  }
- }
 ]

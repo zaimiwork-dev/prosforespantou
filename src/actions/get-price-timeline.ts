@@ -5,7 +5,6 @@ import * as Sentry from '@sentry/nextjs';
 import { buildPriceTimeline, type PriceTimeline } from '@/lib/price-timeline';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
 
-export type { PriceTimeline };
 
 // How far back to read. Snapshots go back to April 2026 (~220 days today);
 // 400 days leaves room for a year of history without an unbounded scan.
@@ -29,6 +28,7 @@ const EMPTY: PriceTimeline = {
     suspect: false,
   },
   quality: 'none',
+  reliable: false,
 };
 
 // Truthful price timeline for one canonical product AT ONE CHAIN (SRV-01):
@@ -51,7 +51,7 @@ export async function getPriceTimeline(
         if (!productId || !options.supermarket) return EMPTY;
         const since = new Date(Date.now() - TIMELINE_DAYS * 86400000);
 
-        const [rows, freshChains] = await Promise.all([
+        const [rows, freshChains, skus] = await Promise.all([
           prisma.priceSnapshot.findMany({
             where: { productId, supermarket: options.supermarket, recordedAt: { gte: since } },
             orderBy: { recordedAt: 'asc' },
@@ -61,12 +61,16 @@ export async function getPriceTimeline(
             select: { price: true, kind: true, recordedAt: true },
           }),
           loadFreshShelfChains(prisma),
+          // Snapshots are keyed by product, not by chain SKU: with two SKUs of
+          // this chain on one product the series mixes packs (lib/price-timeline).
+          prisma.chainProductMapping.count({ where: { productId, supermarket: options.supermarket } }),
         ]);
 
         return buildPriceTimeline({
           snapshots: rows.map((r) => ({ price: r.price, kind: r.kind, recordedAt: r.recordedAt })),
           offer: options.offer ?? null,
           shelfFeedAliveAt: freshChains.get(options.supermarket) ?? null,
+          mixedSkus: skus > 1,
         });
       } catch (error) {
         Sentry.captureException(error);
