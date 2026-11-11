@@ -16,7 +16,8 @@ import {
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { api, type DealCard, type DealSort, type MetaResponse } from '@/lib/api';
+import { api, type DealCard, type DealSort } from '@/lib/api';
+import { useMeta } from '@/lib/chains';
 import { arrangeDeals } from '@/lib/lists';
 import { DealCardView } from '@/components/deal-card';
 import { track } from '@/lib/analytics';
@@ -42,12 +43,16 @@ function initialFilters(chain?: string, category?: string, sort?: DealSort): Fil
   return { ...NO_FILTERS, mine: getSettings().myChains.length > 0 };
 }
 
+// A stable empty list, so a missing /meta does not hand the filter sheet a new array every render.
+const NO_CATEGORIES: { id: string; label: string; full: string; offers: number }[] = [];
+
 export default function DealsScreen() {
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
   const { width } = useWindowDimensions();
   const { chains } = useChainList();
   const { myChains } = useSettings();
+  const categories = useMeta().meta?.categories ?? NO_CATEGORIES;
   const listRef = useRef<FlatList<DealCard>>(null);
   const params = useLocalSearchParams<{ chain?: string; category?: string; sort?: string }>();
   const pChain = one(params.chain);
@@ -64,7 +69,6 @@ export default function DealsScreen() {
   // Bumped by retry / pull-to-refresh to re-run the load with the same filters.
   const [reloadKey, setReloadKey] = useState(0);
 
-  const [categories, setCategories] = useState<MetaResponse['categories']>([]);
   const [raw, setRaw] = useState<DealCard[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
@@ -99,16 +103,6 @@ export default function DealsScreen() {
       setLoadingMore(false);
     }
   }
-
-  // Department list, once.
-  useEffect(() => {
-    const ctrl = new AbortController();
-    api
-      .meta(ctrl.signal)
-      .then((m) => setCategories(m.categories))
-      .catch(() => {});
-    return () => ctrl.abort();
-  }, []);
 
   // First page for the current filters. State changes only when the request
   // settles; the handlers put the screen into «loading» beforehand.

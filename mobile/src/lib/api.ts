@@ -40,10 +40,23 @@ export class ApiError extends Error {
   }
 }
 
+// Bad signal in a shop: a request that hangs must end as an error the screen can
+// show (or fall back from), not spin forever. AbortSignal.any/timeout exist in
+// Hermes on RN 0.88 (checked in react-native's AbortSignal.js) and in browsers.
+export const REQUEST_TIMEOUT_MS = 15_000;
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/v1${path}`, { signal, headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new ApiError(res.status, `${path} → HTTP ${res.status}`);
-  return (await res.json()) as T;
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1${path}`, { signal: combined, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new ApiError(res.status, `${path} → HTTP ${res.status}`);
+    return (await res.json()) as T;
+  } catch (e) {
+    // The caller's own cancellation stays an abort; only our timer is an ApiError.
+    if (!(e instanceof ApiError) && timeout.aborted && !signal?.aborted) throw new ApiError(0, `${path} → timeout`);
+    throw e;
+  }
 }
 
 export type DealSort = 'hot' | 'expiring' | 'discount' | 'newest' | 'price_asc' | 'price_desc';

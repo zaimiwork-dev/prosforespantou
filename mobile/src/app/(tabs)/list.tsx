@@ -99,7 +99,7 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
   }
 
   const share = async () => {
-    const message = buildShareText(items, (id) => chainOf(id)?.short ?? 'SM');
+    const message = buildShareText(items, (id) => chainOf(id)?.name ?? 'Κατάστημα');
     if (!message) return;
     setShareFailed(false);
     try {
@@ -124,7 +124,7 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
       <ScrollView contentContainerStyle={styles.content}>
         {groups.length > 1 ? (
           <Text style={styles.multi}>
-            Η λίστα σου απλώνεται σε {groups.length} καταστήματα. Το σύνολο είναι ανά κατάστημα.
+            Σε {groups.length} καταστήματα · υποσύνολο ανά κατάστημα
           </Text>
         ) : null}
         {groups.map((g) => {
