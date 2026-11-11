@@ -6,7 +6,9 @@ import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE } from '@/lib/api';
 import { setConsentChoice } from '@/lib/analytics';
+import { clearRecentlyViewed } from '@/lib/recently-viewed';
 import { updateSettings, useSettings } from '@/lib/settings';
+import { showToast } from '@/components/ui/toast';
 import { ChainTile, TileGrid } from '@/components/chain-tile';
 import { useChainList } from '@/components/filters/use-chain-list';
 import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
@@ -113,6 +115,19 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.h2}>Ιστορικό</Text>
+        <Pressable
+          onPress={() => {
+            void clearRecentlyViewed();
+            showToast({ message: 'Το ιστορικό προβολών καθαρίστηκε' });
+          }}
+          accessibilityRole="button"
+          style={styles.clear}>
+          <Text style={[T.text.button, { color: Colors.ink }]}>Καθαρισμός ιστορικού προβολών</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.version}>Έκδοση εφαρμογής {Constants.expoConfig?.version ?? ''}</Text>
     </ScrollView>
   );
@@ -130,6 +145,7 @@ const makeStyles = (T: TypeScale) =>
     previewText: { ...T.text.title, color: Colors.ink },
     errorBox: { gap: Space[3], alignItems: 'flex-start' },
     retry: { minHeight: 52, paddingHorizontal: Space[6], borderRadius: Radius.pill, backgroundColor: Colors.brand, justifyContent: 'center' },
+    clear: { minHeight: 52, paddingHorizontal: Space[3], borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.line2, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
     link: { minHeight: 48, justifyContent: 'center' },
     linkText: { ...T.text.bodyStrong, color: Colors.brand, textDecorationLine: 'underline' },
     version: { ...T.text.caption, color: Colors.ink3Text, textAlign: 'center', fontFamily: Fonts.sans500 },

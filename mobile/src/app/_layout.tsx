@@ -9,6 +9,7 @@ import { useFonts } from 'expo-font';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
 import { NotoSerifDisplay_400Regular, NotoSerifDisplay_400Regular_Italic } from '@expo-google-fonts/noto-serif-display';
 import { Colors } from '@/constants/theme';
+import { ToastHost } from '@/components/ui/toast';
 import { useSettings, useSettingsLoaded } from '@/lib/settings';
 
 SplashScreen.preventAutoHideAsync();
@@ -49,6 +50,8 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ title: 'Ρυθμίσεις' }} />
         </Stack.Protected>
       </Stack>
+      {/* Last child: draws above every screen and the tab bar. */}
+      <ToastHost />
     </ThemeProvider>
   );
 }

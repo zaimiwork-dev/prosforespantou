@@ -34,7 +34,7 @@ function uuid() {
 }
 
 // Random per-install id, created only once the shopper accepted.
-async function sessionId(): Promise<string | null> {
+export async function sessionId(): Promise<string | null> {
   if (sid) return sid;
   try {
     let v = await AsyncStorage.getItem(SID_KEY);
