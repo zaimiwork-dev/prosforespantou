@@ -48,6 +48,17 @@ Also: `POST /api/v1/events` (lead) live; EAS project linked (`@sigmax99/prosfore
 
 **Lead review 2026-11-10 (Fable took over as lead).** Read every screen and lib file. Verdict: the architecture is sound and should stay — thin typed client over the shared `DealCard` contract, module stores on `useSyncExternalStore`, Stack over tabs, four states per screen, AbortControllers, accessibility labels, large-text scaling, consent gating, honest dates. Design now matches the site. **The one gating risk: the app has never been executed on Android** — every check was `expo export` plus the web preview; NativeTabs, `Stack.Protected`, fonts, keyboard, safe areas and FlatList performance are unverified on the target. No emulator on the dev PC (adb only; 15 GB RAM, HyperV on → install cmdline-tools + emulator, ~5 GB). Gaps ranked: (1) run on Android; (2) no offline cache — supermarkets have bad signal, home/deals should show the last good response with a stale banner; (3) no crash reporting before testers (Sentry); (4) favourites are name+chain → search, not a product watch; `push_tokens` table exists, app never registers; (5) list promises «σε ποιο κατάστημα» but only shows per-chain subtotals; (6) no catalogue screen (owner asked 11-05); (7) icon/splash are still the Expo template chevron; (8) no Android App Links for prosforespantou.gr/offer/:id. Housekeeping (APP-405): duplicate `/meta` fetch in deals.tsx, unused template deps (expo-glass-effect, @expo/ui, expo-symbols, expo-device, expo-system-ui, expo-linking, gesture-handler, reanimated, worklets), `platform` hard-coded 'android', no fetch timeout, share text uses 2-letter chain codes, list footer copy contradicts itself, home errors when only /meta fails, `scripts/reset-project.js`, zero unit tests for lib logic.
 
+**Wave 1 — 2026-11-12 (after the owner's 11-10 brief; findings in CONTEXT.md START HERE).**
+
+| Ticket | Scope | Merged | Review notes |
+|---|---|---|---|
+| SRV-01 | `src/lib/price-timeline.ts` + `timeline` on `/api/v1/offers/:id` | `140e39e` | Lead fixed a build break (type re-export from a 'use server' file) and added `reliable` + the foreign-point rule after checking 42 live offers. |
+| lead | `GET /api/v1/feed`, `POST /api/v1/impressions` | `7c4cc0c` | Live: 21 rails, 209 cards, 0 duplicates. Pools balanced per chain. |
+| APP-500a | `useApi` + cache + stale banner, timeout, housekeeping, 8 unused deps removed | `b651014` | `expo-linking` had to stay (expo-router peer). expo-doctor reports patch-level drift vs SDK 58 — not yet fixed. |
+| APP-500b | skeletons, toast + undo, haptics, card tag, recently-viewed, interest profile, impressions queue | `12a4460` | Tag wraps to two lines instead of cutting the number. After merging with 500a three test files failed to parse → `test/react-native-stub.ts`. |
+
+**Wave 2 (running):** APP-501 home = server-driven feed; APP-502 product page v2 (price chart on `timeline`). Then APP-503 search suggestions + category browse.
+
 **Next:** Play internal test → closed test opens (needs the owner's Play Console account — postponed by the owner on 11-04).
 
 ## The one constraint that sets the calendar
