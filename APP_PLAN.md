@@ -57,7 +57,18 @@ Also: `POST /api/v1/events` (lead) live; EAS project linked (`@sigmax99/prosfore
 | APP-500a | `useApi` + cache + stale banner, timeout, housekeeping, 8 unused deps removed | `b651014` | `expo-linking` had to stay (expo-router peer). expo-doctor reports patch-level drift vs SDK 58 — not yet fixed. |
 | APP-500b | skeletons, toast + undo, haptics, card tag, recently-viewed, interest profile, impressions queue | `12a4460` | Tag wraps to two lines instead of cutting the number. After merging with 500a three test files failed to parse → `test/react-native-stub.ts`. |
 
-**Wave 2 (running):** APP-501 home = server-driven feed; APP-502 product page v2 (price chart on `timeline`). Then APP-503 search suggestions + category browse.
+**Wave 2 — merged 2026-11-13:**
+
+| Ticket | Scope | Merged | Review notes |
+|---|---|---|---|
+| APP-501 | Home = the server's feed: sticky search, category chips, chain strip, «Είδες πρόσφατα», 21 rails virtualised, impressions per rail, skeletons, offline | `eaf03ef` | Clean. `stickyHeaderIndices={[1]}` (index 0 pins the header) — web only, unverified on Android. |
+| APP-502 | Product page v2: price history on `timeline` (stepped shelf line, promo dots, range chips, drag marker, facts in words), signals, skeleton, comparison empty state | `b3671d2` | Lead fixed: facts dated from their own first observation (it printed «από Απρίλιο» for a shelf price first read in November); `/api/v1/offers/:id` no longer lists the offer's own chain as a rival. |
+
+Web preview for the owner (11-13): https://prosfores-pantou--kol3qace2m.expo.app
+
+**Still unverified on Android (nothing has run on a device or emulator):** NativeTabs, sticky header, toast position above the tab bar, haptics, drag on the chart, FlatList smoothness with 21 rails. Owner decision on the emulator install is pending.
+
+**Next app tickets:** APP-503 search suggestions + category browse; list intelligence («όλη η λίστα στο ΑΒ vs στον Σκλαβενίτη»); icon + splash (still the Expo template); Sentry.
 
 **Next:** Play internal test → closed test opens (needs the owner's Play Console account — postponed by the owner on 11-04).
 
