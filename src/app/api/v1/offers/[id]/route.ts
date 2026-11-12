@@ -67,7 +67,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       },
       // Offer rows become cards; shelf rows stay a plain chain + price, the
       // «Κανονική τιμή» line the website draws for chains with no offer.
-      comparison: (comparison as Array<Record<string, any>>).map((r) =>
+      // Rows of the offer's OWN chain are dropped: a product can hold a web and
+      // a leaflet offer at one chain (Discount.source), and the page then listed
+      // «Μασούτης 4,84 €» twice, both «Φθηνότερα» (seen 2026-11-13). The stored
+      // comparison count already ignores them (lib/comparison-count).
+      comparison: (comparison as Array<Record<string, any>>)
+        .filter((r) => r.rowType === 'shelf' || r.supermarket !== offer.supermarket)
+        .map((r) =>
         r.rowType === 'shelf'
           ? { type: 'shelf', chain: r.supermarket, price: r.price, recordedAt: r.recordedAt, checkedAt: r.checkedAt }
           : { type: 'offer', deal: toDealCard(r as never) },

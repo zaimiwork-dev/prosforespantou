@@ -142,3 +142,29 @@ describe('factsFor', () => {
     expect(chartLabel(tl(), fmt, NOW)).toContain('Κανονική τιμή: 2,20 €.');
   });
 });
+
+describe('factsFor dates each fact from its own first observation', () => {
+  it('the shelf change is dated from the first SHELF step, not from an older promo', () => {
+    // Promos seen 200 days ago; the shelf price only read for the last 12 days.
+    const t = tl({
+      since: iso(200),
+      shelf: [
+        { from: iso(12), to: iso(5), price: 4.84 },
+        { from: iso(5), to: iso(0), price: 5.07 },
+      ],
+      promos: [
+        { at: iso(200), until: null, price: 5.07, kind: 'legacy', ongoing: false },
+        { at: iso(130), until: null, price: 4.21, kind: 'mono', ongoing: false },
+      ],
+    }, { shelfChangePct: 4.8, promoCount: 2 });
+    const facts = factsFor(t, fmt, NOW);
+    const month = (daysAgo: number) => factsFor(tl({ since: iso(daysAgo) }, { currentIsLowest: true }), fmt, NOW)[0].text.replace('Η χαμηλότερη τιμή από ', '');
+    expect(facts.find((x) => x.id === 'change')?.text).toBe(`Η κανονική τιμή ανέβηκε 5% από ${month(12)}`);
+    expect(month(12)).not.toBe(month(200));
+  });
+
+  it('says nothing about a shelf change when no shelf step exists', () => {
+    const t = tl({ shelf: [] }, { shelfChangePct: 4.8 });
+    expect(factsFor(t, fmt, NOW).map((x) => x.id)).not.toContain('change');
+  });
+});

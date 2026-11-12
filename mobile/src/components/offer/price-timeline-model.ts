@@ -142,19 +142,25 @@ export function factsFor(t: PriceTimeline, fmt: PriceFmt, now: number = Date.now
   if (s.currentIsLowest && since) {
     out.push({ id: 'lowestNow', good: true, text: `Η χαμηλότερη τιμή από ${formatMonthFrom(since, now)}` });
   }
-  if (s.shelfChangePct != null && Math.abs(s.shelfChangePct) >= 1 && since) {
+  // Each fact dates from ITS OWN first observation. `since` is the first
+  // observation of any kind: an offer seen in April with a shelf price first
+  // read in November printed «η κανονική τιμή ανέβηκε 5% από Απρίλιο» — a
+  // claim about seven months we never measured (lead review, 2026-11-13).
+  const shelfSince = t.shelf[0]?.from;
+  if (s.shelfChangePct != null && Math.abs(s.shelfChangePct) >= 1 && shelfSince) {
     const up = s.shelfChangePct > 0;
     out.push({
       id: 'change',
-      text: `Η κανονική τιμή ${up ? 'ανέβηκε' : 'έπεσε'} ${Math.round(Math.abs(s.shelfChangePct))}% από ${formatMonthFrom(since, now)}`,
+      text: `Η κανονική τιμή ${up ? 'ανέβηκε' : 'έπεσε'} ${Math.round(Math.abs(s.shelfChangePct))}% από ${formatMonthFrom(shelfSince, now)}`,
     });
   }
   if (s.lowest && !s.currentIsLowest) {
     out.push({ id: 'lowest', text: `Χαμηλότερη που έχουμε δει: ${fmt(s.lowest.price)} (${formatDay(s.lowest.at, now)})` });
   }
   if (s.shelfNow != null) out.push({ id: 'shelfNow', text: `Κανονική τιμή: ${fmt(s.shelfNow)}` });
-  if (s.promoCount >= 2 && since) {
-    out.push({ id: 'promos', text: `Σε προσφορά ${s.promoCount} φορές από ${formatMonthFrom(since, now)}` });
+  const promoSince = t.promos[0]?.at;
+  if (s.promoCount >= 2 && promoSince) {
+    out.push({ id: 'promos', text: `Σε προσφορά ${s.promoCount} φορές από ${formatMonthFrom(promoSince, now)}` });
   }
   return out.slice(0, 3);
 }
