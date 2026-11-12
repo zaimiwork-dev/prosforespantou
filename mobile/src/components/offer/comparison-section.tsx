@@ -26,8 +26,6 @@ export function ComparisonSection({ current, comparison }: { current: DealCard; 
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
-  if (comparison.length === 0) return null;
-
   const rows: Row[] = ([
     { key: current.id, chain: current.chain, price: current.price, unit: current.unit, kind: 'current' as const },
     ...comparison.map((r, i): Row =>
@@ -37,9 +35,26 @@ export function ComparisonSection({ current, comparison }: { current: DealCard; 
     ),
   ] as Row[]).sort((a, b) => a.price - b.price);
   const cheapest = rows[0];
+  const lead = rows[0].kind === 'current' && rows.length > 1 ? rows[1].price - rows[0].price : 0;
+
+  if (comparison.length === 0) {
+    return (
+      <View>
+        <Text style={styles.empty}>Δεν βρήκαμε το ίδιο προϊόν σε άλλο κατάστημα ακόμα</Text>
+        <Pressable
+          style={styles.similar}
+          onPress={() => router.navigate({ pathname: '/search', params: { q: current.title || current.name, t: String(Date.now()) } })}
+          accessibilityRole="button"
+          accessibilityLabel="Ψάξε παρόμοια προϊόντα">
+          <Text style={styles.similarText}>Ψάξε παρόμοια</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.list}>
+      {lead >= 0.01 ? <Text style={styles.leadLine}>Φθηνότερο εδώ κατά {formatPrice(lead)}</Text> : null}
       {rows.map((row) => {
         const chain = chains.find((c) => c.id === row.chain);
         const name = chain?.name ?? row.chain ?? '';
@@ -89,6 +104,19 @@ export function ComparisonSection({ current, comparison }: { current: DealCard; 
 
 const makeStyles = (T: TypeScale) =>
   StyleSheet.create({
+    empty: { ...T.text.body, color: Colors.ink2 },
+    similar: {
+      marginTop: Space[3],
+      minHeight: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: Radius.pill,
+      borderWidth: 2,
+      borderColor: Colors.brand,
+      backgroundColor: Colors.surface,
+    },
+    similarText: { ...T.text.button, color: Colors.brand },
+    leadLine: { ...T.text.bodyStrong, color: Colors.good, marginBottom: Space[2] },
     list: { gap: Space[1] },
     row: {
       flexDirection: 'row',

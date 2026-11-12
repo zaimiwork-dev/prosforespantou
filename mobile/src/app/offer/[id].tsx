@@ -2,8 +2,8 @@
 // PriceHistory) from GET /api/v1/offers/:id, laid out per DESIGN.md «Product
 // page». The server answers for ended offers too (shared links, saved lists)
 // with active:false, so an old price is never shown as if it were current.
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -15,11 +15,16 @@ import { useApi } from '@/lib/use-api';
 import { useChains } from '@/lib/chains';
 import { favouriteKeyFor, toggleFavourite, useFavourites } from '@/lib/favourites';
 import { formatPrice, formatUnitPrice } from '@/lib/format';
-import { addToList, useShoppingList } from '@/lib/shopping-list';
+import { addToList, changeQuantity, useShoppingList } from '@/lib/shopping-list';
+import { recordView } from '@/lib/recently-viewed';
+import { noteInterest } from '@/lib/interest';
+import { tap } from '@/lib/haptics';
+import { showToast } from '@/components/ui/toast';
+import { OfferSkeleton } from '@/components/offer/offer-skeleton';
 import { StaleBanner } from '@/components/ui/stale-banner';
 import { DealCardView } from '@/components/deal-card';
 import { ComparisonSection } from '@/components/offer/comparison-section';
-import { PriceHistoryChart } from '@/components/offer/price-history-chart';
+import { PriceHistory } from '@/components/offer/price-history-chart';
 import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
 
 const VERDICT_LABEL = { lowest: 'Χαμηλότερη τιμή', good: 'Καλή τιμή' } as const;
@@ -46,9 +51,9 @@ export default function OfferScreen() {
 
   if (!data && !error) {
     return (
-      <View style={styles.center}>
+      <View style={styles.screen}>
         <Stack.Screen options={headerOptions} />
-        <ActivityIndicator size="large" color={Colors.brand} />
+        <OfferSkeleton />
       </View>
     );
   }
@@ -85,7 +90,7 @@ export default function OfferScreen() {
 }
 
 function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode }) {
-  const { offer, comparison, history, similar } = data;
+  const { offer, comparison, timeline, similar } = data;
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
@@ -115,6 +120,13 @@ function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode
       track('page_view', { page: 'offer', discountId: offer.id, supermarket: offer.chain ?? undefined });
     }, [offer.id, offer.chain]),
   );
+
+  // Once per loaded offer (not per focus): on-device signals only; the consent
+  // gate is inside the libs.
+  useEffect(() => {
+    recordView(offer);
+    noteInterest('view', { category: offer.category, chain: offer.chain });
+  }, [offer]);
 
   const openLeaflet = () => {
     track('leaflet_click', { discountId: offer.id, supermarket: offer.chain ?? undefined });
@@ -199,17 +211,15 @@ function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode
         </Pressable>
       ) : null}
 
-      {comparison.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.h2}>Σε άλλα καταστήματα</Text>
-          <ComparisonSection current={offer} comparison={comparison} />
-        </View>
-      ) : null}
+      <View style={styles.section}>
+        <Text style={styles.h2}>Σε άλλα καταστήματα</Text>
+        <ComparisonSection current={offer} comparison={comparison} />
+      </View>
 
-      {history.points.length >= 2 ? (
+      {timeline && timeline.quality !== 'none' ? (
         <View style={styles.section}>
           <Text style={styles.h2}>Ιστορικό τιμής</Text>
-          <PriceHistoryChart history={history} />
+          <PriceHistory timeline={timeline} price={offer.price} />
         </View>
       ) : null}
 
@@ -247,7 +257,11 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
     <View style={styles.actions}>
       <Pressable
         style={[styles.favBtn, fav && styles.favBtnOn]}
-        onPress={() => toggleFavourite(offer)}
+        onPress={() => {
+          tap();
+          if (!fav) noteInterest('favourite', { category: offer.category, chain: offer.chain });
+          toggleFavourite(offer);
+        }}
         accessibilityRole="button"
         accessibilityState={{ selected: fav }}
         accessibilityLabel={fav ? 'Αφαίρεση από τα αγαπημένα' : 'Πρόσθεσε στα αγαπημένα'}>
@@ -281,7 +295,15 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
       <Pressable
         style={[styles.listBtn, onList && styles.listBtnOn]}
         onPress={() => {
-          addToList(offer, qty);
+          tap();
+          const have = items.find((i) => i.id === offer.id);
+          void addToList(offer, qty);
+          noteInterest('list_add', { category: offer.category, chain: offer.chain });
+          showToast({
+            message: have ? `Στη λίστα: ${have.quantity + qty} τεμάχια` : 'Προστέθηκε στη λίστα',
+            actionLabel: 'Αναίρεση',
+            onAction: () => void changeQuantity(offer.id, -qty),
+          });
           setQty(1);
         }}
         accessibilityRole="button"
