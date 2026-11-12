@@ -1,15 +1,13 @@
 // The home screen's blocks, in the order of the website's landing page
 // (HomeClient + Hero): header, hero, search, chain strip, rails, banner,
 // category tiles. The screen file only fetches data and stacks them.
-import { useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import type { Chain, DealCard, MetaResponse } from '@/lib/api';
-import { DealCardView } from '@/components/deal-card';
+import type { Chain } from '@/lib/api';
 import { Colors, Fonts, Radius, Space, useType } from '@/constants/theme';
 import { formatCount } from './count';
-import { ArrowRightIcon, CategoryIcon, GearIcon, ListIcon, SearchIcon } from './icons';
+import { ArrowRightIcon, GearIcon, ListIcon, SearchIcon } from './icons';
 
 export function HomeHeader({ listCount }: { listCount: number }) {
   return (
@@ -127,51 +125,6 @@ export function railCardWidth(screenWidth: number) {
   return Math.floor((screenWidth - Space[4] - Space[3] * 2 - 28) / 2);
 }
 
-export function Rail({
-  title,
-  hint,
-  deals,
-  width,
-  onSeeAll,
-}: {
-  title: string;
-  hint?: string;
-  deals: DealCard[];
-  width: number;
-  onSeeAll?: () => void;
-}) {
-  const T = useType();
-  if (deals.length === 0) return null;
-  return (
-    <View style={s.section}>
-      <View style={s.sectionHead}>
-        <View style={{ flex: 1 }}>
-          <Text style={[T.text.h2, s.h2]} accessibilityRole="header">
-            {title}
-          </Text>
-          {hint ? <Text style={[T.text.body, s.hint]}>{hint}</Text> : null}
-        </View>
-        {onSeeAll ? (
-          <Pressable onPress={onSeeAll} accessibilityRole="button" accessibilityLabel={`Δες όλες: ${title}`} hitSlop={8} style={s.seeAll}>
-            <Text style={[T.text.bodyStrong, { color: Colors.brand }]}>Όλες</Text>
-            <ArrowRightIcon size={16} color={Colors.brand} />
-          </Pressable>
-        ) : null}
-      </View>
-      <FlatList
-        horizontal
-        data={deals}
-        keyExtractor={(d) => d.id}
-        renderItem={({ item, index }) => <DealCardView deal={item} width={width} position={index} />}
-        ItemSeparatorComponent={() => <View style={{ width: Space[3] }} />}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: Space[4] }}
-        style={s.bleed}
-      />
-    </View>
-  );
-}
-
 // The site's `.promo` block: eyebrow, serif headline, gold button → all offers.
 export function PromoBanner({ total }: { total: number }) {
   const T = useType();
@@ -185,39 +138,6 @@ export function PromoBanner({ total }: { total: number }) {
         <ArrowRightIcon size={18} color={Colors.brand} />
       </View>
     </Pressable>
-  );
-}
-
-export function CategoryGrid({ categories }: { categories: MetaResponse['categories'] }) {
-  const T = useType();
-  const { width } = useWindowDimensions();
-  const tileW = Math.floor((width - Space[4] * 2 - Space[2] * 2) / 3);
-  const rows = useMemo(() => categories.filter((c) => c.offers > 0), [categories]);
-  if (rows.length === 0) return null;
-  return (
-    <View style={s.section}>
-      <Text style={[T.text.h2, s.h2, { marginBottom: Space[3] }]} accessibilityRole="header">
-        Ανά κατηγορία
-      </Text>
-      <View style={s.catGrid}>
-        {rows.map((c) => (
-          <Pressable
-            key={c.id}
-            onPress={() => router.navigate({ pathname: '/deals', params: { category: c.id } })}
-            accessibilityRole="button"
-            accessibilityLabel={`${c.full}, ${c.offers} προσφορές`}
-            style={({ pressed }) => [s.catTile, { width: tileW }, pressed && s.pressed]}>
-            <View style={s.catIcon}>
-              <CategoryIcon id={c.id} size={28} color={Colors.brand} />
-            </View>
-            <Text style={[T.text.caption, s.catLabel]} numberOfLines={2}>
-              {c.label}
-            </Text>
-            <Text style={[T.text.caption, s.catCount]}>{formatCount(c.offers)}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
   );
 }
 
@@ -254,13 +174,12 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: '#fff', fontFamily: Fonts.sans700, fontSize: 12, lineHeight: 16 },
-  hero: { marginTop: Space[5] },
+  hero: { marginTop: Space[2] },
   heroLine: { color: Colors.ink },
-  trust: { flexDirection: 'row', alignItems: 'center', gap: Space[2], marginTop: Space[3], flexWrap: 'wrap' },
+  trust: { flexDirection: 'row', alignItems: 'center', gap: Space[2], marginTop: Space[2], flexWrap: 'wrap' },
   trustText: { color: Colors.ink3Text },
   liveDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.good, borderWidth: 3, borderColor: '#BFDDC9' },
   search: {
-    marginTop: Space[5],
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space[2],
@@ -288,12 +207,7 @@ const s = StyleSheet.create({
   },
   logo: { width: '100%', height: '100%' },
   chainCount: { color: Colors.ink3Text },
-  section: { marginTop: Space[7] },
-  sectionHead: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: Space[3], gap: Space[2] },
-  h2: { color: Colors.ink },
-  hint: { color: Colors.ink3Text, marginTop: 2 },
-  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingLeft: Space[2] },
-  promo: { marginTop: Space[7], backgroundColor: Colors.brand, borderRadius: Radius.lg, padding: Space[5], overflow: 'hidden' },
+  promo: { backgroundColor: Colors.brand, borderRadius: Radius.lg, padding: Space[5], overflow: 'hidden' },
   eyebrow: { color: Colors.gold, fontFamily: Fonts.sans700, letterSpacing: 1 },
   promoTitle: { color: Colors.brandInk, marginTop: Space[2] },
   promoSub: { color: 'rgba(243,238,226,0.85)', marginTop: Space[1] },
@@ -308,21 +222,6 @@ const s = StyleSheet.create({
     borderRadius: Radius.pill,
     backgroundColor: Colors.gold,
   },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] },
-  // Three columns: (100% - 2 gaps) / 3, via flexBasis so no width maths is needed.
-  catTile: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.line,
-    borderRadius: Radius.md,
-    paddingVertical: Space[3],
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    gap: 4,
-  },
-  catIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.bgSoft, alignItems: 'center', justifyContent: 'center' },
-  catLabel: { color: Colors.ink, textAlign: 'center', fontFamily: Fonts.sans500 },
-  catCount: { color: Colors.ink3Text },
   error: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Space[6] },
   retry: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: Colors.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
 });
