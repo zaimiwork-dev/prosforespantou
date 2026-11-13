@@ -141,20 +141,18 @@ export function buildSuggestIndex(rows: Row[], labels: Record<string, string> = 
   }
 
   // Department words (so «τυρ» offers «Τυριά» even when no name starts with it).
-  // Counted as the department's offers; spelled with the department's accents.
+  // They add one to the count, not the department's size: a word like
+  // «Φροντίδα» must not outrank the products people actually look for. Their
+  // own spelling (with accents) wins over a shouted spelling from a name.
   deptIds.forEach((id, i) => {
     if (!deptCount[i]) return;
     for (const w of id.split(/\s+/)) {
       const clean = w.replace(CLEAN_EDGE_RE, '');
       const key = normalizeSearchText(clean);
       if (clean.length < 4 || STOP.has(key)) continue;
-      const existing = acc.get(key);
-      // Boost the department spelling so it beats a shouted name form.
-      bump(acc, key, clean, i, 0);
+      bump(acc, key, clean, i);
       const a = acc.get(key)!;
       a.forms.set(clean, (a.forms.get(clean) ?? 0) + 1_000_000);
-      a.count = Math.max(a.count, deptCount[i]);
-      if (!existing) a.depts.set(i, a.count);
     }
   });
 

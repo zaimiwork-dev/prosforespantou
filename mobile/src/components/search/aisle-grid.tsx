@@ -27,7 +27,7 @@ export function AisleGrid({ categories, onPick, title = 'Ανά διάδρομο
             <View style={s.icon}>
               <CategoryIcon id={c.id} size={26} color={Colors.brand} />
             </View>
-            <View style={s.text}>
+            <View>
               <Text style={s.label} numberOfLines={2}>{c.label}</Text>
               <Text style={s.count}>{c.offers.toLocaleString('el-GR')} προσφορές</Text>
             </View>
@@ -45,10 +45,8 @@ const makeStyles = (T: TypeScale) =>
     tile: {
       flexBasis: '47%',
       flexGrow: 1,
-      minHeight: 72,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Space[3],
+      minHeight: 112,
+      gap: Space[2],
       padding: Space[3],
       backgroundColor: Colors.surface,
       borderWidth: 1,
@@ -57,7 +55,6 @@ const makeStyles = (T: TypeScale) =>
     },
     pressed: { opacity: 0.8 },
     icon: { width: 44, height: 44, borderRadius: Radius.pill, backgroundColor: Colors.bgSoft, alignItems: 'center', justifyContent: 'center' },
-    text: { flex: 1 },
     label: { ...T.text.bodyStrong, color: Colors.ink },
     count: { ...T.text.caption, color: Colors.ink3Text },
   });

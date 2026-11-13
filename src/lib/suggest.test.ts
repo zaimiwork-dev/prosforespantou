@@ -76,6 +76,12 @@ describe('suggest', () => {
     expect(suggest(idx, 'γαλ').categories.length).toBeLessThanOrEqual(3);
   });
 
+  it('offers department words as phrases, with their own accents, without outranking real products', () => {
+    const r = suggest(idx, 'τυρ');
+    expect(r.terms.map((t) => t.text)).toContain('Τυριά');
+    expect(idx.terms.find((t) => t[0] === 'Τυριά')![1]).toBeLessThanOrEqual(1);
+  });
+
   it('keeps sizes, units and filler out of the suggestions', () => {
     const all = idx.terms.map((t) => t[0].toLowerCase());
     expect(all.some((t) => /\d/.test(t))).toBe(false);

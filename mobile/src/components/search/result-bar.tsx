@@ -75,7 +75,7 @@ export function ResultBar({
         accessibilityLabel={`Ταξινόμηση: ${SORT_LABELS[sort]}`}
         style={s.sortPill}>
         <Text style={s.sortLabel}>Ταξινόμηση:</Text>
-        <Text style={s.sortValue} numberOfLines={1}>{SORT_LABELS[sort]}</Text>
+        <Text style={s.sortValue} numberOfLines={2}>{SORT_LABELS[sort]}</Text>
         <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.ink2} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
           <Path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
         </Svg>
@@ -114,8 +114,7 @@ const makeStyles = (T: TypeScale) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: Space[2],
-      alignSelf: 'flex-start',
-      maxWidth: '100%',
+      alignSelf: 'stretch',
       paddingHorizontal: Space[4],
       backgroundColor: Colors.surface,
       borderWidth: 1,
@@ -124,7 +123,7 @@ const makeStyles = (T: TypeScale) =>
       marginBottom: Space[3],
     },
     sortLabel: { ...T.text.chip, fontFamily: Fonts.sans500, color: Colors.ink3Text },
-    sortValue: { ...T.text.chip, color: Colors.ink, flexShrink: 1 },
+    sortValue: { ...T.text.chip, color: Colors.ink, flex: 1 },
     options: { backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, marginBottom: Space[3] },
     option: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Space[3], paddingHorizontal: Space[4] },
     optionLine: { borderTopWidth: 1, borderTopColor: Colors.line },
