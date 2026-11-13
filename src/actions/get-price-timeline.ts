@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
-import { buildPriceTimeline, type PriceTimeline } from '@/lib/price-timeline';
+import { buildPriceTimeline, selectTimelineSnapshots, type PriceTimeline } from '@/lib/price-timeline';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
 
 
@@ -41,6 +41,8 @@ export async function getPriceTimeline(
     supermarket: string | null | undefined;
     // The offer on screen. firstSeenAt is the best "since when" we have for it.
     offer?: { price: number; firstSeenAt: string | Date; active: boolean } | null;
+    // The on-screen offer's chain SKU: lets the history be that SKU's own (SRV-02).
+    chainItemcode?: string | null;
   }
 ): Promise<PriceTimeline> {
   return await Sentry.withServerActionInstrumentation(
@@ -55,10 +57,7 @@ export async function getPriceTimeline(
           prisma.priceSnapshot.findMany({
             where: { productId, supermarket: options.supermarket, recordedAt: { gte: since } },
             orderBy: { recordedAt: 'asc' },
-            // LASTSEEN: once PriceSnapshot gets a `lastSeenAt` column, add
-            // `lastSeenAt: true` here and `lastSeenAt: r.lastSeenAt` below -
-            // nothing else changes (the library already honours it).
-            select: { price: true, kind: true, recordedAt: true },
+            select: { price: true, kind: true, recordedAt: true, lastSeenAt: true, chainItemcode: true },
           }),
           loadFreshShelfChains(prisma),
           // Snapshots are keyed by product, not by chain SKU: with two SKUs of
@@ -66,11 +65,19 @@ export async function getPriceTimeline(
           prisma.chainProductMapping.count({ where: { productId, supermarket: options.supermarket } }),
         ]);
 
+        const picked = selectTimelineSnapshots({
+          rows, offerItemcode: options.chainItemcode, mappingCount: skus,
+        });
+
         return buildPriceTimeline({
-          snapshots: rows.map((r) => ({ price: r.price, kind: r.kind, recordedAt: r.recordedAt })),
+          snapshots: picked.rows.map((r) => ({
+            price: r.price, kind: r.kind, recordedAt: r.recordedAt,
+            lastSeenAt: r.lastSeenAt, chainItemcode: r.chainItemcode,
+          })),
           offer: options.offer ?? null,
           shelfFeedAliveAt: freshChains.get(options.supermarket) ?? null,
-          mixedSkus: skus > 1,
+          // A per-SKU series is one pack by construction.
+          mixedSkus: !picked.perSku && skus > 1,
         });
       } catch (error) {
         Sentry.captureException(error);

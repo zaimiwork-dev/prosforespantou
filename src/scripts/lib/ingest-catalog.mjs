@@ -30,6 +30,7 @@
 // Batched for 10k–20k-row catalogs. Safety: 0 valid items → no-op, never deletes.
 
 import { SM_MAPPING, normalizeBarcode, withDbRetry } from './ingest-offers.mjs';
+import { normItemcode, fetchLatestRows, bumpLastSeen, pickSnapshotIdsToBump, planNormalSnapshots } from './snapshot-seen.mjs';
 import {
   evaluateVolume,
   VOLUME_HISTORY,
@@ -211,7 +212,9 @@ export async function ingestCatalog({
   // Existing rows aren't field-churned every run — only identity + the SKU
   // mapping are ensured; image/brand refresh is left to the offer scrape and
   // the catalog-image mirror, so steady-state runs stay cheap.
-  const wantPrice = new Map(); // productId → shelf price to snapshot (first wins)
+  // (productId, SKU) → shelf price to snapshot (first wins). Keyed per SKU since
+  // SRV-02: two SKUs sharing a product no longer overwrite each other's price.
+  const wantPrice = new Map();
   const toStamp = []; // SKUs whose existing mapping is proven by this run's GTIN
   const toRefresh = []; // [productId, item] — only when refreshFields is on
   for (const it of valid) {
@@ -290,7 +293,11 @@ export async function ingestCatalog({
         if (bc) barcodeToPid.set(bc, pid);
         out.created++;
       }
-      if (it.baseline !== false && !wantPrice.has(pid)) wantPrice.set(pid, it.price);
+      if (it.baseline !== false) {
+        const code = normItemcode(it.chainItemcode);
+        const key = `${pid}|${code ?? ''}`;
+        if (!wantPrice.has(key)) wantPrice.set(key, { productId: pid, chainItemcode: code, price: it.price });
+      }
     } catch {
       out.errors++;
     }
@@ -344,29 +351,24 @@ export async function ingestCatalog({
     }
   }
 
-  // Shelf-price snapshots, on-change (DISTINCT ON latest 'normal' per product).
-  const pids = [...wantPrice.keys()];
-  const lastNormal = new Map();
-  for (let i = 0; i < pids.length; i += 1000) {
-    const chunk = pids.slice(i, i + 1000);
-    const snaps = await withDbRetry('catalog last-normal', () =>
-      prisma.priceSnapshot.findMany({
-        where: { supermarket: chain, kind: 'normal', productId: { in: chunk } },
-        orderBy: [{ productId: 'asc' }, { recordedAt: 'desc' }],
-        distinct: ['productId'],
-        select: { productId: true, price: true },
-      }));
-    for (const s of snaps) lastNormal.set(s.productId, s.price);
-  }
-  const toWrite = [];
-  for (const [pid, price] of wantPrice) {
-    if (lastNormal.get(pid) === price) { out.unchanged++; continue; }
-    toWrite.push({ productId: pid, supermarket: chain, price, isDiscounted: false, kind: 'normal' });
-  }
+  // Shelf-price snapshots, on-change, compared per SKU (SRV-02): the latest
+  // 'normal' row per (product, SKU); a SKU with no row of its own falls back to
+  // the product's newest pre-SRV-02 row (no itemcode) so history is not duplicated.
+  // Unchanged SKUs get lastSeenAt = run time in batched UPDATEs.
+  const wants = [...wantPrice.values()];
+  const latest = await fetchLatestRows(
+    prisma, chain, wants.map((w) => w.productId), withDbRetry, 'catalog last-normal', { kind: 'normal' });
+  const { toWrite, seenUnchanged } = planNormalSnapshots(wants, latest, chain);
+  out.unchanged += seenUnchanged.length;
   for (let i = 0; i < toWrite.length; i += 1000) {
     const chunk = toWrite.slice(i, i + 1000);
     await withDbRetry('catalog snap insert', () => prisma.priceSnapshot.createMany({ data: chunk }));
     out.snapshots += chunk.length;
+  }
+  try {
+    await bumpLastSeen(prisma, pickSnapshotIdsToBump(seenUnchanged, latest), runStart, withDbRetry);
+  } catch (e) {
+    out.warnings.push(`lastSeenAt bump failed (non-fatal): ${e.message}`);
   }
 
   if (out.errors > 0) {

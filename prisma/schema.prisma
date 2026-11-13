@@ -63,10 +63,16 @@ model PriceSnapshot {
   // back-compat boolean; `kind` is the richer signal the baseline/verdict use.
   kind            String?
   recordedAt      DateTime @default(now()) @map("recorded_at")
+  // SRV-02: the last run that still saw this exact price for this SKU (promo
+  // ends are read from it), and the chain SKU the row was recorded for (null on
+  // rows written before the column existed).
+  lastSeenAt      DateTime? @map("last_seen_at")
+  chainItemcode   String?  @map("chain_itemcode")
   product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, recordedAt])
   @@index([productId, kind, recordedAt])
+  @@index([productId, supermarket, chainItemcode, recordedAt])
   @@map("price_snapshots")
 }
 

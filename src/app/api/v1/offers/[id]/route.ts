@@ -48,6 +48,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       }),
       getPriceTimeline(offer.productId, {
         supermarket: offer.supermarket,
+        chainItemcode: offer.chainItemcode ?? null,
         // Discount has no first-seen column. validFrom is the earliest start we
         // can stand behind (re-stamped by runs when dates are not the chain's,
         // which only understates how long the offer has run - never overstates).
