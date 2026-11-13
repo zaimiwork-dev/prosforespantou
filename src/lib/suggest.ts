@@ -9,8 +9,15 @@
 // first two/three words of a name (brand-first or noun-first, e.g. «Nescafe
 // Classic», «Γάλα ΔΕΛΤΑ Φρέσκο»), plus the words of the department names. Words
 // with digits, sizes, units and filler («με», «και», «τεμ») never become
-// phrases. The list is capped (MAX_TERMS, most-offered first) so the cached
-// entry stays small whatever the catalogue grows to.
+// phrases; neither do the chains' abbreviations («ΖΥΜ.», a capitals-only «ΣΑΜΠ»)
+// or words mixing Greek and Latin letters. The list is capped (MAX_TERMS,
+// most-offered first) so the cached entry stays small whatever the catalogue
+// grows to.
+//
+// Counts are offers, not searches, so suggest() corrects two things a Greek
+// reader notices at once: a base word goes before a more common form that only
+// extends it («Γάλα» before «Γάλακτος»), and a noun is listed in one case
+// («Κοτόπουλο», not also «Κοτόπουλου»). Measured on the live catalogue 11-13.
 //
 // Pure + strip-safe (no enums/decorators): imported by a server action and by
 // vitest; the only dependencies are the search normaliser and the categorizer
@@ -22,9 +29,23 @@ import { DEPARTMENTS } from './categories.ts';
 export const MAX_TERMS = 6000;
 export const MAX_SUGGESTED_TERMS = 8;
 export const MAX_SUGGESTED_DEPARTMENTS = 3;
+// A capitals-only word of at most this many letters is a truncation when a
+// longer word starting with it is this many times more common.
+const TRUNCATION_MAX_LEN = 5;
+const TRUNCATION_RATIO = 5;
+// «Γάλα» (123 offers) goes before «Γάλακτος» (175): a word the other merely
+// extends — by an ending, not by another word («Πάνα» / «Πανάρισμα») — comes
+// first while it is at least a quarter as common.
+const BASE_FIRST_RATIO = 4;
+const BASE_FIRST_MAX_EXTRA = 4;
+const BASE_FIRST_WINDOW = 60;
+// A phrase «lives in» a department only when most of its offers are there.
+// «Φέτα» is in frozen pies, sauces and fish fillets as much as in cheese:
+// naming one aisle for it would be a guess.
+const DEPARTMENT_SHARE_MIN = 0.6;
 
 // [display text, offers containing it, index into SuggestIndex.departments of
-// the department most of those offers are in (-1 = none/«Άλλο»)]
+// the department at least DEPARTMENT_SHARE_MIN of those offers are in (-1 = none)]
 export type SuggestTerm = [string, number, number];
 
 export type SuggestIndex = {
@@ -54,12 +75,27 @@ const STOP = new Set(
 
 const WORD_RE = /^[\p{L}][\p{L}'’-]*$/u;
 const CLEAN_EDGE_RE = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+const LEAD_EDGE_RE = /^[^\p{L}\p{N}]+/u;
+// «ΖΥΜ.», «ΣΑΜΠ.», «ΕΠΙΚ.»: a chain's abbreviation, not a word to suggest.
+const ABBREV_RE = /\p{L}\.$/u;
 
 function wordsOf(name: string): string[] {
   // Tokens that are not plain words (sizes, prices, «3x500γρ», «&») end the
   // phrase-able prefix but are skipped for unigrams — see buildSuggestIndex.
-  return name.split(/\s+/).map((t) => t.replace(CLEAN_EDGE_RE, '')).filter(Boolean);
+  // An abbreviation keeps its dot so it is treated the same way.
+  return name
+    .split(/\s+/)
+    .map((t) => (ABBREV_RE.test(t) ? t.replace(LEAD_EDGE_RE, '') : t.replace(CLEAN_EDGE_RE, '')))
+    .filter(Boolean);
 }
+
+const isShouted = (raw: string) => raw === raw.toUpperCase() && raw !== raw.toLowerCase();
+
+// Greek and Latin letters in one word are a data-entry slip («Σαμπoyan», «ΧΧL»
+// typed with Greek Χ): the right spelling exists as its own phrase.
+const GREEK_RE = /\p{Script=Greek}/u;
+const LATIN_RE = /\p{Script=Latin}/u;
+const isPlainWord = (t: string) => WORD_RE.test(t) && !(GREEK_RE.test(t) && LATIN_RE.test(t));
 
 // ALL-CAPS names are shouted by the chains; show «Κουβερτούρα» not «ΚΟΥΒΕΡΤΟΥΡΑ».
 // (Accents are lost in caps; a mixed-case spelling seen elsewhere wins, see quality.)
@@ -78,7 +114,7 @@ function tidy(phrase: string): string {
 
 // Higher = a nicer spelling to show for the same normalised phrase.
 function quality(raw: string): number {
-  const shouted = raw === raw.toUpperCase() && raw !== raw.toLowerCase();
+  const shouted = isShouted(raw);
   const accented = raw !== normalizeSearchText(raw) && /[άέήίόύώϊϋΐΰ]/i.test(raw) ? 1 : 0;
   return (shouted ? 0 : 2) + accented;
 }
@@ -114,7 +150,7 @@ export function buildSuggestIndex(rows: Row[], labels: Record<string, string> = 
 
     // Unigrams: every plain word of at least 3 letters.
     for (const t of tokens) {
-      if (!WORD_RE.test(t) || t.length < 3) continue;
+      if (!isPlainWord(t) || t.length < 3) continue;
       const key = normalizeSearchText(t);
       if (STOP.has(key) || seen.has(key)) continue;
       seen.add(key);
@@ -124,7 +160,7 @@ export function buildSuggestIndex(rows: Row[], labels: Record<string, string> = 
     // Leading phrases: the first 2 and 3 words, as long as they are plain words.
     const lead: string[] = [];
     for (const t of tokens) {
-      if (!WORD_RE.test(t)) break;
+      if (!isPlainWord(t)) break;
       lead.push(t);
       if (lead.length === 3) break;
     }
@@ -156,8 +192,28 @@ export function buildSuggestIndex(rows: Row[], labels: Record<string, string> = 
     }
   });
 
+  // Truncations written without a dot («ULTREX ΣΑΜΠ DEEP CLEAN», «ΣΑΚ ΑΠΟΡ»):
+  // a short word only ever seen in capitals that a far more common word starts
+  // with. Both conditions are needed — «Μέλι» is short and «Μέλισσα» is more
+  // common, but «Μέλι» is also written in normal case, so it stays.
+  const longerMax = new Map<string, number>();
+  for (const [key, a] of acc) {
+    if (key.includes(' ')) continue;
+    for (let p = 3; p <= TRUNCATION_MAX_LEN && p < key.length; p++) {
+      const pre = key.slice(0, p);
+      if ((longerMax.get(pre) ?? 0) < a.count) longerMax.set(pre, a.count);
+    }
+  }
+  const truncated = new Set<string>();
+  for (const [key, a] of acc) {
+    if (key.includes(' ') || key.length > TRUNCATION_MAX_LEN) continue;
+    if ((longerMax.get(key) ?? 0) < a.count * TRUNCATION_RATIO) continue;
+    if ([...a.forms.keys()].every(isShouted)) truncated.add(key);
+  }
+
   const terms: SuggestTerm[] = [];
-  for (const a of acc.values()) {
+  for (const [key, a] of acc) {
+    if (truncated.has(key) || (key.includes(' ') && key.split(' ').some((w) => truncated.has(w)))) continue;
     let best = '';
     let bestQ = -1;
     let bestN = -1;
@@ -177,6 +233,7 @@ export function buildSuggestIndex(rows: Row[], labels: Record<string, string> = 
         domN = n;
       }
     }
+    if (domN < a.count * DEPARTMENT_SHARE_MIN) dom = -1;
     terms.push([tidy(best), a.count, dom]);
   }
   terms.sort((x, y) => y[1] - x[1] || x[0].length - y[0].length || (x[0] < y[0] ? -1 : 1));
@@ -215,8 +272,7 @@ export function suggest(index: SuggestIndex, rawQuery: string): SuggestResult {
   const variants = isLatin ? [base, ...expandSearch(query).filter((v) => v !== base)] : [base];
 
   const norms = normalisedTerms(index);
-  type Hit = { i: number; tier: number; variant: number };
-  const hits: Hit[] = [];
+  const hits: RankedHit[] = [];
   for (let i = 0; i < norms.length; i++) {
     for (let v = 0; v < variants.length; v++) {
       const tier = matchTier(norms[i], variants[v]);
@@ -237,35 +293,103 @@ export function suggest(index: SuggestIndex, rawQuery: string): SuggestResult {
       a.i - b.i,
   );
 
-  const taken = new Set<string>();
-  for (const h of hits) {
+  const taken: number[] = [];
+  const seen = new Set<string>();
+  for (const h of baseFirst(hits, norms, index.terms)) {
+    const norm = norms[h.i];
+    if (seen.has(norm)) continue;
+    // «Κοτόπουλου» under «Κοτόπουλο» is the same search in another case.
+    if (isWord(norm) && taken.some((j) => isWord(norms[j]) && sameWordOtherCase(norms[j], norm))) continue;
+    seen.add(norm);
+    taken.push(h.i);
     const [text, count] = index.terms[h.i];
-    if (taken.has(norms[h.i])) continue;
-    taken.add(norms[h.i]);
     out.terms.push({ text, count });
     if (out.terms.length >= MAX_SUGGESTED_TERMS) break;
   }
 
   // Departments: those whose own name has a word starting with the query, then
-  // those most of the matched phrases live in (weighted by how many offers).
-  const deptScore = new Map<number, number>();
+  // the ONE department the first suggestion lives in. Not every department a
+  // matching phrase touches: «γάλα» also reaches «Γαλάκτωμα», and a row «σε
+  // Προσωπική Φροντίδα» opens an aisle the shopper did not ask for.
+  const named: number[] = [];
   index.departments.forEach((d, i) => {
     if (!d.count) return;
     const words = normalizeSearchText(`${d.id} ${d.label}`).split(/[\s&]+/).filter((w) => w.length >= 3 && !STOP.has(w));
-    if (words.some((w) => variants.some((v) => w.startsWith(v)))) deptScore.set(i, Number.MAX_SAFE_INTEGER);
+    if (words.some((w) => variants.some((v) => w.startsWith(v)))) named.push(i);
   });
-  for (const h of hits.slice(0, 40)) {
-    const [, count, dept] = index.terms[h.i];
-    if (dept < 0 || deptScore.get(dept) === Number.MAX_SAFE_INTEGER) continue;
-    deptScore.set(dept, Math.max(deptScore.get(dept) ?? 0, count));
-  }
-  const ranked = [...deptScore.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
-  for (const [i, score] of ranked) {
+  for (const i of named.slice(0, MAX_SUGGESTED_DEPARTMENTS)) {
     const d = index.departments[i];
-    // A department reached only through phrases must hold a real share of them.
-    if (score !== Number.MAX_SAFE_INTEGER && score < 2) continue;
-    out.categories.push({ id: d.id, label: d.label, count: score === Number.MAX_SAFE_INTEGER ? d.count : Math.min(score, d.count) });
-    if (out.categories.length >= MAX_SUGGESTED_DEPARTMENTS) break;
+    out.categories.push({ id: d.id, label: d.label, count: d.count });
+  }
+  if (taken.length > 0 && out.categories.length < MAX_SUGGESTED_DEPARTMENTS) {
+    const [, count, dept] = index.terms[taken[0]];
+    // One offer is not «where this lives».
+    if (dept >= 0 && count >= 2 && !named.includes(dept)) {
+      const d = index.departments[dept];
+      out.categories.push({ id: d.id, label: d.label, count: Math.min(count, d.count) });
+    }
   }
   return out;
+}
+
+const isWord = (norm: string) => !norm.includes(' ');
+
+// Case endings a Greek noun takes without becoming another product: «Κοτόπουλο /
+// Κοτόπουλου», «Φρούτα / Φρούτων», «Γιαούρτι / Γιαουρτιού», «Σοκολάτα /
+// Σοκολάτας», «Τόνος / Τόνο». Number is NOT folded: «Φέτα» (the cheese) and
+// «Φέτες» (slices) are different searches. Works on normalised text (no
+// accents, final sigma as σ); Latin words have none of these endings.
+const ENDINGS = ['ιου', 'ιων', 'ου', 'ων', 'οσ', 'ασ', 'ησ', 'εσ', 'ια', 'α', 'ο', 'η', 'ι', 'ε', 'υ'];
+const GENITIVE = new Set(['ιου', 'ιων', 'ου', 'ων']);
+
+function stemOf(norm: string): [string, string] {
+  for (const e of ENDINGS) {
+    if (norm.length - e.length >= 3 && norm.endsWith(e)) return [norm.slice(0, -e.length), e];
+  }
+  return [norm, ''];
+}
+
+export function sameWordOtherCase(a: string, b: string): boolean {
+  if (a === b) return false;
+  if (a + 'σ' === b || b + 'σ' === a) return true;
+  const [stemA, endA] = stemOf(a);
+  const [stemB, endB] = stemOf(b);
+  return stemA === stemB && (GENITIVE.has(endA) || GENITIVE.has(endB));
+}
+
+type RankedHit = { i: number; tier: number; variant: number };
+
+// Counts come from offer names, not from what people search, so an inflected
+// form can outnumber its own base word: «Γάλακτος» (every milk chocolate) beats
+// «Γάλα». Within the leading hits, a single word that another merely extends is
+// moved in front of it when it is about as common (BASE_FIRST_RATIO).
+function baseFirst(hits: RankedHit[], norms: string[], terms: SuggestTerm[]): RankedHit[] {
+  const head = hits.slice(0, BASE_FIRST_WINDOW);
+  const placed = new Array<boolean>(head.length).fill(false);
+  const out: RankedHit[] = [];
+  for (let a = 0; a < head.length; a++) {
+    if (placed[a]) continue;
+    const long = head[a];
+    const longNorm = norms[long.i];
+    if (isWord(longNorm)) {
+      const bases: number[] = [];
+      for (let b = a + 1; b < head.length; b++) {
+        if (placed[b]) continue;
+        const short = head[b];
+        const shortNorm = norms[short.i];
+        if (short.variant !== long.variant || short.tier !== long.tier || !isWord(shortNorm)) continue;
+        const extra = longNorm.length - shortNorm.length;
+        if (extra < 1 || extra > BASE_FIRST_MAX_EXTRA || !longNorm.startsWith(shortNorm)) continue;
+        if (terms[short.i][1] * BASE_FIRST_RATIO >= terms[long.i][1]) bases.push(b);
+      }
+      bases.sort((x, y) => norms[head[x].i].length - norms[head[y].i].length);
+      for (const b of bases) {
+        out.push(head[b]);
+        placed[b] = true;
+      }
+    }
+    out.push(long);
+    placed[a] = true;
+  }
+  return hits.length > head.length ? out.concat(hits.slice(head.length)) : out;
 }

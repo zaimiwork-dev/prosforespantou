@@ -205,7 +205,10 @@ export default function SearchScreen() {
   };
 
   const typedQ = text.trim();
-  const typing = typedQ.length >= MIN_CHARS && typedQ !== searched;
+  // `searched` outlives a cleared field, so retyping the same word must still
+  // count as typing: with nothing on screen for it (idle) there is no result to
+  // fall back to, and the screen would show recents under a filled field.
+  const typing = typedQ.length >= MIN_CHARS && (typedQ !== searched || status === 'idle');
   const showResults = !typing && status !== 'idle';
   const done = showResults && status === 'done';
 
