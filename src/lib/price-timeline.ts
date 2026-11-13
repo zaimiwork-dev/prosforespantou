@@ -19,10 +19,32 @@ export type TimelineSnapshot = {
   price: number;
   kind: string | null;
   recordedAt: string | Date;
-  // When the offer pipeline last still saw this price. A column that does not
-  // exist yet; until it does, every promo's end is unknown (`until: null`).
+  // When the pipeline last still saw this price (SRV-02). Old rows have none:
+  // their promo's end stays unknown (`until: null`).
   lastSeenAt?: string | Date | null;
+  // The chain SKU the row was recorded for; null on rows older than SRV-02.
+  chainItemcode?: string | null;
 };
+
+// Per-SKU history (SRV-02). Snapshots hang off the product, so several SKUs of
+// one chain interleave. When the offer on screen has an itemcode AND at least one
+// snapshot carries it, the history is that SKU's own rows - plus the older
+// itemcode-less rows only when the product has a single mapping at the chain
+// (then they can only be this SKU's). Otherwise nothing changes: all rows, and
+// the caller keeps its `mappings > 1` mixed-pack verdict.
+export function selectTimelineSnapshots<T extends { chainItemcode?: string | null }>(input: {
+  rows: T[];
+  offerItemcode: string | null | undefined;
+  mappingCount: number;
+}): { rows: T[]; perSku: boolean } {
+  const code = input.offerItemcode;
+  if (!code || !input.rows.some((r) => r.chainItemcode === code)) return { rows: input.rows, perSku: false };
+  const keepLegacy = input.mappingCount === 1;
+  return {
+    rows: input.rows.filter((r) => r.chainItemcode === code || (keepLegacy && (r.chainItemcode ?? null) === null)),
+    perSku: true,
+  };
+}
 
 export type TimelineInput = {
   snapshots: TimelineSnapshot[]; // this product AT THIS CHAIN, any order, any age

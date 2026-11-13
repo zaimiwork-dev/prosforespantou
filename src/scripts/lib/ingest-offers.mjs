@@ -11,6 +11,7 @@ import 'dotenv/config';
 import { computeHotScore } from '../../lib/hotness.ts';
 import { alertMatchesDiscount } from '../../lib/alert-match.ts';
 import { categorizeForChain, hasChainMap } from '../../lib/categories.ts';
+import { snapshotLookupWhere, pickSnapshotIdsToBump, fetchLatestRows, bumpLastSeen } from './snapshot-seen.mjs';
 
 // Chain slug → Store.name (must match what's already in the DB).
 export const SM_MAPPING = {
@@ -320,12 +321,23 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
   // Snapshots hang off the Product, so productless offers get history only
   // once they're claimed.
   let snapshotWritten = false;
+  let seen = null; // present and price unchanged: the caller bumps lastSeenAt in one batch
   const priceMoved = !existing || existing.discountedPrice !== item.price;
   if (productId && priceMoved) {
-    const last = await prisma.priceSnapshot.findFirst({
-      where: { productId, supermarket: chain },
+    // Per-SKU (SRV-02): with an itemcode the comparison is against THIS SKU's
+    // own latest snapshot; without one, today's product-wide rule.
+    let last = await prisma.priceSnapshot.findFirst({
+      where: snapshotLookupWhere(productId, chain, chainItemcode),
       orderBy: { recordedAt: 'desc' },
     });
+    if (!last && chainItemcode) {
+      // History written before the column existed has no itemcode: compare with
+      // the product's newest such row so the first run does not duplicate it.
+      last = await prisma.priceSnapshot.findFirst({
+        where: { productId, supermarket: chain, chainItemcode: null },
+        orderBy: { recordedAt: 'desc' },
+      });
+    }
     if (!last || last.price !== item.price) {
       // This path only runs for OFFER rows, so the snapshot is a promo price:
       // strikethrough when a reference price was published, else mono. The
@@ -337,12 +349,21 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
           price: item.price,
           isDiscounted: !!originalPrice,
           kind: data.offerType,
+          chainItemcode,
+          lastSeenAt: now,
         },
       });
       snapshotWritten = true;
+    } else {
+      seen = { productId, chainItemcode, price: item.price, snapshotId: last.id };
     }
+  } else if (productId) {
+    // Price did not move vs the stored Discount: no snapshot read here (that
+    // would be a query per item). The latest snapshot is resolved in one batch
+    // at the end of the run.
+    seen = { productId, chainItemcode, price: item.price };
   }
-  return { snapshotWritten, alert, mappingCollision };
+  return { snapshotWritten, alert, mappingCollision, seen };
 }
 
 // ── Full-catalog price baseline (Phase 9) ────────────────────────────────────
@@ -632,6 +653,7 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
     let mappingCollisions = 0;
     const unmappedLabels = new Set();
     const alertable = []; // offers that newly appeared / dropped this run
+    const seenUnchanged = []; // matched items whose price did not move: lastSeenAt is bumped at the end
     for (const item of items) {
       idx++;
       try {
@@ -665,10 +687,11 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
             if (!skipped) report.unmatchedShown++;
           }
         } else {
-          const { snapshotWritten, mappingCollision, alert } = await withDbRetry(`write ${item.name}`, () =>
+          const { snapshotWritten, mappingCollision, alert, seen } = await withDbRetry(`write ${item.name}`, () =>
             writeOffer(prisma, item, productId, store.id, chain, source, runStart, unmappedLabels)
           );
           if (snapshotWritten) report.priceChanges++;
+          if (seen && !mappingCollision) seenUnchanged.push(seen);
           if (mappingCollision) {
             mappingCollisions++;
             report.reviewQueued++;
@@ -714,6 +737,23 @@ export async function ingestOffers({ chain, source, items, dryRun = false, showU
       report.warnings.push(
         `${unmappedLabels.size} native categor${unmappedLabels.size === 1 ? 'y' : 'ies'} have no map entry (keyword fallback used): ${sample}${unmappedLabels.size > 8 ? ', …' : ''}`
       );
+    }
+
+    // lastSeenAt (SRV-02): every item this run saw at an unchanged price gets its
+    // latest snapshot stamped with the run time - one batched pass, real runs only
+    // (dryRun returned above). This runs EVEN when the run is judged partial:
+    // having seen an item is a fact whatever else the run missed, and the stamp
+    // only widens "last seen"; it never deactivates, deletes or hides anything
+    // (that decision stays with the health check below).
+    if (seenUnchanged.length > 0) {
+      try {
+        const latest = await fetchLatestRows(prisma, chain, seenUnchanged.map((x) => x.productId), withDbRetry, 'seen latest snapshots');
+        const ids = pickSnapshotIdsToBump(seenUnchanged, latest);
+        const n = await bumpLastSeen(prisma, ids, runStart, withDbRetry);
+        console.log(`   👁️ lastSeenAt: ${n} snapshot(s) stamped (${seenUnchanged.length} unchanged items seen)`);
+      } catch (e) {
+        report.warnings.push(`lastSeenAt bump failed (non-fatal): ${e.message}`);
+      }
     }
 
     // End-of-run deactivation — only when the health check is clean.
