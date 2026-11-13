@@ -75,6 +75,13 @@ export type DealsResponse = { deals: DealCard[]; total: number; nextOffset: numb
 
 export type SearchResponse = { query: string; deals: DealCard[] };
 
+// GET /api/v1/suggest — completions while typing (src/lib/suggest.ts on the server).
+export type SuggestResponse = {
+  query: string;
+  terms: { text: string; count: number }[];
+  categories: { id: string; label: string; count: number }[];
+};
+
 export type ComparisonRow =
   | { type: 'offer'; deal: DealCard }
   | { type: 'shelf'; chain: string; price: number; recordedAt: string; checkedAt: string };
@@ -143,5 +150,6 @@ export const api = {
     ),
   search: (text: string, chain?: string, signal?: AbortSignal) =>
     get<SearchResponse>(`/search${query({ q: text, chain })}`, signal),
+  suggest: (text: string, signal?: AbortSignal) => get<SuggestResponse>(`/suggest${query({ q: text })}`, signal),
   offer: (id: string, signal?: AbortSignal) => get<OfferResponse>(`/offers/${encodeURIComponent(id)}`, signal),
 };
