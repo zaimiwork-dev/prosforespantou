@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { searchDeals } from '@/actions/search-deals';
 import { toDealCard } from '@/lib/api/deal-card';
-import { ok, fail, param, rateLimited } from '@/lib/api/respond';
+import { ok, fail, param, rateLimited, timed } from '@/lib/api/respond';
 
 const Query = z.object({
   q: z.string().min(2).max(80),
@@ -19,8 +19,11 @@ export async function GET(req: Request) {
   if (rateLimited(req, 'search')) return fail(429, 'too many searches');
 
   try {
+    const t0 = performance.now();
     const rows = await searchDeals(parsed.data.q, parsed.data.chain);
-    return ok({ query: parsed.data.q, deals: rows.map(toDealCard) });
+    const t1 = performance.now();
+    const body = { query: parsed.data.q, deals: rows.map(toDealCard) };
+    return timed(ok(body), { db: t1 - t0, cards: performance.now() - t1 });
   } catch (error) {
     Sentry.captureException(error);
     console.error(`[api/v1] search unavailable:`, error);

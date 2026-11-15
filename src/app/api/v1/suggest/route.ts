@@ -6,7 +6,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { getSuggestIndex } from '@/actions/get-suggest-index';
 import { suggest } from '@/lib/suggest';
-import { ok, fail, param, rateLimited } from '@/lib/api/respond';
+import { ok, fail, param, rateLimited, timed } from '@/lib/api/respond';
 
 const Query = z.object({ q: z.string().min(2).max(40) });
 
@@ -25,9 +25,7 @@ export async function GET(req: Request) {
     const t1 = performance.now();
     const result = suggest(index, parsed.data.q);
     const t2 = performance.now();
-    const res = ok(result);
-    res.headers.set('Server-Timing', `index;dur=${(t1 - t0).toFixed(1)}, match;dur=${(t2 - t1).toFixed(1)}`);
-    return res;
+    return timed(ok(result), { index: t1 - t0, match: t2 - t1 });
   } catch (error) {
     Sentry.captureException(error);
     console.error('[api/v1] suggest unavailable:', error);

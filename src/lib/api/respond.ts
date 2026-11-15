@@ -21,6 +21,18 @@ export function ok(data: unknown, cache: string | null = CDN_CACHE) {
   });
 }
 
+// Server-Timing: how long each named step took, in ms. Readable with
+// `curl -D -` and in browser dev tools, so "why is this endpoint slow" has an
+// answer without server logs. On 2026-11-15 this is what showed the suggest
+// index being rebuilt on every call (700–900 ms) while matching took 8 ms.
+export function timed<R extends NextResponse>(res: R, steps: Record<string, number>): R {
+  res.headers.set(
+    'Server-Timing',
+    Object.entries(steps).map(([name, ms]) => `${name};dur=${ms.toFixed(1)}`).join(', '),
+  );
+  return res;
+}
+
 export function fail(status: number, error: string) {
   return NextResponse.json({ error }, { status, headers: { ...CORS, 'Cache-Control': 'no-store' } });
 }

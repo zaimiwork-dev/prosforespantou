@@ -17,7 +17,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { getFeed } from '@/actions/get-feed';
 import { toDealCard } from '@/lib/api/deal-card';
-import { ok, fail, param } from '@/lib/api/respond';
+import { ok, fail, param, timed } from '@/lib/api/respond';
 
 const Query = z.object({
   chains: z.string().regex(/^[a-z]{2,20}(,[a-z]{2,20}){0,9}$/).optional(),
@@ -30,15 +30,19 @@ export async function GET(req: Request) {
   if (!parsed.success) return fail(400, 'invalid query');
 
   try {
+    const t0 = performance.now();
     const { total, sections } = await getFeed({
       chains: parsed.data.chains?.split(','),
       interests: parsed.data.cats?.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 4),
     });
+    const t1 = performance.now();
     if (sections.length === 0) return fail(500, 'feed unavailable');
-    return ok({
+    const body = {
       total,
       sections: sections.map(({ rows, ...s }) => ({ ...s, deals: rows.map((r) => toDealCard(r as never)) })),
-    });
+    };
+    // `data` = the cached pools (should be a few ms when they are found).
+    return timed(ok(body), { data: t1 - t0, cards: performance.now() - t1 });
   } catch (error) {
     Sentry.captureException(error);
     console.error(`[api/v1] feed unavailable:`, error);
