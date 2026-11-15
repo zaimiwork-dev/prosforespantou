@@ -17,8 +17,17 @@ export async function GET(req: Request) {
   if (rateLimited(req, 'suggest', 300)) return fail(429, 'too many requests');
 
   try {
+    // Typeahead has to feel instant, so the two halves are timed and sent as
+    // Server-Timing (visible in curl -D and browser dev tools): `index` is the
+    // cached index read, `match` the scan over it.
+    const t0 = performance.now();
     const index = await getSuggestIndex();
-    return ok(suggest(index, parsed.data.q));
+    const t1 = performance.now();
+    const result = suggest(index, parsed.data.q);
+    const t2 = performance.now();
+    const res = ok(result);
+    res.headers.set('Server-Timing', `index;dur=${(t1 - t0).toFixed(1)}, match;dur=${(t2 - t1).toFixed(1)}`);
+    return res;
   } catch (error) {
     Sentry.captureException(error);
     console.error('[api/v1] suggest unavailable:', error);
