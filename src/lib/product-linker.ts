@@ -29,7 +29,7 @@ export function foldText(s: string | null | undefined): string {
     .replace(/ς/g, 'σ')
     .replace(/['’‘`´^]/g, '')
     // «Χ.ΖΑΧΑΡΗ», «Χ.ΛΑΚΤΟΖΗ» = χωρίς …
-    .replace(/(^|[s(])χ.s*(?=[a-zα-ω])/g, '$1χωρις ');
+    .replace(/(^|[\s(])χ\.\s*(?=[a-zα-ω])/g, '$1χωρις ');
 }
 
 // Latin letters identical to Greek ones, repaired inside MIXED-script words
@@ -264,6 +264,13 @@ export type LinkContext = {
   brandKeys?: Set<string>;
   /** token key → weight (idf-like). Missing tokens weigh 1 — optional */
   weights?: Map<string, number>;
+  /**
+   * Link only when BOTH names state a size and the sizes agree. A name that is
+   * silent about size («- Μέλι ανθέων») cannot be told apart from its 450 g and
+   * 900 g siblings, so for proposals that will be shown as price comparisons
+   * silence is a veto, not a small penalty.
+   */
+  requireSameSize?: boolean;
 };
 
 /** Build the optional corpus context from all names and the known brand strings. */
@@ -346,18 +353,76 @@ function sameKey(a: string, b: string): boolean {
   if (a === b) return true;
   if (/\d/.test(a) || /\d/.test(b)) return false;
   const [s, l] = a.length <= b.length ? [a, b] : [b, a];
-  return s.length >= 3 && l.startsWith(s);
+  // 4, not 3: at three letters «cool» (kol) passed as a truncation of «cola».
+  return s.length >= 4 && l.startsWith(s);
+}
+
+// A brand word is the same word when equal or when only a short ending differs
+// («Παπαδοπούλου» / «Παπαδόπουλος», «Kellogg» / «Kelloggs»). Unlike sameKey it
+// does NOT accept a prefix: «Royal Sugar» and «Sugartia» are two sugar brands,
+// and the 11-13 hand review found them linked through «sugar» ⊂ «sugartia».
+function brandWordSame(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (/\d/.test(a) || /\d/.test(b)) return false;
+  let common = 0;
+  while (common < a.length && common < b.length && a[common] === b[common]) common += 1;
+  return common >= 4 && a.length - common <= 2 && b.length - common <= 2;
 }
 
 function brandMatches(a: ParsedName, b: ParsedName): boolean {
   if (!a.brand || !b.brand) return false;
-  const ak = a.brand.split(' ');
-  const bk = b.brand.split(' ');
   // the brand of one side must appear among the other side's tokens — brand
-  // position varies by chain («Καφές Nescafe» vs «Nescafe Καφές»).
-  const inOther = (keys: string[], other: ParsedName) =>
-    keys.every((k) => other.tokens.some((t) => sameKey(k, t.key)));
-  return inOther(ak, b) || inOther(bk, a);
+  // position varies by chain («Καφές Nescafe» vs «Nescafe Καφές») — and a
+  // brand may be written as one word or two («Every Day» / «EVERYDAY»).
+  const inOther = (owner: ParsedName, other: ParsedName) => {
+    const keys = owner.brand!.split(' ');
+    const toks = other.tokens.map((t) => t.key);
+    if (keys.every((k) => toks.some((t) => brandWordSame(k, t)))) return true;
+    const first = owner.tokens[0]?.key ?? '';
+    const second = owner.tokens[1]?.key ?? '';
+    // «every» + «day» against «everyday», and the reverse
+    if (second && toks.includes(first + second)) return true;
+    return toks.some((t, i) => i + 1 < toks.length && t + toks[i + 1] === first);
+  };
+  return inOther(a, b) || inOther(b, a);
+}
+
+// Words that name a different sellable item when only ONE of the two names has
+// them: «Tampax Super Plus» is not «Tampax Super», «Dove Men+Care» is not the
+// women's roll-on, a «Protein» brownie mix is not the plain one. Chains drop
+// plenty of words («Κλασικό», «Original»); these they do not drop. Folded form.
+const ONE_SIDED_MODIFIERS = new Set([
+  'plus', 'max', 'maxi', 'mini', 'extra', 'ultra', 'light', 'lite', 'zero', 'forte',
+  'men', 'man', 'women', 'woman', 'kids', 'kid', 'junior', 'sensitive',
+  'protein', 'bio', 'xl', 'xxl', 'duo', 'trio', 'night', 'fine',
+  'μινι', 'μαξι', 'λαιτ', 'ελαφρυ', 'ανδρικο', 'γυναικειο', 'παιδικο', 'παιδικη', 'βιολογικο', 'βιολογικη',
+  'νυχτασ', 'αοσμο',
+]);
+// Compared by sound, so «Μίνι» on one side and «Mini» on the other agree.
+// («baby» is deliberately absent: it is half of brand names — Baby Care, Babylino.)
+const MODIFIER_KEYS = new Set([...ONE_SIDED_MODIFIERS].map((w) => phoneticKey(w)));
+
+function modifiersOf(p: ParsedName): Set<string> {
+  const out = new Set<string>();
+  for (const t of p.tokens) if (MODIFIER_KEYS.has(t.key)) out.add(t.key);
+  return out;
+}
+
+// A can and a bottle of the same drink are two shelf items with two prices.
+// Only a conflict when BOTH names say which one they are — most names say
+// nothing, and silence on one side stays a known ambiguity (see LINK-01 report).
+function containerOf(folded: string): 'can' | 'bottle' | null {
+  if (/(^|[^a-zα-ω])(κουτι|κουτια|can|cans)([^a-zα-ω]|$)/.test(folded)) return 'can';
+  if (/(^|[^a-zα-ω])(φιαλη|φιαλεσ|μπουκαλι|μπουκαλια|bottle|bottles|γυαλινη|γυαλινο)([^a-zα-ω]|$)/.test(folded)) return 'bottle';
+  return null;
+}
+
+function modifierConflict(a: ParsedName, b: ParsedName): boolean {
+  const ma = modifiersOf(a);
+  const mb = modifiersOf(b);
+  if (ma.size !== mb.size) return true;
+  for (const m of ma) if (!mb.has(m)) return true;
+  return false;
 }
 
 // ───────────────────────── scoring ─────────────────────────
@@ -430,9 +495,18 @@ export function scoreParsed(
   // 1. size / pack — a different size or pack is a different sellable item.
   const sz = compareSizes(pa.size, pb.size);
   if (sz === 'conflict') return veto('size');
+  if (ctx.requireSameSize && sz !== 'same') return veto('size-unstated');
+
+  // a piece count on one side only («100γρ 3τεμ» against «100γρ») is a
+  // multipack against a single item more often than a chain being thorough
+  if (ctx.requireSameSize && (pa.size.pieces === null) !== (pb.size.pieces === null)) return veto('pieces-one-side');
 
   // 2. variant markers (flavour, fat level, decaf, …)
   if (variantConflict(pa.raw, pb.raw)) return veto('variant');
+  if (modifierConflict(pa, pb)) return veto('modifier');
+  const ca = containerOf(pa.folded);
+  const cb = containerOf(pb.folded);
+  if (ca && cb && ca !== cb) return veto('container');
 
   // 3. department
   if (pa.dept !== pb.dept && pa.dept !== 'Άλλο' && pb.dept !== 'Άλλο') return veto('department');

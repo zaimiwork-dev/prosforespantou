@@ -8,6 +8,8 @@
 //   LINK_OUT_DIR=<output dir>        (default <repo>/.local-scratch/LINK-01)
 //   LINK_THRESHOLD=0.xx              (override the train-chosen threshold)
 //   LINK_SEED=n                      (sampling seed, default 1111)
+//   LINK_REQUIRE_SIZE=0              (allow links when a name states no size; default: required)
+//   LINK_NO_BRAND_FIELD=1            (ignore products.brand; reproduces the first runs)
 //
 //   node src/scripts/link-products-offline.mjs
 import fs from 'node:fs';
@@ -45,6 +47,24 @@ const splitOf = (productId) => (hashStr(productId + ':link01') % 100 < 55 ? 'tra
 const readJsonl = (f) => fs.readFileSync(path.join(DATA, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const pct = (x) => (x * 100).toFixed(1) + '%';
 const STRONG = new Set(['barcode', 'catalog', null]);
+
+// AB keeps the brand in its own field and leaves it out of the name («Φρέσκο
+// Γάλα Πλήρες 1lt», brand ΔΕΛΤΑ; 99 % of AB products have the field). Taking the
+// name's first word as the brand then pairs a brandless name with whichever
+// brand matches the rest — the 11-13 hand review found 16 right of 39 AB
+// proposals, one of them AB milk linked to ΜΑΡΑΤΑ, Σκλαβενίτης' own label.
+// products.brand belongs to the chain that created the record, so it is only
+// put in front of that chain's name, and only when the name lacks it.
+const USE_BRAND_FIELD = !process.env.LINK_NO_BRAND_FIELD;
+const foldWords = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ')
+  .split(/[^a-z0-9α-ω]+/).filter((w) => w.length >= 2);
+function withBrand(name, brand) {
+  if (!USE_BRAND_FIELD || !brand) return name;
+  const words = foldWords(brand);
+  if (!words.length) return name; // «-»
+  const have = new Set(foldWords(name).map((w) => phoneticKey(w)));
+  return have.has(phoneticKey(words[0])) ? name : `${String(brand).trim()} ${name}`;
+}
 
 // ───────── load + build items ─────────
 function loadItems() {
@@ -88,12 +108,14 @@ function loadItems() {
       if (cn) { name = cn.name; price = cn.price; active = !!cn.active; }
       else if (c === originChain) name = p.name;
       if (!name) continue;
+      const rawName = name;
+      if (c === originChain) name = withBrand(name, p.brand);
       const sh = shelfBy.get(k);
       let at = null;
       if (price == null && sh) price = sh.price;
       if (sh && price === sh.price) at = Date.parse(sh.recordedAt);
       items.push({
-        id: k, productId: p.id, chain: c, name, price, at, active,
+        id: k, productId: p.id, chain: c, name, rawName, price, at, active,
         barcode: p.barcode, via: viaOf.get(k) ?? null, nChains: chains.length, fromProductName: !cn,
       });
     }
@@ -262,7 +284,10 @@ function buildIndex(items, parse) {
   return { idx, byBrand: byChainBrand };
 }
 
-function candidatesFor(a, index, parse) {
+// sameProductOk: the retrieval simulation asks for the item of the SAME product
+// at another chain (that is the ground truth), so it must stay a candidate; the
+// real job links separate product records and skips it.
+function candidatesFor(a, index, parse, sameProductOk = false) {
   const pa = parse(a);
   const set = new Map();
   if (!pa.brand) return [];
@@ -274,13 +299,13 @@ function candidatesFor(a, index, parse) {
   for (const t of pa.tokens) {
     for (const b of index.byBrand.get(t.key.slice(0, 4)) || []) set.set(b.id, b);
   }
-  return [...set.values()].filter((b) => b.chain !== a.chain && b.productId !== a.productId);
+  return [...set.values()].filter((b) => b.chain !== a.chain && (sameProductOk || b.productId !== a.productId));
 }
 
 /** best candidate per other chain for source item a, with margin to the runner-up */
-function bestPerChain(a, index, scorer, minScore) {
+function bestPerChain(a, index, scorer, minScore, sameProductOk = false) {
   const byChain = new Map();
-  for (const b of candidatesFor(a, index, scorer.parse)) {
+  for (const b of candidatesFor(a, index, scorer.parse, sameProductOk)) {
     const r = scorer.score(a, b);
     if (r.veto || r.score < minScore) continue;
     if (!byChain.has(b.chain)) byChain.set(b.chain, []);
@@ -301,6 +326,7 @@ function main() {
   const t0 = Date.now();
   const { products, items, viasByProduct, brands } = loadItems();
   const ctx = buildLinkContext(items.map((i) => i.name), brands);
+  ctx.requireSameSize = process.env.LINK_REQUIRE_SIZE !== '0';
   const scorer = makeScorer(ctx);
   console.log(`items ${items.length}, products ${products.length}`);
 
@@ -436,7 +462,7 @@ function simulateRetrieval(items, truth, scorer, thresh) {
   const res = rules.map((r) => ({ rule: r.rule, n: 0, proposed: 0, correct: 0 }));
   for (const q of queries) {
     for (const [from, to] of [[q.a, q.b], [q.b, q.a]]) {
-      const found = bestPerChain(from, index, scorer, thresh).find((c) => c.chain === to.chain);
+      const found = bestPerChain(from, index, scorer, thresh, true).find((c) => c.chain === to.chain);
       rules.forEach((rule, i) => {
         res[i].n += 1;
         if (found && rule.ok(found)) {
