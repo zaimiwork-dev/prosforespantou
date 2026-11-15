@@ -13,6 +13,9 @@ export default function AppTabs() {
       tintColor={Colors.brand}
       // bgSoft pill behind the active icon, red count badge on Λίστα (DESIGN.md «Tab bar»).
       indicatorColor={Colors.bgSoft}
+      // Android shows only the selected tab's label once there are four tabs
+      // ('auto'); our shoppers should not have to guess what an icon means.
+      labelVisibilityMode="labeled"
       badgeBackgroundColor={Colors.accent}
       badgeTextColor="#fff"
       labelStyle={{ color: Colors.ink2, fontFamily: Fonts.sans600, fontSize: 13 }}>
@@ -31,7 +34,9 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="list">
         <NativeTabs.Trigger.Label>Λίστα</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'checklist', selected: 'checklist' }} md="checklist" />
-        <NativeTabs.Trigger.Badge hidden={count === 0}>{count > 99 ? '99+' : String(count)}</NativeTabs.Trigger.Badge>
+        {/* No element at all for an empty list: a Badge with text is drawn even
+            when `hidden` is set (the text wins), so Android showed a red «0». */}
+        {count > 0 ? <NativeTabs.Trigger.Badge>{count > 99 ? '99+' : String(count)}</NativeTabs.Trigger.Badge> : null}
       </NativeTabs.Trigger>
     </NativeTabs>
   );
