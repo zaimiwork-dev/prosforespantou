@@ -10,8 +10,12 @@ function num(n: number): string {
   return `${n < 0 ? '−' : ''}${grouped},${dec}`;
 }
 
-/** formatPrice(1.5) -> "1,50 €" */
-export const formatPrice = (n: number) => `${num(n)} €`;
+// A no-break space, as CLDR el-GR and the website use: with a plain space a
+// narrow card at a large text size can put the € alone on the next line.
+const NBSP = ' ';
+
+/** formatPrice(1.5) -> "1,50 €" (no-break space before €) */
+export const formatPrice = (n: number) => `${num(n)}${NBSP}€`;
 
 /** The API's `unit` field: formatUnitPrice({ value: 0.83, per: 'λίτρο' }) -> "0,83 €/λίτρο" */
 export const formatUnitPrice = (u: { value: number; per: string }) => `${formatPrice(u.value)}/${u.per}`;

@@ -7,6 +7,7 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DealCard } from './api';
 import { track } from './analytics';
+import { formatPrice } from './format';
 
 const KEY = 'prosfores-pantou:list:v1';
 // Same origin the share text of the website ends with.
@@ -168,20 +169,20 @@ export function groupByChain(items: ListItem[], now = Date.now()): { groups: Cha
   return { groups, total: groups.reduce((s, g) => s + g.subtotal, 0) };
 }
 
-// Same wording and layout as getShareText() on the website (decimal point and
-// all, so a list shared from the app reads like one shared from the site).
+// Same wording and layout as getShareText() on the website, prices in the
+// Greek format both now use («3,00 €»; this used to print «3.00€»).
 export function buildShareText(items: ListItem[], shortOf: (chain: string | null) => string): string {
   const live = items.filter((i) => !isExpired(i));
   if (live.length === 0) return '';
-  const total = live.reduce((s, i) => s + i.price * i.quantity, 0).toFixed(2);
+  const total = live.reduce((s, i) => s + i.price * i.quantity, 0);
   const lines = live
-    .map((i) => `• ${i.quantity}x ${i.name} (${shortOf(i.chain)}) - ${(i.price * i.quantity).toFixed(2)}€`)
+    .map((i) => `• ${i.quantity}x ${i.name} (${shortOf(i.chain)}) - ${formatPrice(i.price * i.quantity)}`)
     .join('\n');
   return `ΠΡΟΣΦΟΡΕΣ ΠΑΝΤΟΥ — Η λίστα μου
 
 ${lines}
 
-Σύνολο: ${total}€
+Σύνολο: ${formatPrice(total)}
 
 Δες περισσότερα στο: ${SITE_ORIGIN}`;
 }

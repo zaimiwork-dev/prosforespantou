@@ -51,8 +51,9 @@ describe('groupByChain', () => {
 describe('buildShareText', () => {
   it('writes the website layout with the chain name and the total', () => {
     const text = buildShareText([item({ quantity: 2, price: 1.5 })], () => 'ΑΒ Βασιλόπουλος');
-    expect(text).toContain('• 2x Γάλα (ΑΒ Βασιλόπουλος) - 3.00€');
-    expect(text).toContain('Σύνολο: 3.00€');
+    // Greek format, no-break space before € (as on the website)
+    expect(text).toContain('• 2x Γάλα (ΑΒ Βασιλόπουλος) - 3,00 €');
+    expect(text).toContain('Σύνολο: 3,00 €');
     expect(text.startsWith('ΠΡΟΣΦΟΡΕΣ ΠΑΝΤΟΥ')).toBe(true);
   });
   it('is empty when everything has expired', () => {
