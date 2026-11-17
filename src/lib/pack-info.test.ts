@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePack, perUnitPrice, unitPrice } from './pack-info';
+import { parsePack, perUnitPrice, splitNameAndSize, unitPrice } from './pack-info';
 
 // €/κιλό-€/λίτρο — the shelf-label number. Names are real DB rows.
 describe('unitPrice', () => {
@@ -93,5 +93,29 @@ describe('perUnitPrice', () => {
   it('rejects missing price or single unit', () => {
     expect(perUnitPrice(null, 12)).toBeNull();
     expect(perUnitPrice(8.42, 1)).toBeNull();
+  });
+});
+
+// The card prints the size on its own line; the title must not keep a piece of it.
+describe('splitNameAndSize', () => {
+  it('peels a trailing size off the name', () => {
+    expect(splitNameAndSize('ΔΕΛΤΑ Γάλα Φρέσκο Πλήρες 1lt')).toEqual({ title: 'ΔΕΛΤΑ Γάλα Φρέσκο Πλήρες', size: '1lt' });
+    expect(splitNameAndSize('ΝΟΥΝΟΥ Kid Ρόφημα Γάλακτος Συμπυκνωμένο 6x400g')).toEqual({ title: 'ΝΟΥΝΟΥ Kid Ρόφημα Γάλακτος Συμπυκνωμένο', size: '6x400g' });
+    expect(splitNameAndSize('Lurpak Βούτυρο Ανάλατο 225γρ.')).toEqual({ title: 'Lurpak Βούτυρο Ανάλατο', size: '225γρ' });
+  });
+
+  it('keeps weight and volume together when a name gives both (ice cream)', () => {
+    expect(splitNameAndSize('ΕΠΙΛΟΓΗ ΜΟΥ ΠΑΓΩΤΟ ΞΥΛ ΒΑΝ.ΕΠΙΚ ΣΟΚ ΥΓΕΙΑΣ 3*80ΓΡ/110ML')).toEqual({
+      title: 'ΕΠΙΛΟΓΗ ΜΟΥ ΠΑΓΩΤΟ ΞΥΛ ΒΑΝ.ΕΠΙΚ ΣΟΚ ΥΓΕΙΑΣ',
+      size: '3*80ΓΡ/110ML',
+    });
+    expect(splitNameAndSize('Κρι Κρι Παγωτό Βανίλια 1,5kg / 3lt')).toEqual({ title: 'Κρι Κρι Παγωτό Βανίλια', size: '1,5kg/3lt' });
+  });
+
+  it('leaves the name whole when there is no size, a one-word title, or a weight range', () => {
+    expect(splitNameAndSize('Αυγά Φρέσκα Μεσαία')).toEqual({ title: 'Αυγά Φρέσκα Μεσαία', size: null });
+    expect(splitNameAndSize('Γάλα 1lt')).toEqual({ title: 'Γάλα 1lt', size: null });
+    expect(splitNameAndSize('Pampers Πάνες Νο4 (9-14kg)').size).toBeNull();
+    expect(splitNameAndSize(null)).toEqual({ title: '', size: null });
   });
 });

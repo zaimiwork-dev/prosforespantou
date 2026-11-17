@@ -141,8 +141,15 @@ function round2(v: number): number {
 // name so the card can print it on its own line. Conservative: only a token
 // at the very end splits (never mid-name, never a diaper weight range like
 // «Νο4 (9-14kg)» — the lookbehind refuses a token glued to a range dash).
-const TRAILING_SIZE_RE =
-  /(?<![\d\-–])\s*\(?\s*((?:\d{1,3}\s*[x*×χ]\s*)?\d+(?:[.,]\d+)?\s*(?:ml|lt|l|gr|g|γρ|kg|κιλ)\.?)\s*\)?\s*[.,]?\s*$/i;
+//
+// Ice cream is sold by weight AND volume («3*80ΓΡ/110ML»): the pair is one
+// size. Peeling only the last half left the title ending in «3*80ΓΡ/» with
+// «110ML» printed under it (seen on the product page, 2026-11-15).
+const ONE_SIZE = String.raw`(?:\d{1,3}\s*[x*×χ]\s*)?\d+(?:[.,]\d+)?\s*(?:ml|lt|l|gr|g|γρ|kg|κιλ)\.?`;
+const TRAILING_SIZE_RE = new RegExp(
+  String.raw`(?<![\d\-–])\s*\(?\s*((?:${ONE_SIZE}\s*\/\s*)?${ONE_SIZE})\s*\)?\s*[.,]?\s*$`,
+  'i',
+);
 
 export type NameParts = { title: string; size: string | null };
 
