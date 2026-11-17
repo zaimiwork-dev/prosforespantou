@@ -26,14 +26,38 @@ const GREEKLISH_MAP: Record<string, string> = {
   f: 'φ', v: 'β', w: 'ω', q: 'κ',
 };
 
+// Written in normalised form (no accents, final sigma as «σ») because that is
+// what both the SQL recall and the ranking compare against.
 const SYNONYMS = [
   ['gouda', 'γουδα', 'γκουντα'],
   ['bacon', 'μπεικον', 'μπεηκον'],
   ['edam', 'ενταμ'],
   ['cheddar', 'τσενταρ'],
-  ['kelloggs', 'κελογκς'],
+  ['kelloggs', 'κελογκσ'],
   ['quaker', 'κουακερ'],
-  ['pampers', 'παμπερς'],
+  ['pampers', 'παμπερσ'],
+  // Words the chains write two ways. Counts are live offers per spelling on
+  // 2026-11-16 (.local-scratch/spelling-pairs.mjs): a shopper typing one
+  // spelling was not shown the other.
+  ['μπυρ', 'μπιρ'], // μπύρα 17 / μπίρα 58
+  ['beer', 'μπυρα', 'μπιρα'],
+  ['ντοματ', 'τοματ'], // ντομάτα 47 / τομάτα 192
+  ['τσιπσ', 'chips'], // 26 / 33
+  ['εσπρεσο', 'εσπρεσσο', 'espresso'], // 0 / 0 / 121
+  ['καπουτσινο', 'cappuccino'], // 0 / 17
+  ['πιτσα', 'pizza'], // 37 / 16
+  ['μπεργκερ', 'burger'], // 2 / 13
+  ['κρακερ', 'cracker'], // 8 / 15
+  ['βοτκα', 'vodka'], // 5 / 8
+  ['ουισκι', 'whisky', 'whiskey'], // 22 / 7 / 2
+  ['κετσαπ', 'ketchup'], // 59 / 4
+  ['σαμπουαν', 'shampoo'], // 408 / 27
+  ['γιαουρτι', 'yogurt', 'yoghurt'], // 109 / 10 / 6
+  ['κρουασαν', 'croissant'], // 75 / 3
+  ['mayonnaise', 'μαγιονεζα'],
+  ['μαγιονεζα', 'mayo'], // 50 / 11
+  ['σοκολατα', 'chocolate'], // 508 / 38
+  ['τοστ', 'toast'], // 88 / 5
 ];
 
 export function normalizeSearchText(s: string | null | undefined): string {

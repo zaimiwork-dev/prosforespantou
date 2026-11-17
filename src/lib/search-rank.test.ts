@@ -65,7 +65,24 @@ describe('expandSearch', () => {
   it('expands greeklish to Greek', () => {
     expect(expandSearch('gala')).toContain('γαλα');
   });
-  it('expands brand synonyms', () => {
-    expect(expandSearch('pampers')).toContain('παμπερς');
+  it('expands brand synonyms, in the normalised form the search compares against', () => {
+    expect(expandSearch('pampers')).toContain('παμπερσ');
+  });
+  // Live offers 2026-11-16: «μπύρα» 17 / «μπίρα» 58, «ντομάτα» 47 / «τομάτα» 192,
+  // "espresso" 121 and no Greek spelling at all.
+  it('finds a word under the other spelling the chains use', () => {
+    expect(expandSearch('μπύρα')).toContain('μπιρα');
+    expect(expandSearch('μπίρες')).toContain('μπυρεσ');
+    expect(expandSearch('beer')).toEqual(expect.arrayContaining(['μπυρα', 'μπιρα']));
+    expect(expandSearch('ντομάτα')).toContain('τοματα');
+    expect(expandSearch('τομάτες')).toContain('ντοματεσ');
+    expect(expandSearch('εσπρέσο')).toContain('espresso');
+    expect(expandSearch('pizza')).toContain('πιτσα');
+    expect(expandSearch('τσιπς')).toContain('chips');
+    expect(expandSearch('γιαούρτι')).toEqual(expect.arrayContaining(['yogurt', 'yoghurt']));
+  });
+  it('ranks the other spelling as a match', () => {
+    const lager = { productName: 'ΑΛΦΑ Μπίρα Lager 4x500ml', description: null, category: 'Κάβα', hotScore: 5 };
+    expect(rankSearchResults('μπύρα', [lager])).toHaveLength(1);
   });
 });
