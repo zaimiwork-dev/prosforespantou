@@ -64,7 +64,8 @@ export function PriceComparison({ offer, comparison, compact = false }) {
           const body = (
             <>
               <div className="pc-chain" style={{ background: row.sm.color }}>
-                {row.sm.name.toUpperCase()}
+                {/* toLocaleUpperCase: plain toUpperCase keeps the accent («ΣΚΛΑΒΕΝΊΤΗΣ») */}
+                {row.sm.name.toLocaleUpperCase('el')}
               </div>
               <div className="pc-tags">
                 {isCheapest && <span className="pc-best">ΦΘΗΝΟΤΕΡΑ</span>}

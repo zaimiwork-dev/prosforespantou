@@ -115,7 +115,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
           <div className="discount-badge">-{pct}%</div>
         ) : !originalPrice ? (
           <div className="discount-badge" style={{ backgroundColor: 'var(--accent)', fontSize: '0.7rem', padding: '4px 8px', letterSpacing: '0.5px' }}>
-            {offer.description && offer.description.length <= 24 ? offer.description.toUpperCase() : 'ΜΟΝΟ'}
+            {offer.description && offer.description.length <= 24 ? offer.description.toLocaleUpperCase('el') : 'ΜΟΝΟ'}
           </div>
         ) : null}
         <div className="chain-pill" style={{ color: sm.color }}>{sm.name}</div>
