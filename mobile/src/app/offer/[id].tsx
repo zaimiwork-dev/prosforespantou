@@ -327,7 +327,7 @@ function DateBox({ label, value, sub, urgent }: { label: string; value: string; 
   return (
     <View style={styles.dateBox}>
       <Text style={styles.dateLabel}>{label}</Text>
-      <Text style={[styles.dateValue, urgent && { color: Colors.accent }]}>{value}</Text>
+      <Text style={[styles.dateValue, urgent && { color: Colors.accentText }]}>{value}</Text>
       {sub ? <Text style={styles.dateSub}>{sub}</Text> : null}
     </View>
   );
@@ -350,7 +350,7 @@ const makeStyles = (T: TypeScale) =>
     },
     primaryText: { ...T.text.button, color: '#fff' },
     ended: { backgroundColor: Colors.discountBg, borderRadius: Radius.md, padding: Space[3], marginBottom: Space[3] },
-    endedText: { ...T.text.bodyStrong, color: Colors.accent, textAlign: 'center' },
+    endedText: { ...T.text.bodyStrong, color: Colors.accentText, textAlign: 'center' },
     imagePanel: {
       backgroundColor: Colors.surface,
       borderRadius: Radius.lg,
@@ -369,8 +369,9 @@ const makeStyles = (T: TypeScale) =>
     priceLabel: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.ink3Text, letterSpacing: 0.8, marginTop: Space[5] },
     priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: Space[3] },
     price: { ...T.text.priceLarge, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    priceSale: { color: Colors.accent },
-    priceMuted: { color: Colors.ink4 },
+    priceSale: { color: Colors.accentText },
+    // Ended offer: muted but still readable (3.5:1; large text needs 3:1). ink4 was 2.0:1.
+    priceMuted: { color: Colors.ink3 },
     was: { ...T.text.secondary, color: Colors.ink3Text, textDecorationLine: 'line-through' },
     baseline: { ...T.text.secondary, color: Colors.ink3Text, marginTop: 2 },
     unitBox: {

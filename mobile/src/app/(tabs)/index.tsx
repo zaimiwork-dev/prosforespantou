@@ -215,5 +215,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.line,
   },
-  fallbackBtn: { minHeight: 44, justifyContent: 'center' },
+  fallbackBtn: { minHeight: 48, justifyContent: 'center' },
 });

@@ -20,6 +20,10 @@ export const Colors = {
   brand2: '#1A7048',
   brandInk: '#F3EEE2',
   accent: '#D1453B',
+  // Red TEXT. accent is 4.25:1 on bg and 3.85:1 on discountBg (WCAG asks
+  // 4.5:1 below 18 sp); this is 5.2 / 4.7 and looks the same. accent stays
+  // for fills and badges (white on accent = 4.5:1).
+  accentText: '#BD3A30',
   gold: '#E8B24A',
   good: '#1F7A3E',
   discountBg: '#FBE8E6',

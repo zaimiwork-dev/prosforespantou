@@ -149,5 +149,5 @@ const makeStyles = (T: TypeScale) =>
     best: { ...T.text.badge, color: Colors.good },
     right: { alignItems: 'flex-end', flexShrink: 0 },
     price: { ...T.text.price, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    diff: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.accent },
+    diff: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.accentText },
   });

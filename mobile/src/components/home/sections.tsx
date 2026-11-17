@@ -130,7 +130,7 @@ export function PromoBanner({ total }: { total: number }) {
   const T = useType();
   return (
     <Pressable onPress={() => router.navigate('/deals')} accessibilityRole="button" accessibilityLabel="Δες όλες τις προσφορές" style={s.promo}>
-      <Text style={[T.text.caption, s.eyebrow]}>ΌΛΕΣ ΟΙ ΠΡΟΣΦΟΡΕΣ</Text>
+      <Text style={[T.text.caption, s.eyebrow]}>ΟΛΕΣ ΟΙ ΠΡΟΣΦΟΡΕΣ</Text>
       <Text style={[T.text.h2, s.promoTitle]}>Περιήγηση σε {formatCount(total)} προσφορές</Text>
       <Text style={[T.text.body, s.promoSub]}>Φίλτραρε ανά κατάστημα, κατηγορία ή τιμή</Text>
       <View style={s.goldBtn}>
