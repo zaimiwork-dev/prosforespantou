@@ -43,8 +43,9 @@ export const LightColors = {
   good: '#1F7A3E',
   goodBg: '#E3F2E6',
   discountBg: '#FBE8E6',
-  // Product photos and chain logos are on white: their frames stay light.
-  imageBg: '#F9FCF7',
+  // Product photos and chain logos are on white: their frames are pure white
+  // (a tinted frame showed a box around logos that carry their own white).
+  imageBg: '#FFFFFF',
   toastBg: '#1C2A22',
   scrim: 'rgba(20,32,26,0.5)',
   liveRing: '#BFDDC9',
