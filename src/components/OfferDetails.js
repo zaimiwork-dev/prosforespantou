@@ -7,7 +7,7 @@ import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { PriceHistory } from './PriceHistory';
 import { PriceComparison } from './PriceComparison';
-import { SUPERMARKETS } from '@/lib/constants';
+import { SUPERMARKETS, categoryFullName } from '@/lib/constants';
 import { track } from '@/lib/track';
 import { hiResImage } from '@/lib/images';
 import { parsePack, perUnitPrice, unitPrice } from '@/lib/pack-info';
@@ -138,7 +138,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
       </div>
 
       <div className="od-body">
-        {category && <div className="od-category">{category}</div>}
+        {category && <div className="od-category">{categoryFullName(category)}</div>}
         <h2 className="od-title">{displayName}</h2>
         {description && <p className="od-desc">{description}</p>}
 

@@ -32,29 +32,45 @@ export const PARKED_SUPERMARKETS = [
   { id: "galaxias", name: "Γαλαξίας", short: "ΓΑ", color: "#003f88", bg: "#eef3ff", heroLabel: "Γαλα-", heroSub: "ξίας", logo: "galaxias.jpg" },
 ];
 
-// `label` is the SHORT form for space-tight chips ("Φρούτα & Λαχ."). Anywhere
+// `label` is the SHORT form for space-tight chips ("Φρούτα & λαχ."). Anywhere
 // with room (listing page titles, active-filter chips) must show the full
-// name: use `full ?? id` — never `label` (user feedback 2026-06-12).
+// name: categoryFullName(id) — never `label` (user feedback 2026-06-12), and
+// never the raw id, which is Title Case.
+// Departments. `id` is the value stored in discounts.category and used by the
+// categoriser, the chains' native maps, URLs and filters — never change it.
+// What people see is `label` (short, for chips) and `full` (headings, pages,
+// screen readers), both in Greek sentence case: only the first word starts
+// with a capital (owner decision 2026-11-22; Microsoft Greek style guide).
 export const CATEGORIES = [
-  { id: "all", label: "Όλες" },
-  { id: "Φρούτα & Λαχανικά", label: "Φρούτα & Λαχ." },
-  { id: "Κρέας & Ψάρι", label: "Κρέας & Ψάρι" },
-  { id: "Γαλακτοκομικά & Είδη Ψυγείου", label: "Γαλακτοκομικά" },
-  { id: "Τυριά & Αλλαντικά", label: "Τυριά & Αλλαν." },
-  { id: "Σαλάτες & Αλοιφές", label: "Σαλάτες & Αλοιφές" },
-  { id: "Κονσέρβες", label: "Κονσέρβες" },
-  { id: "Αρτοποιία", label: "Αρτοποιία" },
-  { id: "Κατεψυγμένα", label: "Κατεψυγμένα" },
-  { id: "Είδη Παντοπωλείου", label: "Παντοπωλείο" },
-  { id: "Πρωινό & Ροφήματα", label: "Πρωινό & Καφές" },
-  { id: "Σνακ & Γλυκά", label: "Σνακ & Γλυκά" },
-  { id: "Κάβα", label: "Ποτά & Κάβα", full: "Ποτά & Κάβα" },
-  { id: "Προσωπική Φροντίδα", label: "Προσωπική Φρ." },
-  { id: "Βρεφικά Είδη", label: "Βρεφικά Είδη" },
-  { id: "Είδη Καθαρισμού & Σπιτιού", label: "Καθαριστικά" },
-  { id: "Είδη Κατοικιδίων", label: "Κατοικίδια" },
-  { id: "Άλλο", label: "Άλλο" },
+  { id: "all", label: "Όλες", full: "Όλες οι κατηγορίες" },
+  { id: "Φρούτα & Λαχανικά", label: "Φρούτα & λαχ.", full: "Φρούτα & λαχανικά" },
+  { id: "Κρέας & Ψάρι", label: "Κρέας & ψάρι", full: "Κρέας & ψάρι" },
+  { id: "Γαλακτοκομικά & Είδη Ψυγείου", label: "Γαλακτοκομικά", full: "Γαλακτοκομικά & είδη ψυγείου" },
+  { id: "Τυριά & Αλλαντικά", label: "Τυριά & αλλαν.", full: "Τυριά & αλλαντικά" },
+  { id: "Σαλάτες & Αλοιφές", label: "Σαλάτες & αλοιφές", full: "Σαλάτες & αλοιφές" },
+  { id: "Κονσέρβες", label: "Κονσέρβες", full: "Κονσέρβες" },
+  { id: "Αρτοποιία", label: "Αρτοποιία", full: "Αρτοποιία" },
+  { id: "Κατεψυγμένα", label: "Κατεψυγμένα", full: "Κατεψυγμένα" },
+  { id: "Είδη Παντοπωλείου", label: "Παντοπωλείο", full: "Είδη παντοπωλείου" },
+  { id: "Πρωινό & Ροφήματα", label: "Πρωινό & καφές", full: "Πρωινό & ροφήματα" },
+  { id: "Σνακ & Γλυκά", label: "Σνακ & γλυκά", full: "Σνακ & γλυκά" },
+  { id: "Κάβα", label: "Ποτά & κάβα", full: "Ποτά & κάβα" },
+  { id: "Προσωπική Φροντίδα", label: "Προσωπική φρ.", full: "Προσωπική φροντίδα" },
+  { id: "Βρεφικά Είδη", label: "Βρεφικά είδη", full: "Βρεφικά είδη" },
+  { id: "Είδη Καθαρισμού & Σπιτιού", label: "Καθαριστικά", full: "Είδη καθαρισμού & σπιτιού" },
+  { id: "Είδη Κατοικιδίων", label: "Κατοικίδια", full: "Είδη κατοικιδίων" },
+  { id: "Άλλο", label: "Άλλο", full: "Άλλο" },
 ];
+
+const CATEGORY_BY_ID = new Map(CATEGORIES.map((c) => [c.id, c]));
+
+// The name to SHOW for a stored category id; unknown ids are shown as they are.
+export function categoryFullName(id) {
+  return CATEGORY_BY_ID.get(id)?.full ?? id ?? '';
+}
+export function categoryShortName(id) {
+  return CATEGORY_BY_ID.get(id)?.label ?? id ?? '';
+}
 
 export const CATEGORY_MAP = {
   "fruit": "Φρούτα & Λαχανικά",
