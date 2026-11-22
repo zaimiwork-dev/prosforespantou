@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { comparisonChainCount } from './comparison-count';
+import { pairKey, type Verdict } from './comparison-verdict';
 
 const NOW = new Date('2026-07-08T12:00:00Z');
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86400000);
@@ -126,5 +127,15 @@ describe('comparisonChainCount', () => {
       now: NOW,
     });
     expect(n).toBe(2); // ab (offer) + kritikos (shelf)
+  });
+
+  it('hides a rival the AI check judged different, exactly like the sheet does', () => {
+    const rival = { productName: 'ΗΒΗ Πορτοκαλάδα ανθρακικό 1,5lt', supermarket: 'ab' };
+    const verdicts = new Map<string, Verdict>([
+      [pairKey(source.supermarket, source.productName, rival.supermarket, rival.productName), 'different'],
+    ]);
+    const args = { source, clusterOffers: [rival], now: NOW };
+    expect(comparisonChainCount(args)).toBe(1);
+    expect(comparisonChainCount({ ...args, verdictOf: (k: string) => verdicts.get(k) })).toBe(0);
   });
 });

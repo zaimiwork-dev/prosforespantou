@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
+import { filterByVerdict, loadVerdictLookup, pairKey } from '@/lib/comparison-verdict';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 import { pickShelfRows, SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
@@ -61,12 +62,28 @@ export async function getPriceComparison(discountId: string) {
         // canonical product with single units must not be priced against them.
         const sameSize = others.filter((d) => samePack(source.productName, d.productName));
 
+        // AI verdicts (lib/comparison-verdict, owner decision 2026-11-22): a
+        // pair the nightly check judged different or unsure is never shown.
+        // Before filterComparable, so a hidden row cannot take its chain's slot.
+        // KEEP IN LOCKSTEP with lib/comparison-count comparisonRivals.
+        const verdictOf = await loadVerdictLookup(
+          prisma,
+          sameSize.map((d) => pairKey(source.supermarket, source.productName, d.supermarket, d.productName)),
+        );
+        const vetted = filterByVerdict(
+          { name: source.productName, chain: source.supermarket },
+          sameSize,
+          (d) => d.productName,
+          (d) => d.supermarket,
+          verdictOf,
+        );
+
         // Mis-mapped productIds (several chain SKUs on one canonical product)
         // would otherwise render DIFFERENT products as "the same item elsewhere"
         // — see lib/offer-similarity. Guard on actual name similarity.
         const comparable = filterComparable(
           source.productName,
-          sameSize,
+          vetted,
           (d) => d.productName,
           (d) => d.supermarket
         ).slice(0, 8);

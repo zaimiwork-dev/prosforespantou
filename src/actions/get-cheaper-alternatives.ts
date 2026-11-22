@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
+import { filterByVerdict, loadVerdictLookup, pairKey } from '@/lib/comparison-verdict';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export interface CheaperAlternative {
@@ -99,7 +100,7 @@ export async function getCheaperAlternatives(
           byProductId.get(c.productId)!.push(c);
         }
 
-        const out: Record<string, CheaperAlternative | null> = {};
+        const eligibleBySource = new Map<string, typeof candidates>();
         for (const s of sources) {
           const matched = new Set<string>();
           if (s.productId) matched.add(s.productId);
@@ -118,11 +119,30 @@ export async function getCheaperAlternatives(
               eligible.push(c);
             }
           }
+          eligibleBySource.set(s.id, eligible);
+        }
 
+        // AI verdicts (lib/comparison-verdict): «the same thing, cheaper
+        // elsewhere» is a comparison claim too — one query for every source.
+        const verdictOf = await loadVerdictLookup(
+          prisma,
+          sources.flatMap((s) => (eligibleBySource.get(s.id) ?? []).map((c) =>
+            pairKey(s.supermarket, s.productName, c.supermarket, c.productName))),
+        );
+
+        const out: Record<string, CheaperAlternative | null> = {};
+        for (const s of sources) {
+          const vetted = filterByVerdict(
+            { name: s.productName, chain: s.supermarket },
+            eligibleBySource.get(s.id) ?? [],
+            (c) => c.productName,
+            (c) => c.supermarket,
+            verdictOf,
+          );
           // Apply the exact name + variant guard used by the comparison UI.
           const comparable = filterComparable(
             s.productName,
-            eligible,
+            vetted,
             (c) => c.productName,
             (c) => c.supermarket,
           );

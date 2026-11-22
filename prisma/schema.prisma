@@ -483,3 +483,27 @@ model ScraperState {
 
   @@map("scraper_state")
 }
+
+// One AI verdict per cross-chain comparison pair (owner decision 2026-11-22):
+// is chain A's listing the SAME sellable item as chain B's, so their prices can
+// be compared? Written by src/scripts/verify-comparisons.mjs (nightly, Groq),
+// read by the comparison sheet, «cheaper elsewhere» and the nightly comparison
+// count — see src/lib/comparison-verdict.ts. Keyed by pairKey() of the two
+// chain-side names, so a renamed listing is a new pair and is judged again.
+// Rows are never overwritten by the script, so a verdict the owner corrects by
+// hand (model = 'owner') stays corrected.
+// Created by src/scripts/ensure-comparison-verdicts.mjs, not `prisma db push`
+// (db push would also drop the hand-made search index on discounts).
+model ComparisonVerdict {
+  pairKey   String   @id @map("pair_key")
+  chainA    String   @map("chain_a")
+  nameA     String   @map("name_a")
+  chainB    String   @map("chain_b")
+  nameB     String   @map("name_b")
+  verdict   String   // 'same' | 'different' | 'unsure'
+  reason    String?  // the model's few-word why, for the owner's review
+  model     String   // Groq model id, 'barcode' (both sides carry the same GTIN) or 'owner'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("comparison_verdicts")
+}

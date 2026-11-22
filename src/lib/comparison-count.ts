@@ -1,7 +1,7 @@
 // How many OTHER chains an offer's price-comparison sheet would render rows
 // for. This is the precompute twin of actions/get-price-comparison.ts —
 // KEEP THE GUARD CHAIN IN LOCKSTEP with that action (samePack →
-// filterComparable → slice(8) for offer rows; barcode-gated pickShelfRows
+// filterByVerdict → filterComparable → slice(8) for offer rows; barcode-gated pickShelfRows
 // with the same chain exclusions for shelf rows). A count that disagrees
 // with what the sheet actually shows is a lying chip.
 //
@@ -15,6 +15,7 @@ import { samePack } from './packaging.ts';
 import { filterComparable } from './offer-similarity.ts';
 import { pickShelfRows, type ShelfSnapshotInput } from './shelf-comparison.ts';
 import type { FreshChains } from './feed-freshness.ts';
+import { filterByVerdict, type VerdictLookup } from './comparison-verdict.ts';
 
 export type ComparisonCandidate = {
   productName: string;
@@ -42,6 +43,10 @@ type ComparisonArgs = {
   // Chains whose catalog feed is alive (lib/feed-freshness). Must be the same
   // map the action loads, or the chip and the sheet disagree.
   freshChains?: FreshChains;
+  // AI verdicts on cross-chain pairs (lib/comparison-verdict loadVerdictLookup,
+  // whole table). Must be passed by the nightly count: without it every pair
+  // counts as "not judged yet", which 'require-same' hides.
+  verdictOf?: VerdictLookup;
   now?: Date;
 };
 
@@ -52,16 +57,25 @@ export function comparisonRivals({
   barcodeBacked = false,
   snapshots = [],
   freshChains = new Map(),
+  verdictOf = () => undefined,
   now = new Date(),
 }: ComparisonArgs): RivalRow[] {
   const rows: RivalRow[] = [];
 
-  // Offer rows — same pipeline as the action: pack guard, then the
-  // variant/quantity/similarity/per-chain-best filter, then the 8-row cap.
+  // Offer rows — same pipeline as the action: pack guard, then the AI
+  // verdicts, then the variant/quantity/similarity/per-chain-best filter,
+  // then the 8-row cap.
   const sameSize = clusterOffers.filter((d) => samePack(source.productName, d.productName));
+  const vetted = filterByVerdict(
+    { name: source.productName, chain: source.supermarket },
+    sameSize,
+    (d) => d.productName,
+    (d) => d.supermarket,
+    verdictOf,
+  );
   const comparable = filterComparable(
     source.productName,
-    sameSize,
+    vetted,
     (d) => d.productName,
     (d) => d.supermarket
   ).slice(0, 8);

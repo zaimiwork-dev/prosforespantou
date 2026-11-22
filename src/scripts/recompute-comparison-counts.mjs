@@ -24,6 +24,7 @@ dotenv.config();
 import { comparisonRivals, isCheapestInCluster } from '../lib/comparison-count.ts';
 import { SHELF_PRICE_MAX_AGE_DAYS } from '../lib/shelf-comparison.ts';
 import { loadFreshShelfChains } from '../lib/feed-freshness.ts';
+import { loadVerdictLookup } from '../lib/comparison-verdict.ts';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 
@@ -75,6 +76,10 @@ async function run() {
   const freshChains = await loadFreshShelfChains(prisma, now);
   console.log(`   fresh shelf feeds: ${[...freshChains.keys()].sort().join(', ') || '(none)'}`);
 
+  // AI verdicts on cross-chain pairs — the whole table, same rule as the
+  // sheet (lib/comparison-verdict). Written earlier in the same nightly job.
+  const verdictOf = await loadVerdictLookup(prisma);
+
   // Normal-shelf snapshots (sanity-capped window) for every barcode-backed cluster.
   const shelfPids = [...new Set(
     active.filter((d) => d.productId && d.product?.barcode).map((d) => d.productId)
@@ -113,6 +118,7 @@ async function run() {
         barcodeBacked: Boolean(d.product?.barcode),
         snapshots: snapsByPid.get(d.productId) || [],
         freshChains,
+        verdictOf,
         now,
       });
       count = new Set(rivals.map((r) => r.supermarket)).size;

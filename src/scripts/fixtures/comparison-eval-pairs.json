@@ -1,0 +1,653 @@
+{
+ "note": "Hand-labelled 2026-11-22 from 200 random live offers (comparison audit). label = what a careful shopper would say: same / different / unsure (cannot tell from the two names). Used by EVAL=1 node src/scripts/verify-comparisons.mjs.",
+ "pairs": [
+  {
+   "n": 1,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Ava Perle Υγρό Απορρυπαντικό Πιάτων Σόδα & Λεμόνι 900ml.",
+   "chainB": "mymarket",
+   "nameB": "Αva Perle Υγρό Πιάτων Σόδα & Εκχύλισμα Λεμονιού 900ml"
+  },
+  {
+   "n": 2,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Syoss Brow Tint Βαφή Φρυδιών Καστανό Σκούρο",
+   "chainB": "mymarket",
+   "nameB": "Syoss Brow Tint Καστανό Σκούρο 17ml"
+  },
+  {
+   "n": 3,
+   "label": "different",
+   "chainA": "masoutis",
+   "nameA": "Wella Koleston Βαφή Μαλλιών Νo66/46",
+   "chainB": "mymarket",
+   "nameB": "Koleston Βαφή Μαλλιών Νο55/46 50ml"
+  },
+  {
+   "n": 4,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Softex Classic Pure Χαρτί Υγείας 2 Φύλλων 8αρι 0,496kg",
+   "chainB": "sklavenitis",
+   "nameB": "SOFTEX Classic Pure Χαρτί Υγείας 2 Φύλλων 8τεμ 496g"
+  },
+  {
+   "n": 5,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Koleston Βαφή Μαλλιών Νο 7/1 50ml",
+   "chainB": "masoutis",
+   "nameB": "Wella Koleston Βαφή Μαλλιών Νo7/1"
+  },
+  {
+   "n": 6,
+   "label": "different",
+   "chainA": "sklavenitis",
+   "nameA": "GILLETTE Fusion5  Ξυριστική Μηχανή Proglide & 2 Ανταλλακτικές Κεφαλές",
+   "chainB": "masoutis",
+   "nameB": "Gillette Fusion5 Ξυριστική Μηχανή Με Λαβή Βάση Στήριξης +5 Ανταλλακτικές Κεφαλές"
+  },
+  {
+   "n": 7,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "FAIRY Platinum Plus Απορρυπαντικό Πλυντηρίου Πιάτων Ταμπλέτες Anti-Dull 48τεμ",
+   "chainB": "mymarket",
+   "nameB": "Fairy Platinum Plus Ταμπλέτες Πλυντηρίου Πιάτων Anti Dull XXL 48τεμ"
+  },
+  {
+   "n": 8,
+   "label": "unsure",
+   "chainA": "masoutis",
+   "nameA": "Always Dailies Σερβιετάκια Extra Protect Long Plus 24τεμ.",
+   "chainB": "sklavenitis",
+   "nameB": "ALWAYS Daily Protect Σερβιετάκια Extra Long 24τεμ"
+  },
+  {
+   "n": 9,
+   "label": "unsure",
+   "chainA": "mymarket",
+   "nameA": "Gillette Fusion Manual Ξυριστική Μηχανή Με 2 Ανταλλακτικά",
+   "chainB": "masoutis",
+   "nameB": "Gillette Fusion 5 Ξυριστική Μηχανή +2 Ανταλλακτικά"
+  },
+  {
+   "n": 10,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "PALMOLIVE Ultra Δύναμη Απορρυπαντικό Πιάτων Υγρό Original 1500ml",
+   "chainB": "mymarket",
+   "nameB": "Palmolive Υγρό Πιάτων Original 1500ml"
+  },
+  {
+   "n": 11,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "PALMOLIVE Ultra Δύναμη Απορρυπαντικό Πιάτων Υγρό Original 1500ml",
+   "chainB": "masoutis",
+   "nameB": "Palmolive Original Υγρό Απορρυπαντικό Πιάτων 1,5lt."
+  },
+  {
+   "n": 13,
+   "label": "unsure",
+   "chainA": "mymarket",
+   "nameA": "Colgate 360 Black Οδοντόβουρτσα Medium",
+   "chainB": "masoutis",
+   "nameB": "Colgate Οδοντόβουρτσα 360 Μέτρια"
+  },
+  {
+   "n": 15,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "TENA Pants Plus Εσώρουχα Ακράτειας XL 12τεμ",
+   "chainB": "masoutis",
+   "nameB": "Tena Pants Εσώρουχα Ακράτειας Plus Extra Large 12τεμ."
+  },
+  {
+   "n": 16,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "TENA Pants Plus Εσώρουχα Ακράτειας XL 12τεμ",
+   "chainB": "mymarket",
+   "nameB": "Tena Pants Plus Extra Large Πάνες Ακράτειας 12τεμ"
+  },
+  {
+   "n": 17,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Always Platinum Ultra Normal 30τεμ",
+   "chainB": "sklavenitis",
+   "nameB": "ALWAYS Platinum Σερβιέτες No1 Normal 30τεμ"
+  },
+  {
+   "n": 18,
+   "label": "unsure",
+   "chainA": "mymarket",
+   "nameA": "Pescanova Γλώσσα Φιλέτο Λιμάντα Κατεψυγμένο 425gr",
+   "chainB": "ab",
+   "nameB": "Γλώσσα Λιμάντα Φιλέτο 425g"
+  },
+  {
+   "n": 19,
+   "label": "unsure",
+   "chainA": "ab",
+   "nameA": "Φιλέτο Μπακαλιάρου με Τραγανό Πανάρισμα 250g",
+   "chainB": "mymarket",
+   "nameB": "Pescanova Φιλέτο Μπακαλιάρου Με Τραγανό Πανάρισμα Κατεψυγμένο 250gr"
+  },
+  {
+   "n": 20,
+   "label": "unsure",
+   "chainA": "ab",
+   "nameA": "Γάμπαρη Αργεντινής Γίγας 500g",
+   "chainB": "kritikos",
+   "nameB": "PESCANOVA ΓΑΜΠΑΡΗ ΓΙΓΑΣ ΑΡΓΕΝΤΙΝΗΣ ΚΤΨ 500ΓΡ"
+  },
+  {
+   "n": 21,
+   "label": "unsure",
+   "chainA": "ab",
+   "nameA": "Γάμπαρη Αργεντινής Γίγας 500g",
+   "chainB": "mymarket",
+   "nameB": "Pescanova Γάμπαρη Γίγας Αργεντινής Κατεψυγμένο 500gr"
+  },
+  {
+   "n": 22,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Le Petit Marseillais Vanilla Αφρόλουτρο 650ml",
+   "chainB": "sklavenitis",
+   "nameB": "LE PETIT MARSEILLAIS Αφρόλουτρο με Βιολογικό Γάλα Βανίλιας 650ml"
+  },
+  {
+   "n": 23,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Le Petit Marseillais Vanilla Αφρόλουτρο 650ml",
+   "chainB": "masoutis",
+   "nameB": "Le Petit Marseillais Αφρόλουτρο Βιολογικό Γάλα Βανίλιας 650ml."
+  },
+  {
+   "n": 24,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Wet Hankies Υγρά Μαντηλάκια Αντιβακτηριδιακά Orange 4x15",
+   "chainB": "masoutis",
+   "nameB": "Wet Hankies Υγρά Μαντηλάκια Αντιβακτηριδιακά Πορτοκάλι 4x15τεμ."
+  },
+  {
+   "n": 25,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Syoss Oleo Βαφή Ξανθό Σκούρο 6-10",
+   "chainB": "masoutis",
+   "nameB": "Syoss Βαφή Μαλλιών Oleo Intense No6-10 Ξανθό Σκούρο"
+  },
+  {
+   "n": 26,
+   "label": "unsure",
+   "chainA": "mymarket",
+   "nameA": "Always Extra Long Plus Σερβιετάκια 24τεμ",
+   "chainB": "sklavenitis",
+   "nameB": "ALWAYS Daily Protect Σερβιετάκια Extra Long 24τεμ"
+  },
+  {
+   "n": 27,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "SEPTONA Kids Calm n' Care Σαμπουάν & Αφρόλουτρο για Αγόρια & Κορίτσια 750ml",
+   "chainB": "masoutis",
+   "nameB": "Septona Kids Calm N' Care Παιδικό Σαμπουάν & Αφρόλουτρο Για Αγόρια & Κορίτσια 750ml."
+  },
+  {
+   "n": 28,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Aim Οδοντόβουρτσα Gentle Care Μαλακή",
+   "chainB": "masoutis",
+   "nameB": "Aim Gentle Care Οδοντόβουρτσα Μαλακή"
+  },
+  {
+   "n": 29,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Rio Mare Insalatissime Με Κους Κους 2x160gr",
+   "chainB": "sklavenitis",
+   "nameB": "RIO MARE Insalatissime Σαλάτα με Τόνο Κους Κους με Ρεβίθια Αρακά & Ντοματίνια 2x160g"
+  },
+  {
+   "n": 30,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Always Ultra Secure Night Extra Duo 10τεμ",
+   "chainB": "sklavenitis",
+   "nameB": "ALWAYS Ultra Σερβιέτες No5 Secure Night Extra 10τεμ"
+  },
+  {
+   "n": 31,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Knorr Pasta Snack Pot Καρμπονάρα 55gr",
+   "chainB": "sklavenitis",
+   "nameB": "KNORR Pasta Καρμπονάρα 55g"
+  },
+  {
+   "n": 32,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Bioten Hydrogel Mask Hydro X-Cell 35gr",
+   "chainB": "masoutis",
+   "nameB": "Bioten Hydro X-Cell Μάσκα Προσώπου Hydrogel 1τεμ."
+  },
+  {
+   "n": 34,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "K2r Colour Catcher Χρωμοπαγίδα 52Φύλλων",
+   "chainB": "sklavenitis",
+   "nameB": "K2R Colour Catcher Χρωμοπαγίδα 52 φύλλα"
+  },
+  {
+   "n": 35,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "K2r Colour Catcher Χρωμοπαγίδα 52Φύλλων",
+   "chainB": "mymarket",
+   "nameB": "K2R Colour Catcher Χρωμοπαγίδα 52 Φύλλα"
+  },
+  {
+   "n": 36,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Wella Koleston Βαφή Μαλλιών Νo5/0",
+   "chainB": "mymarket",
+   "nameB": "Koleston Βαφή Μαλλιών No5/0 50ml"
+  },
+  {
+   "n": 37,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Fairy Clean & Fresh  Υγρό Απορρυπαντικό Πιάτων Μήλο 900ml.",
+   "chainB": "mymarket",
+   "nameB": "Fairy Clean & Fresh Με Άρωμα Μήλο Υγρό Πιάτων 900ml"
+  },
+  {
+   "n": 38,
+   "label": "different",
+   "chainA": "mymarket",
+   "nameA": "EveryDay Σερβιέτες Hyperdry Eliptica Ultra Plus Super 10τεμ",
+   "chainB": "masoutis",
+   "nameB": "Every Day Sensitive Σερβιέτες Super Ultra Plus 10τεμ."
+  },
+  {
+   "n": 39,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Pescanova Χταπόδι Πλοκάμι 600γρ.",
+   "chainB": "mymarket",
+   "nameB": "Pescanova Χταπόδι Πλοκάμι Ινδο-Ειρηνικού Κατεψυγμένο 600gr"
+  },
+  {
+   "n": 40,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Ava Perle Υγρό Απορρυπαντικό Πιάτων Πράσινο Σαπούνι & Μαστίχα Χίου 430ml.",
+   "chainB": "mymarket",
+   "nameB": "Ava Perle Υγρό Πιάτων Πράσινο Σαπούνι & Μαστίχα Χίου 430ml"
+  },
+  {
+   "n": 41,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Bioten Glow Expert 4D Υφασμάτινη Μάσκα Προσώπου 1τεμ.",
+   "chainB": "sklavenitis",
+   "nameB": "BIOTEN Μάσκα Προσώπου Glow Expert 4D 1τεμ"
+  },
+  {
+   "n": 42,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Dettol Πολυκαθαριστικό 24 Ώρες Προστασία Ocean Fresh 460ml",
+   "chainB": "sklavenitis",
+   "nameB": "DETTOL 24 Ώρες Αντιβακτηριδιακό Πολυκαθαριστικό Σπρέι Ocean Fresh 460ml"
+  },
+  {
+   "n": 43,
+   "label": "unsure",
+   "chainA": "sklavenitis",
+   "nameA": "NIVEA Men Black & White Αποσμητικό Στικ Original 50ml",
+   "chainB": "mymarket",
+   "nameB": "Nivea Men Αποσμητικό Σώματος Stick Black & White Invisible 50ml"
+  },
+  {
+   "n": 44,
+   "label": "different",
+   "chainA": "mymarket",
+   "nameA": "Καραμολέγκος Ψωμί Τοστ Σίκαλης 340gr",
+   "chainB": "sklavenitis",
+   "nameB": "ΚΑΡΑΜΟΛΕΓΚΟΣ Ψωμί για Τοστ Σίτου με Προζύμι 340g"
+  },
+  {
+   "n": 45,
+   "label": "different",
+   "chainA": "mymarket",
+   "nameA": "Palmolive Αφρόλουτρο Spa Pink Massage 650ml",
+   "chainB": "sklavenitis",
+   "nameB": "PALMOLIVE Thermal Spa Αφρόλουτρο Mineral Massage 650ml"
+  },
+  {
+   "n": 46,
+   "label": "unsure",
+   "chainA": "masoutis",
+   "nameA": "Pescanova Χταπόδι Πλοκάμι 600γρ.",
+   "chainB": "ab",
+   "nameB": "Χταπόδι Πλοκάμι 600g"
+  },
+  {
+   "n": 47,
+   "label": "same",
+   "chainA": "ab",
+   "nameA": "Ψωμί Τοστ Γεύση2 Σίτου 700g",
+   "chainB": "mymarket",
+   "nameB": "Παπαδοπούλου Ψωμί Τοστ Γεύση2 Σταρένιο 700gr"
+  },
+  {
+   "n": 48,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Johnson's Αφρόλουτρο Clean & Protect 3 Άνθη Αμυγδάλου 750ml.",
+   "chainB": "mymarket",
+   "nameB": "Johnson's Clean & Protect 3 Almond Αφρόλουτρο 750ml"
+  },
+  {
+   "n": 49,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Got2b Beach Matt Πηλός 100ml",
+   "chainB": "masoutis",
+   "nameB": "Schwarzkopf Got2B Paste Beach Matt 100ml."
+  },
+  {
+   "n": 50,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "L'OREAL Excellence Cream No 9 Ξανθό Πολύ Ανοιχτό 48ml",
+   "chainB": "masoutis",
+   "nameB": "L'oreal Paris Excellence Βαφή Μαλλιών No9 Ξανθό Πολύ Ανοιχτό 48ml."
+  },
+  {
+   "n": 51,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Dettol Απολυμαντικό Spray Επιφανειών Υγιεινή & Ασφάλεια 500ml",
+   "chainB": "kritikos",
+   "nameB": "DETTOL ΚΑΘΑΡ/ΚΟ SPRAY ΥΓΙΕΙΝΗ & ΑΣΦΑΛΕΙΑ 500ML"
+  },
+  {
+   "n": 52,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Palmolive Thermal Spa Αφρόλουτρο Silky Oil 650ml.",
+   "chainB": "mymarket",
+   "nameB": "Palmolive Αφρόλουτρο Silky Oil 650ml"
+  },
+  {
+   "n": 53,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Johnnie Walker Red Label Whisky 700ml",
+   "chainB": "sklavenitis",
+   "nameB": "JOHNNIE WALKER Ουίσκι Red Label 700ml"
+  },
+  {
+   "n": 54,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Fa Pink Passion Spray Αποσμητικό Σώματος 150ml",
+   "chainB": "kritikos",
+   "nameB": "FA ΑΠΟΣΜ/ΚΟ SPRAY PINK PASSION 150ML"
+  },
+  {
+   "n": 56,
+   "label": "unsure",
+   "chainA": "mymarket",
+   "nameA": "Sanitas Αρωματικές Σακούλες Απορριμμάτων Μικρές 46x56cm 30τεμ",
+   "chainB": "sklavenitis",
+   "nameB": "SANITAS Σακούλες Απορριμμάτων Αρωματικές Μικρές με Χερούλια Easy Pack 46x50cm 25lt 30τεμ"
+  },
+  {
+   "n": 57,
+   "label": "different",
+   "chainA": "sklavenitis",
+   "nameA": "OLD SPICE Αποσμητικό Stick Super Mario Wolfthorn 50ml",
+   "chainB": "kritikos",
+   "nameB": "OLD SPICE ΑΠΟΣΜ/ΚΟ DEO STICK WHITEWATER 50ML"
+  },
+  {
+   "n": 58,
+   "label": "unsure",
+   "chainA": "mymarket",
+   "nameA": "Palmolive Υγρό Πιάτων Hygiene 750ml",
+   "chainB": "masoutis",
+   "nameB": "Palmolive Υγρό Απορρυπαντικό Πιάτων Exotic Hygiene 750ml."
+  },
+  {
+   "n": 59,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "KLINEX Καθαριστικό Σπρέι κατά της Μούχλας με Ενεργό Χλώριο 500ml",
+   "chainB": "kritikos",
+   "nameB": "KLINEX ΚΑΘΑΡ/ΚΟ SPRAY ΚΑΤΑ ΤΗΣ ΜΟΥΧΛΑΣ 500ML"
+  },
+  {
+   "n": 60,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Sanex Zero% Αποσμητικό Σπρέι Extra Control 200ml.",
+   "chainB": "mymarket",
+   "nameB": "Sanex Αποσμητικό Spray Zero 0% Extra Control 200ml"
+  },
+  {
+   "n": 61,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Periogard Οδοντόκρεμα Προστασίας Ούλων & Ευαίσθητων Δοντιών 75ml",
+   "chainB": "masoutis",
+   "nameB": "Colgate Periogard Οδοντόκρεμα Προστασίας Ούλων 75ml."
+  },
+  {
+   "n": 62,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "BOROTALCO Αποσμητικό Roll On Original 50ml",
+   "chainB": "mymarket",
+   "nameB": "Borotalco Original Αποσμητικό Σώματος Rollon 50ml"
+  },
+  {
+   "n": 63,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Aroma Scrub Ελαιόλαδο & Βάλσαμο 200ml",
+   "chainB": "sklavenitis",
+   "nameB": "AROMA Biorganic Scrub Προσώπου & Σώματος με Ελαιόλαδο Βάλσαμο & Καλέντουλα 200ml"
+  },
+  {
+   "n": 64,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Axe Leather & Cookies Αποσμητικό Σώματος 150ml",
+   "chainB": "masoutis",
+   "nameB": "Axe Αποσμητικό Σπρέι Leather & Cookies 150ml."
+  },
+  {
+   "n": 66,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "WET HANKIES Υγρομάντιλα Αντιβακτηριδιακά με Άρωμα Λεμόνι 72τεμ",
+   "chainB": "mymarket",
+   "nameB": "Wet Hankies Αντιβακτηριδιακά Μαντήλια Lemon Thick 72τεμ"
+  },
+  {
+   "n": 67,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Dove Αποσμητικό Σπρέι Original 150ml.",
+   "chainB": "mymarket",
+   "nameB": "Dove Αποσμητικό Σώματος Σπρέι Advanced Care Original 150ml"
+  },
+  {
+   "n": 68,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Ajax Fete Des Fleurs Αγριολούλούδα Υγρό Καθαριστικό 1,5lt",
+   "chainB": "masoutis",
+   "nameB": "Ajax Υγρό Καθαριστικό Γιορτή Λουλουδιών Αγριολούλουδα 1,5lt."
+  },
+  {
+   "n": 69,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Fa Αποσμητικό Σώματος Invisible Fresh Roll On 50ml",
+   "chainB": "kritikos",
+   "nameB": "FA ΑΠΟΣΜ/ΚΟ ROLL ON INVISIBLE FRESH 50ML"
+  },
+  {
+   "n": 70,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "BIOTEN Glow Expert 4D Κρέμα Ημέρας Κατά των Πανάδων & των Ρυτίδων Spf15 50ml",
+   "chainB": "mymarket",
+   "nameB": "Bioten Κρέμα Ημέρας Glow Expert 4D 50ml"
+  },
+  {
+   "n": 71,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Omo Απορρυπαντικό Πλυντηρίου Ρούχων Σκόνη Τροπικά Λουλούδια & Ylang 45mez. 2,52kg.",
+   "chainB": "sklavenitis",
+   "nameB": "OMO Απορρυπαντικό Πλυντηρίου Ρούχων Σκόνη Τροπικά Λουλούδια 45 πλύσεις"
+  },
+  {
+   "n": 72,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Palmolive Αφρόλουτρο Aroma Sleep 650ml",
+   "chainB": "masoutis",
+   "nameB": "Palmolive Aroma Essense Αφρόλουτρο Sleep 650ml."
+  },
+  {
+   "n": 73,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Soupline Μαλακτικό Ρούχων Mistral 50mez. 4lt.",
+   "chainB": "sklavenitis",
+   "nameB": "SOUPLINE Μαλακτικό Ρούχων Mistral 50 πλύσεις 4lt"
+  },
+  {
+   "n": 74,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Βεργίνα Weiss Μπίρα Φιάλη 500ml",
+   "chainB": "sklavenitis",
+   "nameB": "ΒΕΡΓΙΝΑ Μπίρα Weiss 500ml"
+  },
+  {
+   "n": 75,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "AIM White Now Οδοντόκρεμα 75ml",
+   "chainB": "masoutis",
+   "nameB": "Aim White Now Οδοντόκρεμα 75ml."
+  },
+  {
+   "n": 76,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Sensodyne Οδοντόκρεμα Rapid Relief 75ml",
+   "chainB": "masoutis",
+   "nameB": "Sensodyne Οδοντόκρεμα Rapid Relief 75ml."
+  },
+  {
+   "n": 77,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Dettol Απολυμαντικό Για Τα Ρούχα 1,5lt",
+   "chainB": "kritikos",
+   "nameB": "DETTOL ΑΠΟΛΥΜΑΝΤΙΚΟ ΓΙΑ ΤΑ ΡΟΥΧΑ 1.5L"
+  },
+  {
+   "n": 78,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Nivea Κρέμα Ημέρας Αντιρυτιδική Αναζωογόνησης 55+ 50ml.",
+   "chainB": "mymarket",
+   "nameB": "Nivea Αντιρυτιδική Κρέμα Ημέρας + Αναζωογόνηση 55+ 50ml"
+  },
+  {
+   "n": 79,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Colgate Plax Στοματικό Διάλυμα Original 500ml.",
+   "chainB": "mymarket",
+   "nameB": "Colgate Plax Original Στοματικό Διάλυμα 500ml"
+  },
+  {
+   "n": 80,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Milner Σε Φέτες 175gr",
+   "chainB": "kritikos",
+   "nameB": "MILNER ΦΕΤΕΣ 175ΓΡ"
+  },
+  {
+   "n": 81,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Schwarzkopf Taft Ultimate HL6 250ml",
+   "chainB": "masoutis",
+   "nameB": "Schwarzkopf Taft Λακ Ultimate HL6 250ml."
+  },
+  {
+   "n": 82,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "FAIRY Power Σπρέι 3σε1 Fresh 500ml",
+   "chainB": "masoutis",
+   "nameB": "Fairy Power Fresh Σπρέι 500ml."
+  },
+  {
+   "n": 83,
+   "label": "same",
+   "chainA": "mymarket",
+   "nameA": "Nivea Body Nourishing Milk Με Αντλία 400ml",
+   "chainB": "kritikos",
+   "nameB": "NIVEA BODY NOURISHING MILK 400ML"
+  },
+  {
+   "n": 84,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "O.B. Pro Comfort Ταμπόν Super 16τεμ",
+   "chainB": "mymarket",
+   "nameB": "O.B. Pro Comfort Super 16τεμ"
+  },
+  {
+   "n": 85,
+   "label": "same",
+   "chainA": "masoutis",
+   "nameA": "Fairy Clean & Fresh  Υγρό Απορρυπαντικό Πιάτων Μήλο 900ml.",
+   "chainB": "sklavenitis",
+   "nameB": "FAIRY Clean & Fresh Απορρυπαντικό Πιάτων Υγρό Μήλο 900ml"
+  },
+  {
+   "n": 86,
+   "label": "same",
+   "chainA": "sklavenitis",
+   "nameA": "TENA Lady Σερβιέτες Ακράτειας Super 15τεμ",
+   "chainB": "mymarket",
+   "nameB": "Tena Lady Super Σερβιετες Ακράτειας 15τεμ"
+  }
+ ]
+}
