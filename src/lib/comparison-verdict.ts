@@ -22,7 +22,11 @@ export type Verdict = 'same' | 'different' | 'unsure';
 //                       full verification run is in progress
 //   'require-same'      only pairs judged «same» are shown (the goal)
 export type VerdictMode = 'off' | 'block-different' | 'require-same';
-export const VERDICT_MODE: VerdictMode = 'block-different';
+// 'require-same' since 2026-11-22 evening: every live pair was judged (Groq +
+// Claude Sonnet agents), and a held-out hand check of 100 random «same»
+// verdicts found 0 different products (1 doubtful). A brand-new pair now
+// waits for its first nightly check instead of showing unchecked.
+export const VERDICT_MODE: VerdictMode = 'require-same';
 
 function normalizeName(name: string | null | undefined): string {
   return (name ?? '').normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();

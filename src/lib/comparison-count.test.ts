@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { comparisonChainCount } from './comparison-count';
+// The rules under test, with every pair confirmed by the AI check.
+const ALL_SAME = () => 'same' as const;
 import { pairKey, type Verdict } from './comparison-verdict';
 
 const NOW = new Date('2026-07-08T12:00:00Z');
@@ -21,6 +23,7 @@ describe('comparisonChainCount', () => {
         { productName: 'ΗΒΗ Πορτοκαλάδα με ανθρακικό 1,5lt', supermarket: 'ab' },
         { productName: 'ΗΒΗ Πορτοκαλάδα ανθρακικό 1,5lt', supermarket: 'kritikos' },
       ],
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(2);
@@ -30,6 +33,7 @@ describe('comparisonChainCount', () => {
     const n = comparisonChainCount({
       source,
       clusterOffers: [{ productName: source.productName, supermarket: 'masoutis' }],
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(0);
@@ -39,6 +43,7 @@ describe('comparisonChainCount', () => {
     const n = comparisonChainCount({
       source: { productName: 'Palmolive Αφρόλουτρο Μέλι 650ml', supermarket: 'masoutis' },
       clusterOffers: [{ productName: 'Palmolive Αφρόλουτρο Αμύγδαλο 650ml', supermarket: 'ab' }],
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(0);
@@ -55,6 +60,7 @@ describe('comparisonChainCount', () => {
         { supermarket: 'lidl', price: 1.6, recordedAt: daysAgo(1) }, // feed not fresh → out
       ],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(1);
@@ -67,6 +73,7 @@ describe('comparisonChainCount', () => {
       barcodeBacked: true,
       snapshots: [{ supermarket: 'ab', price: 1.85, recordedAt: daysAgo(40) }],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(1);
@@ -78,6 +85,7 @@ describe('comparisonChainCount', () => {
       clusterOffers: [],
       barcodeBacked: true,
       snapshots: [{ supermarket: 'ab', price: 1.85, recordedAt: daysAgo(2) }],
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(0);
@@ -90,6 +98,7 @@ describe('comparisonChainCount', () => {
       barcodeBacked: false,
       snapshots: [{ supermarket: 'ab', price: 1.85, recordedAt: daysAgo(2) }],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(0);
@@ -109,6 +118,7 @@ describe('comparisonChainCount', () => {
         { supermarket: 'kritikos', price: 2.3, recordedAt: daysAgo(1) },
       ],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(1); // kritikos only
@@ -124,6 +134,7 @@ describe('comparisonChainCount', () => {
         { supermarket: 'kritikos', price: 1.95, recordedAt: daysAgo(1) },
       ],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(n).toBe(2); // ab (offer) + kritikos (shelf)
@@ -135,7 +146,9 @@ describe('comparisonChainCount', () => {
       [pairKey(source.supermarket, source.productName, rival.supermarket, rival.productName), 'different'],
     ]);
     const args = { source, clusterOffers: [rival], now: NOW };
-    expect(comparisonChainCount(args)).toBe(1);
+    expect(comparisonChainCount({ ...args, verdictOf: ALL_SAME })).toBe(1);
     expect(comparisonChainCount({ ...args, verdictOf: (k: string) => verdicts.get(k) })).toBe(0);
+    // Not judged yet: hidden until its first nightly check ('require-same').
+    expect(comparisonChainCount(args)).toBe(0);
   });
 });

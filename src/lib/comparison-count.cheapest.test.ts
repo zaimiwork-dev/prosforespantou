@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { comparisonRivals, comparisonChainCount, isCheapestInCluster } from './comparison-count';
+// The rules under test, with every pair confirmed by the AI check.
+const ALL_SAME = () => 'same' as const;
 
 const NOW = new Date('2026-09-16T12:00:00Z');
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86400000);
@@ -21,6 +23,7 @@ describe('comparisonRivals', () => {
       barcodeBacked: true,
       snapshots: [{ supermarket: 'kritikos', price: 1.85, recordedAt: daysAgo(3) }],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     });
     expect(rivals).toEqual([
@@ -36,6 +39,7 @@ describe('comparisonRivals', () => {
       barcodeBacked: true,
       snapshots: [{ supermarket: 'kritikos', price: 1.85, recordedAt: daysAgo(3) }],
       freshChains: FRESH,
+      verdictOf: ALL_SAME,
       now: NOW,
     };
     expect(comparisonChainCount(args)).toBe(new Set(comparisonRivals(args).map((r) => r.supermarket)).size);
