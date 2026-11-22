@@ -22,7 +22,10 @@
 //   node src/scripts/verify-comparisons.mjs             # judge every new pair (stops cleanly on the daily budget)
 //
 // Groq free tier: openai/gpt-oss-120b (reasoning low), ~200K tokens/day shared with the
-// nightly resolvers; 8 pairs per request ≈ 1.3K tokens → ~1,200 pairs/day.
+// nightly resolvers; measured 11-22: ~290 tokens per pair (8 per request) →
+// at most ~650 pairs/day, so the first full pass (1,433 pairs) takes 2–3 nights.
+// Eval on the 81-pair fixture: 0 of 6 different pairs judged «same», 48 of 63
+// correct pairs kept, 4 of 12 «unsure»-labelled pairs judged «same».
 // A daily-budget stop exits 0: the next run resumes where this one stopped.
 //
 // dotenv first (ESM hoist trap).
