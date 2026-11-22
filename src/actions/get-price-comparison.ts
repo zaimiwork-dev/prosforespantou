@@ -58,9 +58,15 @@ export async function getPriceComparison(discountId: string) {
           orderBy: { discountedPrice: 'asc' },
         });
 
-        // Only compare like-for-like pack sizes. A 12-pack offer sharing a
-        // canonical product with single units must not be priced against them.
-        const sameSize = others.filter((d) => samePack(source.productName, d.productName));
+        // Only OTHER chains, and only like-for-like pack sizes. A row from the
+        // shopper's own chain is never a comparison (2026-11-22): its web +
+        // leaflet twin adds nothing, and a second SKU there is unverified — an
+        // AB «Ψωμί Τοστ Ολικής Άλεσης 720g» at 1,63 € was shown as
+        // «ΦΘΗΝΟΤΕΡΑ» on another AB «Ψωμί Τοστ Ολικής Άλεσης 720g» at 1,93 €
+        // (AB names carry no brand). A 12-pack sharing a canonical product
+        // with single units must not be priced against them either.
+        const sameSize = others.filter((d) =>
+          d.supermarket !== source.supermarket && samePack(source.productName, d.productName));
 
         // AI verdicts (lib/comparison-verdict, owner decision 2026-11-22): a
         // pair the nightly check judged different or unsure is never shown.

@@ -65,7 +65,9 @@ export function comparisonRivals({
   // Offer rows — same pipeline as the action: pack guard, then the AI
   // verdicts, then the variant/quantity/similarity/per-chain-best filter,
   // then the 8-row cap.
-  const sameSize = clusterOffers.filter((d) => samePack(source.productName, d.productName));
+  // Other chains only (the sheet never shows the shopper's own chain).
+  const sameSize = clusterOffers.filter((d) =>
+    d.supermarket !== source.supermarket && samePack(source.productName, d.productName));
   const vetted = filterByVerdict(
     { name: source.productName, chain: source.supermarket },
     sameSize,
