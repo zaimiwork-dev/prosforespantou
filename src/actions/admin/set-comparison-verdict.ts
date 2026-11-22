@@ -41,9 +41,10 @@ export async function setComparisonVerdict(input: unknown) {
       const affected = await prisma.discount.findMany({
         where: {
           isActive: true,
+          // The two chain items: by code (the verdict's key), else by name.
           OR: [
-            { supermarket: row.chainA, productName: row.nameA },
-            { supermarket: row.chainB, productName: row.nameB },
+            row.codeA ? { supermarket: row.chainA, chainItemcode: row.codeA } : { supermarket: row.chainA, productName: row.nameA },
+            row.codeB ? { supermarket: row.chainB, chainItemcode: row.codeB } : { supermarket: row.chainB, productName: row.nameB },
           ],
         },
         select: { id: true },

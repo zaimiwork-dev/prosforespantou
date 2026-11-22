@@ -29,11 +29,11 @@ export async function listComparisonVerdicts(input?: unknown) {
       const now = new Date();
       const [verdicts, offers] = await Promise.all([
         prisma.comparisonVerdict.findMany({
-          select: { pairKey: true, chainA: true, nameA: true, chainB: true, nameB: true, verdict: true, model: true, reason: true, createdAt: true },
+          select: { pairKey: true, chainA: true, codeA: true, nameA: true, chainB: true, codeB: true, nameB: true, verdict: true, model: true, reason: true, createdAt: true },
         }),
         prisma.discount.findMany({
           where: withPublicDealVisibility({ isActive: true, validUntil: { gt: now } }),
-          select: { id: true, productName: true, supermarket: true, discountedPrice: true, imageUrl: true, hotScore: true },
+          select: { id: true, productName: true, supermarket: true, chainItemcode: true, discountedPrice: true, imageUrl: true, hotScore: true },
         }),
       ]);
 

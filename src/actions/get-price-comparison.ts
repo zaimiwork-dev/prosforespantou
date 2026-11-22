@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
-import { filterByVerdict, loadVerdictLookup, pairKey } from '@/lib/comparison-verdict';
+import { filterByVerdict, loadVerdictLookup, pairKeyOf } from '@/lib/comparison-verdict';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 import { pickShelfRows, SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
@@ -22,6 +22,7 @@ export async function getPriceComparison(discountId: string) {
             productId: true,
             productName: true,
             supermarket: true,
+            chainItemcode: true,
             product: { select: { barcode: true } },
           },
         });
@@ -72,17 +73,12 @@ export async function getPriceComparison(discountId: string) {
         // pair the nightly check judged different or unsure is never shown.
         // Before filterComparable, so a hidden row cannot take its chain's slot.
         // KEEP IN LOCKSTEP with lib/comparison-count comparisonRivals.
-        const verdictOf = await loadVerdictLookup(
-          prisma,
-          sameSize.map((d) => pairKey(source.supermarket, source.productName, d.supermarket, d.productName)),
-        );
-        const vetted = filterByVerdict(
-          { name: source.productName, chain: source.supermarket },
-          sameSize,
-          (d) => d.productName,
-          (d) => d.supermarket,
-          verdictOf,
-        );
+        // Keyed by each chain's own item code (its «slot»), so a renamed
+        // listing keeps its verdict.
+        const sourceSide = { chain: source.supermarket, code: source.chainItemcode, name: source.productName };
+        const sideOf = (d: (typeof sameSize)[number]) => ({ chain: d.supermarket, code: d.chainItemcode, name: d.productName });
+        const verdictOf = await loadVerdictLookup(prisma, sameSize.map((d) => pairKeyOf(sourceSide, sideOf(d))));
+        const vetted = filterByVerdict(sourceSide, sameSize, sideOf, verdictOf);
 
         // Mis-mapped productIds (several chain SKUs on one canonical product)
         // would otherwise render DIFFERENT products as "the same item elsewhere"

@@ -50,12 +50,38 @@ function hash64(input: string): string {
   return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
 }
 
-/** One chain's listing, normalised the way pairKey() sees it. */
+/** One chain's listing by NAME (legacy key; still the fallback without a code). */
 export function listingKey(chain: string | null | undefined, name: string | null | undefined): string {
   return `${chain ?? ''}|${normalizeName(name)}`;
 }
 
-/** Order-independent key of a pair of chain-side listings. */
+// One chain item — its «slot» (owner 2026-11-22: «a code for each item so it
+// saves it in that slot whatever the name is»). Every live offer carries the
+// chain's own item code; a verdict keyed by codes survives a rename, so the
+// AI is asked about a pair of items once, ever. The name is only the fallback
+// for a row without a code.
+export type Side = {
+  chain: string | null | undefined;
+  code?: string | null;
+  name?: string | null;
+};
+
+export function itemKey(s: Side): string {
+  const code = s.code?.trim();
+  return code ? `${s.chain ?? ''}#${code}` : listingKey(s.chain, s.name);
+}
+
+/** Order-independent key of a pair of chain items (by code, else by name). */
+export function pairKeyOf(a: Side, b: Side): string {
+  const x = itemKey(a);
+  const y = itemKey(b);
+  return hash64(x < y ? `${x}\u0000${y}` : `${y}\u0000${x}`);
+}
+
+/**
+ * LEGACY name-based key (2026-11-22, before item codes). Kept only to find and
+ * re-key the rows written with it; new code uses pairKeyOf().
+ */
 export function pairKey(chainA: string | null | undefined, nameA: string | null | undefined, chainB: string | null | undefined, nameB: string | null | undefined): string {
   const a = listingKey(chainA, nameA);
   const b = listingKey(chainB, nameB);
@@ -102,16 +128,17 @@ export function mergeVerdict(
  * cross-chain claim and is never judged, so it always passes.
  */
 export function filterByVerdict<T>(
-  source: { name: string | null | undefined; chain: string | null | undefined },
+  source: Side,
   candidates: T[],
-  getName: (c: T) => string | null | undefined,
-  getChain: (c: T) => string | null | undefined,
+  getSide: (c: T) => Side,
   lookup: VerdictLookup,
   mode: VerdictMode = VERDICT_MODE,
 ): T[] {
   if (mode === 'off') return candidates;
-  return candidates.filter((c) => getChain(c) === source.chain
-    || verdictAllows(lookup(pairKey(source.chain, source.name, getChain(c), getName(c))), mode));
+  return candidates.filter((c) => {
+    const side = getSide(c);
+    return side.chain === source.chain || verdictAllows(lookup(pairKeyOf(source, side)), mode);
+  });
 }
 
 // Structural reader so both the Prisma client (server actions) and the one the

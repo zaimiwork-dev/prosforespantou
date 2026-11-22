@@ -50,6 +50,7 @@ async function run() {
       productId: true,
       productName: true,
       supermarket: true,
+      chainItemcode: true,
       discountedPrice: true,
       originalPrice: true,
       description: true,

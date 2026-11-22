@@ -8,12 +8,13 @@
 //
 // Pure: the admin action loads the rows, this shapes them. Strip-safe.
 
-import { listingKey, type Verdict } from './comparison-verdict.ts';
+import { itemKey, listingKey, type Verdict } from './comparison-verdict.ts';
 
 export type ReviewOffer = {
   id: string;
   productName: string;
   supermarket: string;
+  chainItemcode?: string | null;
   discountedPrice: number;
   imageUrl: string | null;
   hotScore: number | null;
@@ -22,8 +23,10 @@ export type ReviewOffer = {
 export type ReviewVerdictRow = {
   pairKey: string;
   chainA: string;
+  codeA?: string | null;
   nameA: string;
   chainB: string;
+  codeB?: string | null;
   nameB: string;
   verdict: string;
   model: string;
@@ -84,20 +87,27 @@ export function buildReviewRows(
   offers: ReviewOffer[],
   filter: ReviewFilter = {},
 ): { total: number; counts: ReviewCounts; rows: ReviewRow[] } {
-  // The most visible live offer behind each listing.
-  const best = new Map<string, ReviewOffer>();
+  // The most visible live offer behind each chain item — by its code (the
+  // verdict's key) and, for rows written before codes, by its name.
+  const byCode = new Map<string, ReviewOffer>();
+  const byName = new Map<string, ReviewOffer>();
+  const keep = (m: Map<string, ReviewOffer>, k: string, o: ReviewOffer) => {
+    const prev = m.get(k);
+    if (!prev || (o.hotScore ?? 0) > (prev.hotScore ?? 0)) m.set(k, o);
+  };
   for (const o of offers) {
-    const k = listingKey(o.supermarket, o.productName);
-    const prev = best.get(k);
-    if (!prev || (o.hotScore ?? 0) > (prev.hotScore ?? 0)) best.set(k, o);
+    if (o.chainItemcode) keep(byCode, itemKey({ chain: o.supermarket, code: o.chainItemcode }), o);
+    keep(byName, listingKey(o.supermarket, o.productName), o);
   }
+  const offerFor = (chain: string, code: string | null | undefined, name: string) =>
+    code ? byCode.get(itemKey({ chain, code })) : byName.get(listingKey(chain, name));
 
   const counts: ReviewCounts = { same: 0, different: 0, unsure: 0 };
   const live: ReviewRow[] = [];
   for (const v of verdicts) {
     if (!isVerdict(v.verdict)) continue;
-    const oa = best.get(listingKey(v.chainA, v.nameA));
-    const ob = best.get(listingKey(v.chainB, v.nameB));
+    const oa = offerFor(v.chainA, v.codeA, v.nameA);
+    const ob = offerFor(v.chainB, v.codeB, v.nameB);
     if (!oa || !ob) continue;
     counts[v.verdict]++;
     const { why, onlyA, onlyB } = parseReason(v.reason);

@@ -20,6 +20,8 @@ import { filterByVerdict, type VerdictLookup } from './comparison-verdict.ts';
 export type ComparisonCandidate = {
   productName: string;
   supermarket: string | null;
+  // The chain's own item code — the key of its AI verdicts (lib/comparison-verdict).
+  chainItemcode?: string | null;
   // The offer price the sheet prints for this row (Discount.discountedPrice).
   discountedPrice?: number | null;
 };
@@ -68,13 +70,8 @@ export function comparisonRivals({
   // Other chains only (the sheet never shows the shopper's own chain).
   const sameSize = clusterOffers.filter((d) =>
     d.supermarket !== source.supermarket && samePack(source.productName, d.productName));
-  const vetted = filterByVerdict(
-    { name: source.productName, chain: source.supermarket },
-    sameSize,
-    (d) => d.productName,
-    (d) => d.supermarket,
-    verdictOf,
-  );
+  const sideOf = (d: ComparisonCandidate) => ({ chain: d.supermarket, code: d.chainItemcode, name: d.productName });
+  const vetted = filterByVerdict(sideOf(source), sameSize, sideOf, verdictOf);
   const comparable = filterComparable(
     source.productName,
     vetted,

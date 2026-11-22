@@ -494,16 +494,28 @@ model ScraperState {
 // hand (model = 'owner') stays corrected.
 // Created by src/scripts/ensure-comparison-verdicts.mjs, not `prisma db push`
 // (db push would also drop the hand-made search index on discounts).
+//
+// 2026-11-22 (owner: «a code for each item so it saves it in that slot whatever
+// the name is»): rows are keyed by the two chain ITEM CODES (Discount.
+// chainItemcode — every live offer has one), so a pair is judged once, ever,
+// and a rename never re-asks. pairKey = pairKeyOf() of (chain, code) on both
+// sides; rows without codes (dead listings from before) keep the name key.
+// A 'same' row is also a LINK between two chain items — the cross-chain
+// product links read from here (code_a / code_b are indexed for that lookup).
 model ComparisonVerdict {
   pairKey   String   @id @map("pair_key")
   chainA    String   @map("chain_a")
+  codeA     String?  @map("code_a")
   nameA     String   @map("name_a")
   chainB    String   @map("chain_b")
+  codeB     String?  @map("code_b")
   nameB     String   @map("name_b")
   verdict   String   // 'same' | 'different' | 'unsure'
   reason    String?  // the model's few-word why, for the owner's review
-  model     String   // Groq model id, 'barcode' (both sides carry the same GTIN) or 'owner'
+  model     String   // Groq model id, 'claude-…' agent, 'barcode' (same GTIN) or 'owner'
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([chainA, codeA])
+  @@index([chainB, codeB])
   @@map("comparison_verdicts")
 }

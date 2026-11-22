@@ -34,8 +34,14 @@ try {
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "comparison_verdicts_pkey" PRIMARY KEY ("pair_key")
   )`);
+  // 2026-11-22: rows keyed by chain item codes («slots»); index names are the
+  // ones Prisma generates for @@index([chainA, codeA]) / ([chainB, codeB]).
+  await client.query(`ALTER TABLE "comparison_verdicts" ADD COLUMN IF NOT EXISTS "code_a" TEXT`);
+  await client.query(`ALTER TABLE "comparison_verdicts" ADD COLUMN IF NOT EXISTS "code_b" TEXT`);
+  await client.query(`CREATE INDEX IF NOT EXISTS "comparison_verdicts_chain_a_code_a_idx" ON "comparison_verdicts"("chain_a", "code_a")`);
+  await client.query(`CREATE INDEX IF NOT EXISTS "comparison_verdicts_chain_b_code_b_idx" ON "comparison_verdicts"("chain_b", "code_b")`);
   await client.query('COMMIT');
-  console.log('ok: comparison_verdicts in place');
+  console.log('ok: comparison_verdicts in place (with item-code columns)');
 } catch (error) {
   await client.query('ROLLBACK').catch(() => {});
   console.error('failed, nothing changed:', error.message);
@@ -43,7 +49,8 @@ try {
 } finally {
   const check = await client.query(
     `SELECT (SELECT count(*)::int FROM information_schema.tables WHERE table_name = 'comparison_verdicts') AS tbl,
-            (SELECT count(*)::int FROM information_schema.columns WHERE table_name = 'comparison_verdicts') AS cols`,
+            (SELECT count(*)::int FROM information_schema.columns WHERE table_name = 'comparison_verdicts') AS cols,
+            (SELECT count(*)::int FROM pg_indexes WHERE tablename = 'comparison_verdicts') AS idx`,
   );
   console.log('present:', JSON.stringify(check.rows[0]));
   await client.end();

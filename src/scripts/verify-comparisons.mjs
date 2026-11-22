@@ -48,7 +48,7 @@ dotenv.config();
 import { readFileSync, writeFileSync } from 'node:fs';
 import { samePack } from '../lib/packaging.ts';
 import { areComparableNames } from '../lib/offer-similarity.ts';
-import { mergeVerdict, pairKey } from '../lib/comparison-verdict.ts';
+import { mergeVerdict, pairKeyOf } from '../lib/comparison-verdict.ts';
 import { RETIRED_SUPERMARKET_IDS } from '../lib/constants.js';
 
 const EVAL = process.env.EVAL === '1';
@@ -284,7 +284,11 @@ async function livePairs(prisma, now) {
         const b = cluster[j];
         if (a.supermarket === b.supermarket) continue;
         if (!samePack(a.productName, b.productName) || !areComparableNames(a.productName, b.productName)) continue;
-        const key = pairKey(a.supermarket, a.productName, b.supermarket, b.productName);
+        // Keyed by the two chain items («slots»): judged once, whatever their names become.
+        const key = pairKeyOf(
+          { chain: a.supermarket, code: a.chainItemcode, name: a.productName },
+          { chain: b.supermarket, code: b.chainItemcode, name: b.productName },
+        );
         const priority = Math.max(a.hotScore ?? 0, b.hotScore ?? 0);
         const proven = barcodeProven(a) && barcodeProven(b);
         const prev = pairs.get(key);
@@ -296,8 +300,10 @@ async function livePairs(prisma, now) {
         pairs.set(key, {
           pairKey: key,
           chainA: a.supermarket,
+          codeA: a.chainItemcode ?? null,
           nameA: a.productName,
           chainB: b.supermarket,
+          codeB: b.chainItemcode ?? null,
           nameB: b.productName,
           priority,
           proven,
@@ -322,7 +328,7 @@ async function runLive(apiKey) {
   console.log(`   already judged: ${pairs.size - fresh.length}; new: ${fresh.length} (barcode-proven: ${proven.length}, for the model: ${todo.length})${DRY_RUN ? ' — DRY_RUN' : ''}`);
 
   const row = (p, v, model) => ({
-    pairKey: p.pairKey, chainA: p.chainA, nameA: p.nameA, chainB: p.chainB, nameB: p.nameB,
+    pairKey: p.pairKey, chainA: p.chainA, codeA: p.codeA, nameA: p.nameA, chainB: p.chainB, codeB: p.codeB, nameB: p.nameB,
     verdict: v.verdict, reason: v.reason, model,
   });
   // ── Outside judge: hand the pairs out as a file, take verdicts back ──────

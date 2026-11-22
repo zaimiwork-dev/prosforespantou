@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
-import { filterByVerdict, loadVerdictLookup, pairKey } from '@/lib/comparison-verdict';
+import { filterByVerdict, loadVerdictLookup, pairKeyOf } from '@/lib/comparison-verdict';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export interface CheaperAlternative {
@@ -42,6 +42,7 @@ export async function getCheaperAlternatives(
             productName: true,
             discountedPrice: true,
             supermarket: true,
+            chainItemcode: true,
             product: { select: { id: true, barcode: true } },
           },
         });
@@ -88,6 +89,7 @@ export async function getCheaperAlternatives(
             productName: true,
             discountedPrice: true,
             supermarket: true,
+            chainItemcode: true,
             product: { select: { name: true } },
           },
           orderBy: { discountedPrice: 'asc' },
@@ -124,21 +126,19 @@ export async function getCheaperAlternatives(
 
         // AI verdicts (lib/comparison-verdict): «the same thing, cheaper
         // elsewhere» is a comparison claim too — one query for every source.
+        // Keyed by each chain's item code (its «slot»).
+        // Generic so filterByVerdict keeps the full candidate type (price etc.).
+        const sideOf = <D extends { supermarket: string; chainItemcode: string | null; productName: string }>(d: D) =>
+          ({ chain: d.supermarket, code: d.chainItemcode, name: d.productName });
         const verdictOf = await loadVerdictLookup(
           prisma,
           sources.flatMap((s) => (eligibleBySource.get(s.id) ?? []).map((c) =>
-            pairKey(s.supermarket, s.productName, c.supermarket, c.productName))),
+            pairKeyOf(sideOf(s), sideOf(c)))),
         );
 
         const out: Record<string, CheaperAlternative | null> = {};
         for (const s of sources) {
-          const vetted = filterByVerdict(
-            { name: s.productName, chain: s.supermarket },
-            eligibleBySource.get(s.id) ?? [],
-            (c) => c.productName,
-            (c) => c.supermarket,
-            verdictOf,
-          );
+          const vetted = filterByVerdict(sideOf(s), eligibleBySource.get(s.id) ?? [], sideOf, verdictOf);
           // Apply the exact name + variant guard used by the comparison UI.
           const comparable = filterComparable(
             s.productName,
