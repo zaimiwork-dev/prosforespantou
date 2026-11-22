@@ -12,7 +12,7 @@ import { dedupeCards } from '@/lib/lists';
 import { noteInterest } from '@/lib/interest';
 import { useImpressionTracker } from '@/lib/impressions';
 import { useRecentlyViewed, type ViewedOffer } from '@/lib/recently-viewed';
-import { Colors, Radius, Space, useType } from '@/constants/theme';
+import { Radius, Space, useType, useColors, type Palette } from '@/constants/theme';
 import { ArrowRightIcon, CategoryIcon } from './icons';
 
 const GAP = Space[3];
@@ -31,6 +31,8 @@ function openSeeAll(seeAll: NonNullable<FeedSection['seeAll']>) {
 // FlatList always receives the same handlers (it throws otherwise).
 export const FeedRail = memo(function FeedRail({ section, width }: { section: FeedSection; width: number }) {
   const T = useType();
+  const C = T.c;
+  const s = useS();
   const tracker = useImpressionTracker('home:' + section.id);
   const deals = useMemo(() => dedupeCards(section.deals), [section.deals]);
   if (deals.length === 0) return null;
@@ -50,8 +52,8 @@ export const FeedRail = memo(function FeedRail({ section, width }: { section: Fe
             accessibilityLabel={`Δες όλες: ${section.title}`}
             hitSlop={8}
             style={s.seeAll}>
-            <Text style={[T.text.bodyStrong, { color: Colors.brand }]}>Όλες</Text>
-            <ArrowRightIcon size={16} color={Colors.brand} />
+            <Text style={[T.text.bodyStrong, { color: C.brandText }]}>Όλες</Text>
+            <ArrowRightIcon size={16} color={C.brandText} />
           </Pressable>
         ) : null}
       </View>
@@ -76,7 +78,9 @@ export const FeedRail = memo(function FeedRail({ section, width }: { section: Fe
 const cardKey = (d: DealCard) => d.id;
 
 export function CategoryChips({ categories }: { categories: MetaResponse['categories'] }) {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   const rows = useMemo(() => categories.filter((c) => c.offers > 0), [categories]);
   if (rows.length === 0) return null;
   return (
@@ -95,8 +99,8 @@ export function CategoryChips({ categories }: { categories: MetaResponse['catego
           accessibilityRole="button"
           accessibilityLabel={`${c.full}, ${c.offers} προσφορές`}
           style={({ pressed }) => [s.chip, pressed && { opacity: 0.7 }]}>
-          <CategoryIcon id={c.id} size={22} color={Colors.brand} />
-          <Text style={[T.text.chip, { color: Colors.ink }]}>{c.label}</Text>
+          <CategoryIcon id={c.id} size={22} color={C.brandText} />
+          <Text style={[T.text.chip, { color: C.ink }]}>{c.label}</Text>
         </Pressable>
       )}
     />
@@ -104,6 +108,7 @@ export function CategoryChips({ categories }: { categories: MetaResponse['catego
 }
 
 export function RecentRail() {
+  const s = useS();
   const T = useType();
   const { items } = useRecentlyViewed();
   if (items.length === 0) return null;
@@ -130,9 +135,11 @@ export function RecentRail() {
 const viewedKey = (v: ViewedOffer) => v.id;
 
 function RecentCard({ item }: { item: ViewedOffer }) {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   const chains = useChains();
-  const color = chains.find((c) => c.id === item.chain)?.color ?? Colors.ink3Text;
+  const color = chains.find((c) => c.id === item.chain)?.color ?? C.ink3Text;
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/offer/[id]', params: { id: item.id } })}
@@ -143,23 +150,23 @@ function RecentCard({ item }: { item: ViewedOffer }) {
         {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="contain" /> : null}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={[T.text.secondary, { color: Colors.ink }]} numberOfLines={2}>
+        <Text style={[T.text.secondary, { color: C.ink }]} numberOfLines={2}>
           {item.name}
         </Text>
         <View style={s.priceRow}>
           <View style={[s.dot, { backgroundColor: color }]} />
-          <Text style={[T.text.bodyStrong, { color: Colors.ink }]}>{formatPrice(item.price)}</Text>
+          <Text style={[T.text.bodyStrong, { color: C.ink }]}>{formatPrice(item.price)}</Text>
         </View>
       </View>
     </Pressable>
   );
 }
 
-const s = StyleSheet.create({
+const makeS = (C: Palette) => StyleSheet.create({
   rail: { marginTop: Space[6] },
   head: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: Space[3], gap: Space[2], paddingHorizontal: Space[4] },
-  title: { color: Colors.ink },
-  subtitle: { color: Colors.ink3Text, marginTop: 2 },
+  title: { color: C.ink },
+  subtitle: { color: C.ink3Text, marginTop: 2 },
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingLeft: Space[2] },
   chip: {
     flexDirection: 'row',
@@ -167,9 +174,9 @@ const s = StyleSheet.create({
     gap: Space[2],
     minHeight: 48,
     paddingHorizontal: Space[4],
-    backgroundColor: Colors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: C.line,
     borderRadius: Radius.pill,
   },
   recent: {
@@ -178,12 +185,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: Space[3],
     padding: Space[2],
-    backgroundColor: Colors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: C.line,
     borderRadius: Radius.md,
   },
-  thumb: { width: 60, height: 60, borderRadius: Radius.sm, backgroundColor: Colors.surface2, overflow: 'hidden' },
+  thumb: { width: 60, height: 60, borderRadius: Radius.sm, backgroundColor: C.imageBg, overflow: 'hidden' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: Space[2] },
   dot: { width: 10, height: 10, borderRadius: 5 },
 });
+
+// Rebuilt when the palette changes (light/dark).
+function useS() {
+  const C = useColors();
+  return useMemo(() => makeS(C), [C]);
+}

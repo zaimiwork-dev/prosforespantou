@@ -16,7 +16,7 @@ import { track } from '@/lib/analytics';
 import { formatCount } from '@/components/home/count';
 import { StaleBanner } from '@/components/ui/stale-banner';
 import { RailSkeleton } from '@/components/ui/skeleton';
-import { Colors, Radius, Space, useType } from '@/constants/theme';
+import { Radius, Space, useType, useColors, type Palette } from '@/constants/theme';
 import { CategoryChips, FeedRail, RecentRail } from '@/components/home/feed';
 import { ArrowRightIcon } from '@/components/home/icons';
 import { ChainStrip, HomeError, HomeHeader, HomeHero, PromoBanner, SearchPill, railCardWidth } from '@/components/home/sections';
@@ -34,6 +34,8 @@ type Row =
 const BANNER_AFTER = 4;
 
 export default function HomeScreen() {
+  const styles = useStyles();
+  const C = useColors();
   useFocusEffect(useCallback(() => track('page_view', { page: 'home' }), []));
   const { width } = useWindowDimensions();
   const { meta, error: metaError, retry: retryMeta } = useMeta();
@@ -117,7 +119,7 @@ export default function HomeScreen() {
           );
       }
     },
-    [meta, cardWidth, data?.total],
+    [meta, cardWidth, data?.total, styles],
   );
 
   // Nothing to show and nothing cached: the only full-screen failure.
@@ -151,7 +153,7 @@ export default function HomeScreen() {
         maxToRenderPerBatch={4}
         windowSize={5}
         contentContainerStyle={{ paddingBottom: Space[7] * 2 }}
-        refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={onRefresh} tintColor={Colors.brand} />}
+        refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={onRefresh} tintColor={C.brandText} />}
       />
     </SafeAreaView>
   );
@@ -161,6 +163,7 @@ const STICKY = [1];
 const rowKey = (r: Row) => r.key;
 
 function SeeAllButton({ total }: { total: number }) {
+  const styles = useStyles();
   const T = useType();
   return (
     <View style={{ marginTop: Space[6], paddingHorizontal: Space[4] }}>
@@ -178,27 +181,29 @@ function SeeAllButton({ total }: { total: number }) {
 // /meta failed but the feed loaded: the page still works, only the category
 // chips and chain strip are missing — say so in one row.
 function MetaFallback({ onRetry }: { onRetry: () => void }) {
+  const styles = useStyles();
   const T = useType();
+  const C = T.c;
   return (
     <View style={styles.fallback}>
-      <Text style={[T.text.caption, { flexShrink: 1, color: Colors.ink2 }]}>Δεν φορτώθηκαν τα καταστήματα</Text>
+      <Text style={[T.text.caption, { flexShrink: 1, color: C.ink2 }]}>Δεν φορτώθηκαν τα καταστήματα</Text>
       <Pressable onPress={onRetry} accessibilityRole="button" style={styles.fallbackBtn}>
-        <Text style={[T.text.caption, { color: Colors.brand, textDecorationLine: 'underline' }]}>Δοκίμασε ξανά</Text>
+        <Text style={[T.text.caption, { color: C.brandText, textDecorationLine: 'underline' }]}>Δοκίμασε ξανά</Text>
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.bg },
-  sticky: { backgroundColor: Colors.bg, paddingHorizontal: Space[4], paddingTop: Space[3], paddingBottom: Space[2] },
+const makeStyles = (C: Palette) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.bg },
+  sticky: { backgroundColor: C.bg, paddingHorizontal: Space[4], paddingTop: Space[3], paddingBottom: Space[2] },
   seeAllBtn: {
     minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Space[2],
-    backgroundColor: Colors.brand,
+    backgroundColor: C.brand,
     borderRadius: Radius.pill,
     paddingHorizontal: Space[5],
   },
@@ -210,10 +215,16 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: Space[3],
     marginTop: Space[3],
-    backgroundColor: Colors.bgSoft,
+    backgroundColor: C.bgSoft,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: C.line,
   },
   fallbackBtn: { minHeight: 48, justifyContent: 'center' },
 });
+
+// Rebuilt when the palette changes (light/dark).
+function useStyles() {
+  const C = useColors();
+  return useMemo(() => makeStyles(C), [C]);
+}

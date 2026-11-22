@@ -1,23 +1,20 @@
 // Root: a stack with the four tabs at the bottom of it, so screens such as
 // the product page open OVER the tabs with a back arrow (and the Android
 // back gesture) instead of replacing a tab.
-import { useEffect } from 'react';
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { useEffect, useMemo } from 'react';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
 import { NotoSerifDisplay_400Regular, NotoSerifDisplay_400Regular_Italic } from '@expo-google-fonts/noto-serif-display';
-import { Colors } from '@/constants/theme';
+import { useType } from '@/constants/theme';
 import { ToastHost } from '@/components/ui/toast';
 import { useSettings, useSettingsLoaded } from '@/lib/settings';
 
 SplashScreen.preventAutoHideAsync();
 
-const theme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, primary: Colors.brand, background: Colors.bg, card: Colors.surface, text: Colors.ink, border: Colors.line },
-};
 
 export default function RootLayout() {
   const settingsLoaded = useSettingsLoaded();
@@ -29,6 +26,18 @@ export default function RootLayout() {
   // A font failure must not leave the shopper on a splash forever: fall back to system text.
   const loaded = settingsLoaded && (fontsLoaded || !!fontError);
   const { onboarded } = useSettings();
+  // Light or dark (the phone's setting, or the shopper's choice in Ρυθμίσεις).
+  const T = useType();
+  const C = T.c;
+  const theme = useMemo(() => {
+    const base = T.dark ? DarkTheme : DefaultTheme;
+    return { ...base, colors: { ...base.colors, primary: C.brandText, background: C.bg, card: C.surface, text: C.ink, border: C.line } };
+  }, [T, C]);
+  // The window behind the screens: without this Android shows a white flash
+  // between screens in dark mode.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(C.bg).catch(() => {});
+  }, [C]);
   // Keep the splash up until storage is read, so a returning shopper never
   // sees the onboarding flash by.
   useEffect(() => {
@@ -37,8 +46,8 @@ export default function RootLayout() {
   if (!loaded) return null;
   return (
     <ThemeProvider value={theme}>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerTintColor: Colors.brand, headerBackButtonDisplayMode: 'minimal' }}>
+      <StatusBar style={T.dark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerTintColor: C.brandText, headerBackButtonDisplayMode: 'minimal' }}>
         {/* First launch: only the onboarding is reachable; finishing it flips
             the guards and the router lands on the tabs. */}
         <Stack.Protected guard={!onboarded}>

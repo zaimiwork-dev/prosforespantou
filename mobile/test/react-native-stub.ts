@@ -7,3 +7,6 @@ export const Platform = {
   OS: 'android' as const,
   select: <T,>(spec: { android?: T; default?: T }): T | undefined => spec.android ?? spec.default,
 };
+
+// constants/theme reads the system scheme; tests see a light phone.
+export const useColorScheme = (): 'light' | 'dark' | null => 'light';

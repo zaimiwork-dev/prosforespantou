@@ -2,17 +2,18 @@
 // price, the action row) so nothing jumps when the offer arrives.
 import { ScrollView, View } from 'react-native';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Colors, Radius, Space } from '@/constants/theme';
+import { Radius, Space, useColors } from '@/constants/theme';
 
 export function OfferSkeleton() {
+  const C = useColors();
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: Colors.bg }}
+      style={{ flex: 1, backgroundColor: C.bg }}
       contentContainerStyle={{ padding: Space[4] }}
       scrollEnabled={false}
       accessibilityLabel="Φορτώνει η προσφορά"
       accessibilityLiveRegion="polite">
-      <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, padding: Space[4], marginBottom: Space[4] }}>
+      <View style={{ backgroundColor: C.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: C.line, padding: Space[4], marginBottom: Space[4] }}>
         <Skeleton height={300} radius={Radius.md} />
       </View>
       <Skeleton width={90} height={14} />

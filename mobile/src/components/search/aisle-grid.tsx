@@ -2,7 +2,7 @@
 // idle search screen and under an empty result, so there is always a way forward.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MetaResponse } from '@/lib/api';
-import { Colors, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 import { CategoryIcon } from '@/components/home/icons';
 import { useMemo } from 'react';
 
@@ -10,6 +10,7 @@ type Cat = MetaResponse['categories'][number];
 
 export function AisleGrid({ categories, onPick, title = 'Ανά διάδρομο' }: { categories: Cat[] | undefined; onPick: (c: Cat) => void; title?: string }) {
   const T = useType();
+  const C = T.c;
   const s = useMemo(() => makeStyles(T), [T]);
   const tiles = (categories ?? []).filter((c) => c.offers > 0);
   if (tiles.length === 0) return null;
@@ -25,7 +26,7 @@ export function AisleGrid({ categories, onPick, title = 'Ανά διάδρομο
             accessibilityLabel={`${c.full}, ${c.offers} προσφορές`}
             style={({ pressed }) => [s.tile, pressed && s.pressed]}>
             <View style={s.icon}>
-              <CategoryIcon id={c.id} size={26} color={Colors.brand} />
+              <CategoryIcon id={c.id} size={26} color={C.brandText} />
             </View>
             <View>
               <Text style={s.label} numberOfLines={2}>{c.label}</Text>
@@ -38,9 +39,9 @@ export function AisleGrid({ categories, onPick, title = 'Ανά διάδρομο
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    h2: { ...T.text.h2, color: Colors.ink, marginTop: Space[6], marginBottom: Space[3] },
+    h2: { ...T.text.h2, color: C.ink, marginTop: Space[6], marginBottom: Space[3] },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] },
     tile: {
       flexBasis: '47%',
@@ -48,13 +49,13 @@ const makeStyles = (T: TypeScale) =>
       minHeight: 112,
       gap: Space[2],
       padding: Space[3],
-      backgroundColor: Colors.surface,
+      backgroundColor: C.surface,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       borderRadius: Radius.md,
     },
     pressed: { opacity: 0.8 },
-    icon: { width: 44, height: 44, borderRadius: Radius.pill, backgroundColor: Colors.bgSoft, alignItems: 'center', justifyContent: 'center' },
-    label: { ...T.text.bodyStrong, color: Colors.ink },
-    count: { ...T.text.caption, color: Colors.ink3Text },
+    icon: { width: 44, height: 44, borderRadius: Radius.pill, backgroundColor: C.bgSoft, alignItems: 'center', justifyContent: 'center' },
+    label: { ...T.text.bodyStrong, color: C.ink },
+    count: { ...T.text.caption, color: C.ink3Text },
   });

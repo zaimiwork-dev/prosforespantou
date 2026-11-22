@@ -8,7 +8,7 @@ import Svg, { Path } from 'react-native-svg';
 import { api, type Chain, type DealSort, type MetaResponse } from '@/lib/api';
 import { ChainTile, TileGrid } from '@/components/chain-tile';
 import { Chip } from '@/components/chip';
-import { Colors, Fonts, Radius, Space, useType } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, useColors, type Palette } from '@/constants/theme';
 
 export const SORTS: { id: DealSort; label: string }[] = [
   { id: 'hot', label: 'Δημοφιλή' },
@@ -83,7 +83,9 @@ function SheetBody({
   onClose: () => void;
   onApply: (f: Filters) => void;
 }) {
+  const styles = useStyles();
   const T = useType();
+  const C = T.c;
   const [draft, setDraft] = useState<Filters>(initial);
   const [slide] = useState(() => new Animated.Value(H));
   const [fade] = useState(() => new Animated.Value(0));
@@ -133,7 +135,8 @@ function SheetBody({
   const tiles = [
     myChains.length ? (
       <ChainTile key="mine" label="Τα καταστήματά μου" selected={draft.mine} onPress={() => setDraft({ ...draft, mine: !draft.mine })}>
-        <Svg width={36} height={36} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        {/* On the light logo frame, so the fill green (the text green is for dark backgrounds) */}
+        <Svg width={36} height={36} viewBox="0 0 24 24" fill="none" stroke={C.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M12 20.5s-7-4.6-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10.5c0 5.4-7 10-7 10z" />
         </Svg>
       </ChainTile>
@@ -153,9 +156,9 @@ function SheetBody({
           <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
             <View style={styles.handle} />
             <View style={styles.head}>
-              <Text style={[T.text.h2, { color: Colors.ink, flex: 1 }]}>{focus === 'sort' ? 'Ταξινόμηση' : 'Φίλτρα'}</Text>
+              <Text style={[T.text.h2, { color: C.ink, flex: 1 }]}>{focus === 'sort' ? 'Ταξινόμηση' : 'Φίλτρα'}</Text>
               <Pressable onPress={() => close()} accessibilityRole="button" accessibilityLabel="Κλείσιμο" hitSlop={8} style={styles.closeBtn}>
-                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.ink} strokeWidth={2.4} strokeLinecap="round">
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth={2.4} strokeLinecap="round">
                   <Path d="M6 6l12 12M18 6L6 18" />
                 </Svg>
               </Pressable>
@@ -168,7 +171,7 @@ function SheetBody({
                 if (focus === 'sort') scrollRef.current?.scrollTo({ y: Math.max(0, sortY.current - Space[2]), animated: false });
               }}>
               <Text style={[T.text.bodyStrong, styles.section]}>Καταστήματα</Text>
-              {chains.length ? <TileGrid>{tiles}</TileGrid> : <Text style={[T.text.body, { color: Colors.ink3Text }]}>Φόρτωση καταστημάτων…</Text>}
+              {chains.length ? <TileGrid>{tiles}</TileGrid> : <Text style={[T.text.body, { color: C.ink3Text }]}>Φόρτωση καταστημάτων…</Text>}
 
               <Text style={[T.text.bodyStrong, styles.section]}>Κατηγορίες</Text>
               <TileGrid>
@@ -182,10 +185,10 @@ function SheetBody({
                       accessibilityState={{ selected: on }}
                       accessibilityLabel={`${c.full}, ${c.offers} προσφορές`}
                       style={[styles.cat, on && styles.catOn]}>
-                      <Text style={[T.text.chip, { color: Colors.ink, flex: 1 }, on && { fontFamily: Fonts.sans700 }]} numberOfLines={2}>
+                      <Text style={[T.text.chip, { color: C.ink, flex: 1 }, on && { fontFamily: Fonts.sans700 }]} numberOfLines={2}>
                         {c.label}
                       </Text>
-                      <Text style={[T.text.caption, { color: Colors.ink3Text }]}>{c.offers.toLocaleString('el-GR')}</Text>
+                      <Text style={[T.text.caption, { color: C.ink3Text }]}>{c.offers.toLocaleString('el-GR')}</Text>
                     </Pressable>
                   );
                 })}
@@ -204,7 +207,7 @@ function SheetBody({
             <View style={styles.footer}>
               {hasAny ? (
                 <Pressable onPress={() => setDraft({ ...NO_FILTERS })} accessibilityRole="button" style={styles.clear}>
-                  <Text style={[T.text.button, { color: Colors.brand }]}>Καθαρισμός</Text>
+                  <Text style={[T.text.button, { color: C.brandText }]}>Καθαρισμός</Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -221,21 +224,21 @@ function SheetBody({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: Palette) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { backgroundColor: 'rgba(20,32,26,0.5)' },
+  backdrop: { backgroundColor: C.scrim },
   sheet: {
     height: '88%',
-    backgroundColor: Colors.bg,
+    backgroundColor: C.bg,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     overflow: 'hidden',
   },
-  handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: Colors.line2, marginTop: Space[2] },
+  handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: C.line2, marginTop: Space[2] },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Space[4], paddingTop: Space[3], paddingBottom: Space[2] },
-  closeBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, alignItems: 'center', justifyContent: 'center' },
+  closeBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   body: { paddingHorizontal: Space[4], paddingBottom: Space[5] },
-  section: { color: Colors.ink, marginTop: Space[5], marginBottom: Space[3] },
+  section: { color: C.ink, marginTop: Space[5], marginBottom: Space[3] },
   cat: {
     flex: 1,
     minHeight: 56,
@@ -246,12 +249,18 @@ const styles = StyleSheet.create({
     paddingVertical: Space[2],
     borderRadius: Radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.line,
-    backgroundColor: Colors.surface,
+    borderColor: C.line,
+    backgroundColor: C.surface,
   },
-  catOn: { borderColor: Colors.brand, backgroundColor: Colors.bgSoft },
+  catOn: { borderColor: C.brandText, backgroundColor: C.bgSoft },
   sorts: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] },
-  footer: { flexDirection: 'row', gap: Space[3], padding: Space[4], borderTopWidth: 1, borderTopColor: Colors.line, backgroundColor: Colors.surface },
-  clear: { minHeight: 52, paddingHorizontal: Space[4], borderRadius: Radius.pill, borderWidth: 1.5, borderColor: Colors.brand, alignItems: 'center', justifyContent: 'center' },
-  apply: { flex: 1, minHeight: 52, paddingHorizontal: Space[4], borderRadius: Radius.pill, backgroundColor: Colors.brand, alignItems: 'center', justifyContent: 'center' },
+  footer: { flexDirection: 'row', gap: Space[3], padding: Space[4], borderTopWidth: 1, borderTopColor: C.line, backgroundColor: C.surface },
+  clear: { minHeight: 52, paddingHorizontal: Space[4], borderRadius: Radius.pill, borderWidth: 1.5, borderColor: C.brandText, alignItems: 'center', justifyContent: 'center' },
+  apply: { flex: 1, minHeight: 52, paddingHorizontal: Space[4], borderRadius: Radius.pill, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
 });
+
+// Rebuilt when the palette changes (light/dark).
+function useStyles() {
+  const C = useColors();
+  return useMemo(() => makeStyles(C), [C]);
+}

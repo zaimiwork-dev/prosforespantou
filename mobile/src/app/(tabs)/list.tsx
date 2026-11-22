@@ -23,12 +23,13 @@ import {
   useShoppingList,
   type ListItem,
 } from '@/lib/shopping-list';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette, readableOn } from '@/constants/theme';
 
 type Tab = 'list' | 'favourites';
 
 export default function ListScreen() {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const [tab, setTab] = useState<Tab>('list');
   const { items, loaded } = useShoppingList();
@@ -44,7 +45,7 @@ export default function ListScreen() {
       </View>
       {!loaded ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.brand} />
+          <ActivityIndicator size="large" color={C.brandText} />
         </View>
       ) : tab === 'list' ? (
         <ShoppingListView items={items} />
@@ -71,6 +72,7 @@ function SegmentButton({ label, selected, onPress }: { label: string; selected: 
 
 function ShoppingListView({ items }: { items: ListItem[] }) {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
   const [confirming, setConfirming] = useState(false);
@@ -132,13 +134,13 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
           return (
             <View key={g.chain ?? 'none'} style={styles.group}>
               <View style={styles.groupHead}>
-                <View style={[styles.groupDot, { backgroundColor: chain?.color ?? Colors.ink2 }]} />
-                <Text style={[styles.groupName, { color: chain?.color ?? Colors.ink }]}>
+                <View style={[styles.groupDot, { backgroundColor: chain?.color ?? C.ink2 }]} />
+                <Text style={[styles.groupName, { color: readableOn(chain?.color, C.bg, C.ink) }]}>
                   {chain?.name ?? g.chain ?? 'Άλλο κατάστημα'}
                 </Text>
                 <Text style={styles.groupTotal}>{formatPrice(g.subtotal)}</Text>
               </View>
-              <View style={[styles.groupCard, { borderTopColor: chain?.color ?? Colors.line }]}>
+              <View style={[styles.groupCard, { borderTopColor: chain?.color ?? C.line }]}>
                 {g.items.map((item, i) => (
                   <ItemRow key={item.id} item={item} first={i === 0} />
                 ))}
@@ -236,10 +238,11 @@ function ItemRow({ item, first }: { item: ListItem; first: boolean }) {
 
 function StepButton({ label, onPress, minus = false }: { label: string; onPress: () => void; minus?: boolean }) {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={styles.step}>
-      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.ink} strokeWidth={2.5} strokeLinecap="round">
+      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth={2.5} strokeLinecap="round">
         <Path d={minus ? 'M5 12h14' : 'M5 12h14M12 5v14'} />
       </Svg>
     </Pressable>
@@ -248,6 +251,7 @@ function StepButton({ label, onPress, minus = false }: { label: string; onPress:
 
 function FavouritesView() {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const { favourites } = useFavourites();
   const chains = useChains();
@@ -286,7 +290,7 @@ function FavouritesView() {
             accessibilityRole="button"
             accessibilityLabel={`Αφαίρεση από τα αγαπημένα: ${f.name}`}
             style={styles.favRemove}>
-            <Svg width={26} height={26} viewBox="0 0 24 24" fill={Colors.accent} stroke={Colors.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <Svg width={26} height={26} viewBox="0 0 24 24" fill={C.accent} stroke={C.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <Path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
             </Svg>
           </Pressable>
@@ -296,69 +300,69 @@ function FavouritesView() {
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: Colors.bg },
+    screen: { flex: 1, backgroundColor: C.bg },
     flex: { flex: 1 },
-    h1: { ...T.text.hero, color: Colors.ink, paddingHorizontal: Space[4], paddingTop: Space[4], marginBottom: Space[3] },
+    h1: { ...T.text.hero, color: C.ink, paddingHorizontal: Space[4], paddingTop: Space[4], marginBottom: Space[3] },
     segment: {
       flexDirection: 'row',
       marginHorizontal: Space[4],
       marginBottom: Space[3],
-      backgroundColor: Colors.bgSoft,
+      backgroundColor: C.bgSoft,
       borderRadius: Radius.pill,
       padding: 4,
     },
     segBtn: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill, paddingHorizontal: Space[2] },
-    segBtnOn: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line },
-    segText: { ...T.text.chip, fontFamily: Fonts.sans600, color: Colors.ink2, textAlign: 'center' },
-    segTextOn: { fontFamily: Fonts.sans700, color: Colors.brand },
+    segBtnOn: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.line },
+    segText: { ...T.text.chip, fontFamily: Fonts.sans600, color: C.ink2, textAlign: 'center' },
+    segTextOn: { fontFamily: Fonts.sans700, color: C.brandText },
     content: { padding: Space[4], paddingBottom: Space[6] },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Space[6] },
-    emptyTitle: { ...T.text.h2, color: Colors.ink, textAlign: 'center' },
-    emptyText: { ...T.text.body, color: Colors.ink2, textAlign: 'center', marginTop: Space[2] },
-    primary: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: Colors.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
+    emptyTitle: { ...T.text.h2, color: C.ink, textAlign: 'center' },
+    emptyText: { ...T.text.body, color: C.ink2, textAlign: 'center', marginTop: Space[2] },
+    primary: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: C.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
     primaryText: { ...T.text.button, color: '#fff' },
-    multi: { ...T.text.secondary, color: Colors.ink3Text, marginBottom: Space[3] },
+    multi: { ...T.text.secondary, color: C.ink3Text, marginBottom: Space[3] },
     group: { marginBottom: Space[4] },
     groupHead: { flexDirection: 'row', alignItems: 'center', gap: Space[2], paddingHorizontal: Space[1], paddingBottom: Space[2] },
     groupDot: { width: 12, height: 12, borderRadius: 6 },
     groupName: { ...T.text.title, fontFamily: Fonts.sans900, flex: 1 },
-    groupTotal: { ...T.text.title, fontFamily: Fonts.sans900, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    groupCard: { backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, borderTopWidth: 3, overflow: 'hidden' },
-    item: { flexDirection: 'row', alignItems: 'flex-start', padding: Space[3], gap: Space[2], borderTopWidth: 1, borderTopColor: Colors.line },
+    groupTotal: { ...T.text.title, fontFamily: Fonts.sans900, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    groupCard: { backgroundColor: C.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: C.line, borderTopWidth: 3, overflow: 'hidden' },
+    item: { flexDirection: 'row', alignItems: 'flex-start', padding: Space[3], gap: Space[2], borderTopWidth: 1, borderTopColor: C.line },
     itemFirst: { borderTopWidth: 0 },
     itemExpired: { opacity: 0.5 },
     tapBox: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-    box: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-    boxOn: { backgroundColor: Colors.brand, borderColor: Colors.brand },
-    thumb: { width: 64, height: 64, marginTop: 2, borderRadius: Radius.sm, backgroundColor: Colors.surface2 },
-    noThumb: { backgroundColor: Colors.bgSoft },
+    box: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: C.line2, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface },
+    boxOn: { backgroundColor: C.brand, borderColor: C.brand },
+    thumb: { width: 64, height: 64, marginTop: 2, borderRadius: Radius.sm, backgroundColor: C.imageBg },
+    noThumb: { backgroundColor: C.bgSoft },
     itemBody: { flex: 1, minWidth: 0 },
-    itemName: { ...T.text.title, color: Colors.ink },
-    done: { textDecorationLine: 'line-through', color: Colors.ink3Text },
-    itemPrice: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    expired: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, color: Colors.accentText },
+    itemName: { ...T.text.title, color: C.ink },
+    done: { textDecorationLine: 'line-through', color: C.ink3Text },
+    itemPrice: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    expired: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, color: C.accentText },
     priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
     stepRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: Space[1] },
-    stepper: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 24, backgroundColor: Colors.bgSoft, borderWidth: 1, borderColor: Colors.line },
+    stepper: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 24, backgroundColor: C.bgSoft, borderWidth: 1, borderColor: C.line },
     step: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-    qty: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, minWidth: 28, textAlign: 'center', color: Colors.ink },
+    qty: { ...T.text.bodyStrong, fontFamily: Fonts.sans900, minWidth: 28, textAlign: 'center', color: C.ink },
     remove: { minHeight: 48, justifyContent: 'center', paddingLeft: Space[2] },
-    removeText: { ...T.text.bodyStrong, color: Colors.accentText },
-    footer: { backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.line, padding: Space[4] },
+    removeText: { ...T.text.bodyStrong, color: C.accentText },
+    footer: { backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.line, padding: Space[4] },
     totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    totalLabel: { ...T.text.body, color: Colors.ink2 },
-    totalValue: { ...T.text.price, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    footNote: { ...T.text.body, color: Colors.accentText, marginTop: Space[2] },
+    totalLabel: { ...T.text.body, color: C.ink2 },
+    totalValue: { ...T.text.price, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    footNote: { ...T.text.body, color: C.accentText, marginTop: Space[2] },
     footActions: { flexDirection: 'row', gap: Space[3], marginTop: Space[3] },
-    footBtn: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill, borderWidth: 2, borderColor: Colors.brand, backgroundColor: Colors.surface, paddingHorizontal: Space[3] },
-    footBtnPrimary: { backgroundColor: Colors.brand },
+    footBtn: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill, borderWidth: 2, borderColor: C.brandText, backgroundColor: C.surface, paddingHorizontal: Space[3] },
+    footBtnPrimary: { backgroundColor: C.brand, borderColor: C.brand },
     footBtnPrimaryText: { ...T.text.button, color: '#fff', textAlign: 'center' },
-    footBtnText: { ...T.text.button, color: Colors.brand, textAlign: 'center' },
-    footBtnDanger: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-    favRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, marginBottom: Space[3] },
+    footBtnText: { ...T.text.button, color: C.brandText, textAlign: 'center' },
+    footBtnDanger: { backgroundColor: C.accent, borderColor: C.accent },
+    favRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: C.line, marginBottom: Space[3] },
     favMain: { flex: 1, minHeight: 56, justifyContent: 'center', padding: Space[3] },
-    favChain: { ...T.text.secondary, color: Colors.ink3Text, marginTop: 2 },
+    favChain: { ...T.text.secondary, color: C.ink3Text, marginTop: 2 },
     favRemove: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   });

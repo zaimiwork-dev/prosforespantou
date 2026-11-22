@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 // The home screen's blocks, in the order of the website's landing page
 // (HomeClient + Hero): header, hero, search, chain strip, rails, banner,
 // category tiles. The screen file only fetches data and stacks them.
@@ -5,11 +6,13 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { Chain } from '@/lib/api';
-import { Colors, Fonts, Radius, Space, useType } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, useColors, type Palette, readableOn } from '@/constants/theme';
 import { formatCount } from './count';
 import { ArrowRightIcon, GearIcon, ListIcon, SearchIcon } from './icons';
 
 export function HomeHeader({ listCount }: { listCount: number }) {
+  const s = useS();
+  const C = useColors();
   return (
     <View style={s.header}>
       <View style={s.mark} accessible accessibilityLabel="Προσφορές Παντού">
@@ -22,7 +25,7 @@ export function HomeHeader({ listCount }: { listCount: number }) {
         accessibilityLabel="Ρυθμίσεις"
         hitSlop={4}
         style={({ pressed }) => [s.iconBtn, pressed && s.pressed]}>
-        <GearIcon size={26} color={Colors.brand} />
+        <GearIcon size={26} color={C.brandText} />
       </Pressable>
       <Pressable
         onPress={() => router.navigate('/list')}
@@ -30,7 +33,7 @@ export function HomeHeader({ listCount }: { listCount: number }) {
         accessibilityLabel={listCount > 0 ? `Η λίστα μου, ${listCount} προϊόντα` : 'Η λίστα μου'}
         hitSlop={4}
         style={({ pressed }) => [s.iconBtn, pressed && s.pressed]}>
-        <ListIcon size={26} color={Colors.brand} />
+        <ListIcon size={26} color={C.brandText} />
         {listCount > 0 ? (
           <View style={s.badge}>
             <Text style={s.badgeText}>{listCount > 99 ? '99+' : listCount}</Text>
@@ -42,23 +45,25 @@ export function HomeHeader({ listCount }: { listCount: number }) {
 }
 
 export function HomeHero({ total, chainCount }: { total: number; chainCount: number }) {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   return (
     <View style={s.hero}>
       <Text style={[T.text.hero, s.heroLine]} accessibilityRole="header">
         Όλες οι προσφορές,
         {'\n'}
-        <Text style={[T.text.heroItalic, { color: Colors.brand2 }]}>σε ένα μέρος</Text>
+        <Text style={[T.text.heroItalic, { color: C.brand2 }]}>σε ένα μέρος</Text>
       </Text>
       <View style={s.trust}>
         <Text style={[T.text.body, s.trustText]}>
-          <Text style={[T.text.bodyStrong, { color: Colors.ink }]}>{formatCount(total)}</Text> προσφορές
+          <Text style={[T.text.bodyStrong, { color: C.ink }]}>{formatCount(total)}</Text> προσφορές
         </Text>
         {chainCount > 0 ? (
           <>
             <Text style={[T.text.body, s.trustText]}>·</Text>
             <Text style={[T.text.body, s.trustText]}>
-              <Text style={[T.text.bodyStrong, { color: Colors.ink }]}>{chainCount}</Text> αλυσίδες
+              <Text style={[T.text.bodyStrong, { color: C.ink }]}>{chainCount}</Text> αλυσίδες
             </Text>
           </>
         ) : null}
@@ -72,11 +77,13 @@ export function HomeHero({ total, chainCount }: { total: number; chainCount: num
 // Looks like the website's big search pill; the field itself lives on the
 // Search tab, which focuses its input on ?focus=1.
 export function SearchPill() {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   const open = () => router.navigate({ pathname: '/search', params: { focus: '1' } });
   return (
     <Pressable onPress={open} accessibilityRole="search" accessibilityLabel="Αναζήτηση προσφορών" style={s.search}>
-      <SearchIcon size={22} color={Colors.ink3Text} />
+      <SearchIcon size={22} color={C.ink3Text} />
       <Text style={[T.text.body, s.searchHint]} numberOfLines={1}>
         Τι ψάχνεις;
       </Text>
@@ -88,7 +95,9 @@ export function SearchPill() {
 }
 
 export function ChainStrip({ chains }: { chains: Chain[] }) {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   if (chains.length === 0) return null;
   return (
     <FlatList
@@ -108,7 +117,7 @@ export function ChainStrip({ chains }: { chains: Chain[] }) {
             {c.logoUrl ? (
               <Image source={{ uri: c.logoUrl }} style={s.logo} contentFit="contain" />
             ) : (
-              <Text style={[T.text.bodyStrong, { color: c.color }]}>{c.short}</Text>
+              <Text style={[T.text.bodyStrong, { color: readableOn(c.color, C.imageBg, C.ink) }]}>{c.short}</Text>
             )}
           </View>
           <Text style={[T.text.caption, s.chainCount]} numberOfLines={1}>
@@ -127,26 +136,30 @@ export function railCardWidth(screenWidth: number) {
 
 // The site's `.promo` block: eyebrow, serif headline, gold button → all offers.
 export function PromoBanner({ total }: { total: number }) {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   return (
     <Pressable onPress={() => router.navigate('/deals')} accessibilityRole="button" accessibilityLabel="Δες όλες τις προσφορές" style={s.promo}>
       <Text style={[T.text.caption, s.eyebrow]}>ΟΛΕΣ ΟΙ ΠΡΟΣΦΟΡΕΣ</Text>
       <Text style={[T.text.h2, s.promoTitle]}>Περιήγηση σε {formatCount(total)} προσφορές</Text>
       <Text style={[T.text.body, s.promoSub]}>Φίλτραρε ανά κατάστημα, κατηγορία ή τιμή</Text>
       <View style={s.goldBtn}>
-        <Text style={[T.text.button, { color: Colors.brand }]}>Δες όλες</Text>
-        <ArrowRightIcon size={18} color={Colors.brand} />
+        <Text style={[T.text.button, { color: C.promo }]}>Δες όλες</Text>
+        <ArrowRightIcon size={18} color={C.promo} />
       </View>
     </Pressable>
   );
 }
 
 export function HomeError({ onRetry }: { onRetry: () => void }) {
+  const s = useS();
   const T = useType();
+  const C = T.c;
   return (
     <View style={s.error}>
-      <Text style={[T.text.h2, { color: Colors.ink, textAlign: 'center' }]}>Δεν φορτώθηκαν οι προσφορές</Text>
-      <Text style={[T.text.body, { color: Colors.ink2, marginTop: Space[2], textAlign: 'center' }]}>Έλεγξε τη σύνδεσή σου στο ίντερνετ.</Text>
+      <Text style={[T.text.h2, { color: C.ink, textAlign: 'center' }]}>Δεν φορτώθηκαν οι προσφορές</Text>
+      <Text style={[T.text.body, { color: C.ink2, marginTop: Space[2], textAlign: 'center' }]}>Έλεγξε τη σύνδεσή σου στο ίντερνετ.</Text>
       <Pressable onPress={onRetry} accessibilityRole="button" style={s.retry}>
         <Text style={[T.text.button, { color: '#fff' }]}>Δοκίμασε ξανά</Text>
       </Pressable>
@@ -154,11 +167,11 @@ export function HomeError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeS = (C: Palette) => StyleSheet.create({
   pressed: { opacity: 0.7 },
   bleed: { marginHorizontal: -Space[4] },
   header: { flexDirection: 'row', alignItems: 'center', gap: Space[1], minHeight: 52 },
-  mark: { width: 34, height: 34, borderRadius: 9, backgroundColor: Colors.brand, alignItems: 'center', justifyContent: 'center' },
+  mark: { width: 34, height: 34, borderRadius: 9, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
   markText: { color: '#fff', fontFamily: Fonts.sans900, fontSize: 18, lineHeight: 24 },
   iconBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   badge: {
@@ -169,47 +182,47 @@ const s = StyleSheet.create({
     height: 20,
     paddingHorizontal: 5,
     borderRadius: 10,
-    backgroundColor: Colors.accent,
+    backgroundColor: C.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: { color: '#fff', fontFamily: Fonts.sans700, fontSize: 12, lineHeight: 16 },
   hero: { marginTop: Space[2] },
-  heroLine: { color: Colors.ink },
+  heroLine: { color: C.ink },
   trust: { flexDirection: 'row', alignItems: 'center', gap: Space[2], marginTop: Space[2], flexWrap: 'wrap' },
-  trustText: { color: Colors.ink3Text },
-  liveDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.good, borderWidth: 3, borderColor: '#BFDDC9' },
+  trustText: { color: C.ink3Text },
+  liveDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: C.good, borderWidth: 3, borderColor: C.liveRing },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space[2],
-    backgroundColor: Colors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: C.line,
     borderRadius: Radius.pill,
     paddingLeft: Space[4],
     paddingRight: 6,
     height: 64,
   },
-  searchHint: { flex: 1, color: Colors.ink3Text },
-  searchBtn: { height: 52, paddingHorizontal: Space[4], borderRadius: Radius.pill, backgroundColor: Colors.brand, alignItems: 'center', justifyContent: 'center' },
+  searchHint: { flex: 1, color: C.ink3Text },
+  searchBtn: { height: 52, paddingHorizontal: Space[4], borderRadius: Radius.pill, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
   chainTile: { alignItems: 'center', gap: 6, width: 84 },
   logoBox: {
     width: 84,
     height: 60,
     borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: C.imageBg,
     borderWidth: 1,
-    borderColor: Colors.line,
+    borderColor: C.line,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
   },
   logo: { width: '100%', height: '100%' },
-  chainCount: { color: Colors.ink3Text },
-  promo: { backgroundColor: Colors.brand, borderRadius: Radius.lg, padding: Space[5], overflow: 'hidden' },
-  eyebrow: { color: Colors.gold, fontFamily: Fonts.sans700, letterSpacing: 1 },
-  promoTitle: { color: Colors.brandInk, marginTop: Space[2] },
+  chainCount: { color: C.ink3Text },
+  promo: { backgroundColor: C.promo, borderRadius: Radius.lg, padding: Space[5], overflow: 'hidden' },
+  eyebrow: { color: C.gold, fontFamily: Fonts.sans700, letterSpacing: 1 },
+  promoTitle: { color: C.brandInk, marginTop: Space[2] },
   promoSub: { color: 'rgba(243,238,226,0.85)', marginTop: Space[1] },
   goldBtn: {
     marginTop: Space[4],
@@ -220,8 +233,14 @@ const s = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: Space[5],
     borderRadius: Radius.pill,
-    backgroundColor: Colors.gold,
+    backgroundColor: C.gold,
   },
   error: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Space[6] },
-  retry: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: Colors.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
+  retry: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: C.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
 });
+
+// Rebuilt when the palette changes (light/dark).
+function useS() {
+  const C = useColors();
+  return useMemo(() => makeS(C), [C]);
+}

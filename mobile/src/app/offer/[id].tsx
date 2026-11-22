@@ -25,13 +25,14 @@ import { StaleBanner } from '@/components/ui/stale-banner';
 import { DealCardView } from '@/components/deal-card';
 import { ComparisonSection } from '@/components/offer/comparison-section';
 import { PriceHistory } from '@/components/offer/price-history-chart';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 
 const VERDICT_LABEL = { lowest: 'Χαμηλότερη τιμή', good: 'Καλή τιμή' } as const;
 
 export default function OfferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
   // A 404 is an answer («no such offer»), not a connection problem: remember
@@ -46,7 +47,7 @@ export default function OfferScreen() {
   const chainName = data ? chains.find((c) => c.id === data.offer.chain)?.name : undefined;
   const headerOptions = {
     title: chainName ?? 'Προσφορά',
-    headerTitleStyle: { fontFamily: Fonts.sans700, fontSize: T.title, color: Colors.ink },
+    headerTitleStyle: { fontFamily: Fonts.sans700, fontSize: T.title, color: C.ink },
   };
 
   if (!data && !error) {
@@ -247,6 +248,7 @@ function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode
 // while the offer is on the list and keeps adding the chosen amount.
 function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const { items } = useShoppingList();
   const { favourites } = useFavourites();
@@ -265,7 +267,7 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
         accessibilityRole="button"
         accessibilityState={{ selected: fav }}
         accessibilityLabel={fav ? 'Αφαίρεση από τα αγαπημένα' : 'Πρόσθεσε στα αγαπημένα'}>
-        <Svg width={26} height={26} viewBox="0 0 24 24" fill={fav ? Colors.accent : 'none'} stroke={fav ? Colors.accent : Colors.ink2} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <Svg width={26} height={26} viewBox="0 0 24 24" fill={fav ? C.accent : 'none'} stroke={fav ? C.accent : C.ink2} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
         </Svg>
       </Pressable>
@@ -275,7 +277,7 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
           accessibilityRole="button"
           accessibilityLabel="Μείωση ποσότητας"
           style={styles.step}>
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={Colors.ink} strokeWidth={2.5} strokeLinecap="round">
+          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth={2.5} strokeLinecap="round">
             <Path d="M5 12h14" />
           </Svg>
         </Pressable>
@@ -287,7 +289,7 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
           accessibilityRole="button"
           accessibilityLabel="Αύξηση ποσότητας"
           style={styles.step}>
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={Colors.ink} strokeWidth={2.5} strokeLinecap="round">
+          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth={2.5} strokeLinecap="round">
             <Path d="M5 12h14M12 5v14" />
           </Svg>
         </Pressable>
@@ -309,11 +311,11 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
         accessibilityRole="button"
         accessibilityLabel={onList ? 'Στη λίστα. Πάτησε για να προσθέσεις ακόμα' : 'Πρόσθεσε στη λίστα'}>
         {onList ? (
-          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={C.brandText} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
             <Path d="M5 12.5l4.5 4.5L19 7.5" />
           </Svg>
         ) : null}
-        <Text style={[styles.listBtnText, onList && { color: Colors.brand }]} numberOfLines={1}>
+        <Text style={[styles.listBtnText, onList && { color: C.brandText }]} numberOfLines={1}>
           Στη λίστα
         </Text>
       </Pressable>
@@ -323,69 +325,70 @@ function ListActions({ offer }: { offer: OfferResponse['offer'] }) {
 
 function DateBox({ label, value, sub, urgent }: { label: string; value: string; sub?: string | null; urgent?: boolean }) {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   return (
     <View style={styles.dateBox}>
       <Text style={styles.dateLabel}>{label}</Text>
-      <Text style={[styles.dateValue, urgent && { color: Colors.accentText }]}>{value}</Text>
+      <Text style={[styles.dateValue, urgent && { color: C.accentText }]}>{value}</Text>
       {sub ? <Text style={styles.dateSub}>{sub}</Text> : null}
     </View>
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: Colors.bg },
+    screen: { flex: 1, backgroundColor: C.bg },
     content: { padding: Space[4], paddingBottom: Space[7] },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg, padding: Space[6] },
-    errorTitle: { ...T.text.h2, fontSize: T.title, lineHeight: T.title + 6, fontFamily: Fonts.sans700, color: Colors.ink, textAlign: 'center' },
-    errorText: { ...T.text.body, color: Colors.ink2, marginTop: Space[2], textAlign: 'center' },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg, padding: Space[6] },
+    errorTitle: { ...T.text.h2, fontSize: T.title, lineHeight: T.title + 6, fontFamily: Fonts.sans700, color: C.ink, textAlign: 'center' },
+    errorText: { ...T.text.body, color: C.ink2, marginTop: Space[2], textAlign: 'center' },
     primary: {
       marginTop: Space[5],
       minHeight: 52,
       justifyContent: 'center',
-      backgroundColor: Colors.brand,
+      backgroundColor: C.brand,
       borderRadius: Radius.pill,
       paddingHorizontal: Space[6],
     },
     primaryText: { ...T.text.button, color: '#fff' },
-    ended: { backgroundColor: Colors.discountBg, borderRadius: Radius.md, padding: Space[3], marginBottom: Space[3] },
-    endedText: { ...T.text.bodyStrong, color: Colors.accentText, textAlign: 'center' },
+    ended: { backgroundColor: C.discountBg, borderRadius: Radius.md, padding: Space[3], marginBottom: Space[3] },
+    endedText: { ...T.text.bodyStrong, color: C.accentText, textAlign: 'center' },
     imagePanel: {
-      backgroundColor: Colors.surface,
+      backgroundColor: C.imageBg,
       borderRadius: Radius.lg,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       padding: Space[4],
       marginBottom: Space[4],
     },
     image: { width: '100%', aspectRatio: 1 },
-    noImage: { backgroundColor: Colors.bgSoft, borderRadius: Radius.md },
-    badge: { position: 'absolute', top: Space[3], right: Space[3], backgroundColor: Colors.accent, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 4 },
+    noImage: { backgroundColor: C.bgSoft, borderRadius: Radius.md },
+    badge: { position: 'absolute', top: Space[3], right: Space[3], backgroundColor: C.accent, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 4 },
     badgeText: { ...T.text.badge, color: '#fff' },
-    eyebrow: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.brand, letterSpacing: 0.8 },
-    name: { fontFamily: Fonts.sans700, fontSize: Math.round(T.title * 1.22), lineHeight: Math.round(T.title * 1.22) + 6, color: Colors.ink, marginTop: Space[1] },
-    size: { ...T.text.secondary, color: Colors.ink3Text, marginTop: 2 },
-    priceLabel: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.ink3Text, letterSpacing: 0.8, marginTop: Space[5] },
+    eyebrow: { ...T.text.caption, fontFamily: Fonts.sans700, color: C.brandText, letterSpacing: 0.8 },
+    name: { fontFamily: Fonts.sans700, fontSize: Math.round(T.title * 1.22), lineHeight: Math.round(T.title * 1.22) + 6, color: C.ink, marginTop: Space[1] },
+    size: { ...T.text.secondary, color: C.ink3Text, marginTop: 2 },
+    priceLabel: { ...T.text.caption, fontFamily: Fonts.sans700, color: C.ink3Text, letterSpacing: 0.8, marginTop: Space[5] },
     priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: Space[3] },
-    price: { ...T.text.priceLarge, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    priceSale: { color: Colors.accentText },
+    price: { ...T.text.priceLarge, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    priceSale: { color: C.accentText },
     // Ended offer: muted but still readable (3.5:1; large text needs 3:1). ink4 was 2.0:1.
-    priceMuted: { color: Colors.ink3 },
-    was: { ...T.text.secondary, color: Colors.ink3Text, textDecorationLine: 'line-through' },
-    baseline: { ...T.text.secondary, color: Colors.ink3Text, marginTop: 2 },
+    priceMuted: { color: C.ink3 },
+    was: { ...T.text.secondary, color: C.ink3Text, textDecorationLine: 'line-through' },
+    baseline: { ...T.text.secondary, color: C.ink3Text, marginTop: 2 },
     unitBox: {
       alignSelf: 'stretch',
       marginTop: Space[3],
-      backgroundColor: Colors.surface,
+      backgroundColor: C.surface,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       borderRadius: Radius.md,
       paddingHorizontal: Space[4],
       paddingVertical: Space[3],
     },
-    unitText: { ...T.text.bodyStrong, color: Colors.ink },
-    verdict: { ...T.text.bodyStrong, color: Colors.good, marginTop: Space[2] },
+    unitText: { ...T.text.bodyStrong, color: C.ink },
+    verdict: { ...T.text.bodyStrong, color: C.good, marginTop: Space[2] },
     actions: { flexDirection: 'row', alignItems: 'center', gap: Space[2], marginTop: Space[4] },
     favBtn: {
       width: 56,
@@ -394,22 +397,22 @@ const makeStyles = (T: TypeScale) =>
       justifyContent: 'center',
       borderRadius: 28,
       borderWidth: 1,
-      borderColor: Colors.line2,
-      backgroundColor: Colors.surface,
+      borderColor: C.line2,
+      backgroundColor: C.surface,
     },
-    favBtnOn: { borderColor: Colors.accent, backgroundColor: Colors.discountBg },
+    favBtnOn: { borderColor: C.accent, backgroundColor: C.discountBg },
     stepper: {
       height: 56,
       flexDirection: 'row',
       alignItems: 'center',
       borderRadius: 28,
-      backgroundColor: Colors.bgSoft,
+      backgroundColor: C.bgSoft,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       paddingHorizontal: 2,
     },
     step: { width: 44, height: 52, alignItems: 'center', justifyContent: 'center' },
-    qty: { ...T.text.bodyStrong, minWidth: 24, textAlign: 'center', color: Colors.ink },
+    qty: { ...T.text.bodyStrong, minWidth: 24, textAlign: 'center', color: C.ink },
     listBtn: {
       flex: 1,
       minWidth: 0,
@@ -420,27 +423,27 @@ const makeStyles = (T: TypeScale) =>
       gap: Space[2],
       borderRadius: 28,
       borderWidth: 2,
-      borderColor: Colors.brand,
-      backgroundColor: Colors.brand,
+      borderColor: C.brand,
+      backgroundColor: C.brand,
       paddingHorizontal: Space[3],
     },
-    listBtnOn: { backgroundColor: Colors.surface },
+    listBtnOn: { backgroundColor: C.surface, borderColor: C.brandText },
     listBtnText: { ...T.text.button, color: '#fff' },
-    fresh: { ...T.text.caption, color: Colors.ink3Text, textAlign: 'center', marginTop: Space[3] },
-    upcoming: { ...T.text.bodyStrong, color: Colors.brand, marginTop: Space[3] },
+    fresh: { ...T.text.caption, color: C.ink3Text, textAlign: 'center', marginTop: Space[3] },
+    upcoming: { ...T.text.bodyStrong, color: C.brandText, marginTop: Space[3] },
     dates: { flexDirection: 'row', gap: Space[3], marginTop: Space[4] },
     dateBox: {
       flex: 1,
-      backgroundColor: Colors.surface,
+      backgroundColor: C.surface,
       borderRadius: Radius.md,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       padding: Space[3],
     },
-    dateLabel: { ...T.text.caption, color: Colors.ink3Text },
-    dateValue: { fontFamily: Fonts.sans900, fontSize: T.bodyLg, lineHeight: T.bodyLg + 6, color: Colors.ink, marginTop: 2 },
-    dateSub: { ...T.text.caption, color: Colors.ink3Text, marginTop: 2 },
-    description: { ...T.text.body, color: Colors.ink2, marginTop: Space[4] },
+    dateLabel: { ...T.text.caption, color: C.ink3Text },
+    dateValue: { fontFamily: Fonts.sans900, fontSize: T.bodyLg, lineHeight: T.bodyLg + 6, color: C.ink, marginTop: 2 },
+    dateSub: { ...T.text.caption, color: C.ink3Text, marginTop: 2 },
+    description: { ...T.text.body, color: C.ink2, marginTop: Space[4] },
     secondary: {
       marginTop: Space[4],
       minHeight: 52,
@@ -448,10 +451,10 @@ const makeStyles = (T: TypeScale) =>
       justifyContent: 'center',
       borderRadius: Radius.pill,
       borderWidth: 2,
-      borderColor: Colors.brand,
-      backgroundColor: Colors.surface,
+      borderColor: C.brandText,
+      backgroundColor: C.surface,
     },
-    secondaryText: { ...T.text.button, color: Colors.brand },
+    secondaryText: { ...T.text.button, color: C.brandText },
     section: { marginTop: Space[6] },
-    h2: { ...T.text.h2, color: Colors.ink, marginBottom: Space[3] },
+    h2: { ...T.text.h2, color: C.ink, marginBottom: Space[3] },
   });

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 // Browser build only (the owner's iPhone preview, 2026-11-05). NativeTabs on
 // web renders a floating pill at the TOP that covers screen titles, hides the
 // fourth tab on a phone-width screen and puts dark text on dark grey — nothing
@@ -5,7 +6,7 @@
 import { Tabs } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { StyleSheet, View } from 'react-native';
-import { Colors, Fonts } from '@/constants/theme';
+import { Fonts, useColors, type Palette } from '@/constants/theme';
 import { useShoppingList } from '@/lib/shopping-list';
 
 type IconProps = { color: string; size: number };
@@ -38,6 +39,8 @@ const icons: Record<string, (p: IconProps) => React.ReactElement> = {
 const titles: Record<string, string> = { index: 'Αρχική', deals: 'Προσφορές', search: 'Αναζήτηση', list: 'Λίστα' };
 
 export default function AppTabs() {
+  const styles = useStyles();
+  const C = useColors();
   const count = useShoppingList().items.length;
   return (
     <Tabs
@@ -48,13 +51,13 @@ export default function AppTabs() {
         tabBarIcon: ({ color, size, focused }) => (
           <View style={[styles.pill, focused && styles.pillActive]}>{icons[route.name]({ color: String(color), size })}</View>
         ),
-        tabBarActiveTintColor: Colors.brand,
-        tabBarInactiveTintColor: Colors.ink2,
+        tabBarActiveTintColor: C.brandText,
+        tabBarInactiveTintColor: C.ink2,
         // Explicit height and line height: the defaults clip Greek labels at 13px.
-        tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.line, height: 72 },
+        tabBarStyle: { backgroundColor: C.surface, borderTopColor: C.line, height: 72 },
         tabBarItemStyle: { paddingVertical: 6 },
         tabBarLabelStyle: { fontFamily: Fonts.sans600, fontSize: 13, lineHeight: 18 },
-        tabBarBadgeStyle: { backgroundColor: Colors.accent, color: '#fff', fontFamily: Fonts.sans700, fontSize: 12 },
+        tabBarBadgeStyle: { backgroundColor: C.accent, color: '#fff', fontFamily: Fonts.sans700, fontSize: 12 },
       })}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="deals" />
@@ -64,7 +67,13 @@ export default function AppTabs() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: Palette) => StyleSheet.create({
   pill: { width: 56, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  pillActive: { backgroundColor: Colors.bgSoft },
+  pillActive: { backgroundColor: C.bgSoft },
 });
+
+// Rebuilt when the palette changes (light/dark).
+function useStyles() {
+  const C = useColors();
+  return useMemo(() => makeStyles(C), [C]);
+}

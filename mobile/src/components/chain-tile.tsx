@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 // A chain as a tile: logo on white, name under it, a check mark when picked.
 // Used by the offers filter sheet, settings and onboarding (2-column grid).
 // `children` replaces the logo (the «Τα καταστήματά μου» tile has no chain).
@@ -6,7 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import type { Chain } from '@/lib/api';
-import { Colors, Fonts, Radius, Space, useType } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, useColors, type Palette, readableOn } from '@/constants/theme';
 
 export function ChainTile({
   chain,
@@ -21,7 +22,9 @@ export function ChainTile({
   onPress: () => void;
   children?: ReactNode;
 }) {
+  const styles = useStyles();
   const T = useType();
+  const C = T.c;
   const name = label ?? chain?.name ?? '';
   return (
     <Pressable
@@ -35,7 +38,7 @@ export function ChainTile({
           (chain?.logoUrl ? (
             <Image source={{ uri: chain.logoUrl }} style={styles.logo} contentFit="contain" accessibilityLabel={name} />
           ) : (
-            <Text style={[T.text.h2, { color: chain?.color ?? Colors.brand }]}>{chain?.short ?? name.slice(0, 2)}</Text>
+            <Text style={[T.text.h2, { color: readableOn(chain?.color, C.imageBg, C.ink) }]}>{chain?.short ?? name.slice(0, 2)}</Text>
           ))}
       </View>
       <Text style={[T.text.caption, styles.name, selected && { fontFamily: Fonts.sans700 }]} numberOfLines={2}>
@@ -52,7 +55,7 @@ export function ChainTile({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: Palette) => StyleSheet.create({
   tile: {
     flex: 1,
     minHeight: 112,
@@ -62,13 +65,13 @@ const styles = StyleSheet.create({
     padding: Space[3],
     borderRadius: Radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.line,
-    backgroundColor: Colors.surface,
+    borderColor: C.line,
+    backgroundColor: C.surface,
   },
-  tileOn: { borderColor: Colors.brand, backgroundColor: Colors.bgSoft },
-  logoBox: { height: 44, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  tileOn: { borderColor: C.brandText, backgroundColor: C.bgSoft },
+  logoBox: { height: 52, width: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: C.imageBg, borderRadius: Radius.sm },
   logo: { height: 44, width: '80%' },
-  name: { color: Colors.ink, textAlign: 'center' },
+  name: { color: C.ink, textAlign: 'center' },
   check: {
     position: 'absolute',
     top: Space[2],
@@ -76,7 +79,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.brand,
+    backgroundColor: C.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -97,4 +100,10 @@ export function TileGrid({ children }: { children: ReactNode[] }) {
       ))}
     </View>
   );
+}
+
+// Rebuilt when the palette changes (light/dark).
+function useStyles() {
+  const C = useColors();
+  return useMemo(() => makeStyles(C), [C]);
 }

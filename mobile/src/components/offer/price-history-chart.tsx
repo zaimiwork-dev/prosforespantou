@@ -7,7 +7,7 @@ import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import type { PriceTimeline } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 import {
   RANGES,
   UNRELIABLE_LINE,
@@ -50,6 +50,7 @@ export function PriceHistory({ timeline, price }: { timeline?: PriceTimeline; pr
 
 function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const [range, setRange] = useState<RangeKey>('ALL');
   const [width, setWidth] = useState(0);
@@ -113,24 +114,24 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
           <>
             <Svg width={width} height={HEIGHT} pointerEvents="none">
               {m.y.ticks.map((tick) => (
-                <Line key={tick} x1={left} x2={left + INSET + plotW} y1={py(tick)} y2={py(tick)} stroke={Colors.line} strokeWidth={1} />
+                <Line key={tick} x1={left} x2={left + INSET + plotW} y1={py(tick)} y2={py(tick)} stroke={C.line} strokeWidth={1} />
               ))}
-              {shelfPath ? <Path d={shelfPath} stroke={Colors.ink} strokeWidth={2.5} fill="none" strokeLinejoin="round" strokeLinecap="butt" /> : null}
+              {shelfPath ? <Path d={shelfPath} stroke={C.ink} strokeWidth={2.5} fill="none" strokeLinejoin="round" strokeLinecap="butt" /> : null}
               {m.promos.map((p, i) =>
                 p.until != null && p.until > p.at ? (
-                  <Line key={`s${i}`} x1={px(p.at)} x2={px(p.until)} y1={py(p.price)} y2={py(p.price)} stroke={Colors.accent} strokeWidth={4} strokeLinecap="round" />
+                  <Line key={`s${i}`} x1={px(p.at)} x2={px(p.until)} y1={py(p.price)} y2={py(p.price)} stroke={C.accent} strokeWidth={4} strokeLinecap="round" />
                 ) : null,
               )}
               {m.promos.map((p, i) => (
-                <Circle key={`p${i}`} cx={px(p.at)} cy={py(p.price)} r={4.5} fill={Colors.accent} />
+                <Circle key={`p${i}`} cx={px(p.at)} cy={py(p.price)} r={4.5} fill={C.accent} />
               ))}
               {touch ? (
                 <>
-                  <Line x1={px(touch.at)} x2={px(touch.at)} y1={TOP} y2={HEIGHT - BOTTOM} stroke={Colors.ink3} strokeWidth={1} strokeDasharray="3 3" />
-                  <Circle cx={px(touch.at)} cy={py(touch.price)} r={7} fill={Colors.surface} stroke={touch.kind === 'promo' ? Colors.accent : Colors.ink} strokeWidth={3} />
+                  <Line x1={px(touch.at)} x2={px(touch.at)} y1={TOP} y2={HEIGHT - BOTTOM} stroke={C.ink3} strokeWidth={1} strokeDasharray="3 3" />
+                  <Circle cx={px(touch.at)} cy={py(touch.price)} r={7} fill={C.surface} stroke={touch.kind === 'promo' ? C.accent : C.ink} strokeWidth={3} />
                 </>
               ) : null}
-              <Circle cx={nowX} cy={nowY} r={8} fill={Colors.accent} stroke={Colors.surface} strokeWidth={2} />
+              <Circle cx={nowX} cy={nowY} r={8} fill={C.accent} stroke={C.surface} strokeWidth={2} />
             </Svg>
             {m.y.ticks.map((tick) => (
               <Text key={tick} style={[styles.tick, { top: py(tick) - T.caption - 2, width: left - 6 }]} pointerEvents="none">
@@ -142,8 +143,8 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
       </View>
 
       <View style={styles.legend}>
-        {m.shelf.length > 0 ? <LegendDot color={Colors.ink} label="Κανονική τιμή" line /> : null}
-        <LegendDot color={Colors.accent} label="Προσφορά" />
+        {m.shelf.length > 0 ? <LegendDot color={C.ink} label="Κανονική τιμή" line /> : null}
+        <LegendDot color={C.accent} label="Προσφορά" />
       </View>
 
       <View style={styles.chips}>
@@ -212,18 +213,18 @@ function LegendDot({ color, label, line }: { color: string; label: string; line?
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    line: { ...T.text.body, color: Colors.ink2 },
+    line: { ...T.text.body, color: C.ink2 },
     readout: { minHeight: 44, justifyContent: 'center' },
-    readoutText: { ...T.text.body, color: Colors.ink },
-    readoutStrong: { fontFamily: Fonts.sans900, color: Colors.ink },
-    hint: { ...T.text.caption, color: Colors.ink3Text },
-    chart: { height: HEIGHT, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, overflow: 'hidden' },
-    tick: { position: 'absolute', left: 4, ...T.text.caption, color: Colors.ink3Text, textAlign: 'right' },
+    readoutText: { ...T.text.body, color: C.ink },
+    readoutStrong: { fontFamily: Fonts.sans900, color: C.ink },
+    hint: { ...T.text.caption, color: C.ink3Text },
+    chart: { height: HEIGHT, backgroundColor: C.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+    tick: { position: 'absolute', left: 4, ...T.text.caption, color: C.ink3Text, textAlign: 'right' },
     legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: Space[4], marginTop: Space[2] },
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: Space[2] },
-    legendText: { ...T.text.caption, color: Colors.ink2 },
+    legendText: { ...T.text.caption, color: C.ink2 },
     chips: { flexDirection: 'row', gap: Space[2], marginTop: Space[3] },
     chip: {
       flex: 1,
@@ -232,15 +233,15 @@ const makeStyles = (T: TypeScale) =>
       justifyContent: 'center',
       borderRadius: Radius.pill,
       borderWidth: 1,
-      borderColor: Colors.line2,
-      backgroundColor: Colors.surface,
+      borderColor: C.line2,
+      backgroundColor: C.surface,
     },
-    chipOn: { backgroundColor: Colors.brand, borderColor: Colors.brand },
-    chipText: { ...T.text.bodyStrong, color: Colors.ink },
+    chipOn: { backgroundColor: C.brand, borderColor: C.brand },
+    chipText: { ...T.text.bodyStrong, color: C.ink },
     chipTextOn: { color: '#fff' },
     facts: { marginTop: Space[4], gap: Space[2], alignItems: 'flex-start' },
-    fact: { ...T.text.body, color: Colors.ink },
-    pill: { backgroundColor: '#E3F2E7', borderRadius: Radius.pill, paddingHorizontal: Space[3], paddingVertical: Space[1] },
-    pillText: { fontFamily: Fonts.sans700, color: Colors.good },
-    foot: { ...T.text.caption, color: Colors.ink3Text, marginTop: Space[3] },
+    fact: { ...T.text.body, color: C.ink },
+    pill: { backgroundColor: C.goodBg, borderRadius: Radius.pill, paddingHorizontal: Space[3], paddingVertical: Space[1] },
+    pillText: { fontFamily: Fonts.sans700, color: C.good },
+    foot: { ...T.text.caption, color: C.ink3Text, marginTop: Space[3] },
   });

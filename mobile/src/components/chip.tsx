@@ -1,9 +1,10 @@
+import { useMemo } from 'react';
 // A filter chip — the one used for chains, departments, sorts and search
 // suggestions everywhere in the app, so they all look and behave the same.
 // Pill, 44 dp tall (older users), Inter 600 → 700 when selected; the selected
 // state is announced to screen readers.
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Colors, Fonts, Radius, Space, useType } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, useColors, type Palette, readableOn } from '@/constants/theme';
 
 export function Chip({
   label,
@@ -17,8 +18,10 @@ export function Chip({
   // Optional accent (e.g. a chain's colour) used when selected.
   color?: string;
 }) {
+  const styles = useStyles();
   const T = useType();
-  const accent = color ?? Colors.brand;
+  const C = T.c;
+  const accent = readableOn(color, '#FFFFFF', C.brand);
   return (
     <Pressable
       onPress={onPress}
@@ -39,17 +42,23 @@ export function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: Palette) => StyleSheet.create({
   chip: {
     minHeight: 48,
     justifyContent: 'center',
     paddingHorizontal: Space[4],
     borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: Colors.line2,
-    backgroundColor: Colors.surface,
+    borderColor: C.line2,
+    backgroundColor: C.surface,
   },
   pressed: { opacity: 0.8 },
-  label: { color: Colors.ink },
+  label: { color: C.ink },
   labelSelected: { color: '#fff', fontFamily: Fonts.sans700 },
 });
+
+// Rebuilt when the palette changes (light/dark).
+function useStyles() {
+  const C = useColors();
+  return useMemo(() => makeStyles(C), [C]);
+}

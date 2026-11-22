@@ -14,7 +14,7 @@ import Svg, { Path } from 'react-native-svg';
 import { expiryInfo } from '@shared/expiry-label';
 import type { DealCard as Deal } from '@/lib/api';
 import { useChains } from '@/lib/chains';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette, readableOn } from '@/constants/theme';
 import { track } from '@/lib/analytics';
 import { formatPrice, formatUnitPrice } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
@@ -51,6 +51,7 @@ export function DealCardView({
   position?: number;
 }) {
   const T = useType();
+  const C = T.c;
   const [imageH, setImageH] = useState(0);
   const styles = useMemo(() => makeStyles(T), [T]);
   const { myChains } = useSettings();
@@ -143,8 +144,8 @@ export function DealCardView({
           {/* The chain gets its own line under the photo: on the photo it
               covered the product, and a pill beside the badge had to be cut. */}
           <View style={styles.chainRow}>
-            <View style={[styles.chainDot, { backgroundColor: chain?.color ?? Colors.ink3 }]} />
-            <Text style={[styles.chainText, { color: chain?.color ?? Colors.ink2 }]} numberOfLines={1}>
+            <View style={[styles.chainDot, { backgroundColor: chain?.color ?? C.ink3 }]} />
+            <Text style={[styles.chainText, { color: readableOn(chain?.color, C.surface, C.ink2) }]} numberOfLines={1}>
               {chainName}
             </Text>
           </View>
@@ -209,20 +210,20 @@ export function DealCardView({
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
     card: {
-      backgroundColor: Colors.surface,
+      backgroundColor: C.surface,
       borderRadius: Radius.md,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       overflow: 'hidden',
       paddingBottom: Space[3],
     },
     pressed: { opacity: 0.85 },
-    imageWrap: { backgroundColor: Colors.surface2, padding: Space[3] },
+    imageWrap: { backgroundColor: C.imageBg, padding: Space[3] },
     image: { width: '100%', aspectRatio: 1 },
-    noImage: { backgroundColor: Colors.bgSoft, borderRadius: Radius.md },
+    noImage: { backgroundColor: C.bgSoft, borderRadius: Radius.md },
     strip: {
       position: 'absolute',
       top: Space[2],
@@ -233,19 +234,19 @@ const makeStyles = (T: TypeScale) =>
       alignItems: 'flex-start',
       gap: 6,
     },
-    badge: { flexShrink: 0, backgroundColor: Colors.accent, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
+    badge: { flexShrink: 0, backgroundColor: C.accent, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
     badgeText: { ...T.text.badge, color: '#fff' },
     chainRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     chainDot: { width: 10, height: 10, borderRadius: 5 },
     chainText: { ...T.text.caption, fontFamily: Fonts.sans700, flexShrink: 1 },
     text: { paddingHorizontal: Space[3], paddingTop: Space[2], gap: 2 },
-    eyebrow: { ...T.text.caption, color: Colors.brand },
-    eyebrowUrgent: { color: Colors.accentText },
-    title: { ...T.text.title, color: Colors.ink, minHeight: T.text.title.lineHeight * 2 },
-    secondary: { ...T.text.secondary, color: Colors.ink3Text },
+    eyebrow: { ...T.text.caption, color: C.brandText },
+    eyebrowUrgent: { color: C.accentText },
+    title: { ...T.text.title, color: C.ink, minHeight: T.text.title.lineHeight * 2 },
+    secondary: { ...T.text.secondary, color: C.ink3Text },
     priceCol: { paddingHorizontal: Space[3], marginTop: 4 },
-    price: { ...T.text.price, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    priceSale: { color: Colors.accentText },
+    price: { ...T.text.price, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    priceSale: { color: C.accentText },
     was: { textDecorationLine: 'line-through' },
     add: {
       position: 'absolute',
@@ -253,14 +254,14 @@ const makeStyles = (T: TypeScale) =>
       width: ADD_SIZE,
       height: ADD_SIZE,
       borderRadius: ADD_SIZE / 2,
-      backgroundColor: Colors.brand,
+      backgroundColor: C.brand,
       alignItems: 'center',
       justifyContent: 'center',
       // A white ring keeps it readable on any product photo.
       borderWidth: 2,
-      borderColor: Colors.surface,
+      borderColor: C.surface,
     },
-    addDone: { backgroundColor: Colors.brand2 },
+    addDone: { backgroundColor: C.brand2 },
     tagRow: { paddingHorizontal: Space[2], marginTop: Space[1] },
     notes: { paddingHorizontal: Space[3], gap: 2 },
   });

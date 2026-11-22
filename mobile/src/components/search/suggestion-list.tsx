@@ -5,7 +5,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SuggestResponse } from '@/lib/api';
-import { Colors, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 import { CategoryIcon, SearchIcon } from '@/components/home/icons';
 import { splitHighlight } from './search-model';
 
@@ -23,11 +23,12 @@ export function SuggestionList({
   onCategory: (c: { id: string; label: string }) => void;
 }) {
   const T = useType();
+  const C = T.c;
   const s = useMemo(() => makeStyles(T), [T]);
   return (
     <View style={s.box}>
       <Pressable onPress={onSearch} accessibilityRole="button" accessibilityLabel={`Αναζήτηση για ${typed}`} style={({ pressed }) => [s.row, pressed && s.pressed]}>
-        <SearchIcon size={22} color={Colors.brand} />
+        <SearchIcon size={22} color={C.brandText} />
         <Text style={s.rowText} numberOfLines={1}>
           Αναζήτηση για <Text style={s.strong}>«{typed.trim()}»</Text>
         </Text>
@@ -39,7 +40,7 @@ export function SuggestionList({
           accessibilityRole="button"
           accessibilityLabel={`Προσφορές σε ${c.label}`}
           style={({ pressed }) => [s.row, s.line, pressed && s.pressed]}>
-          <CategoryIcon id={c.id} size={22} color={Colors.brand} />
+          <CategoryIcon id={c.id} size={22} color={C.brandText} />
           <Text style={s.rowText} numberOfLines={1}>
             σε <Text style={s.strong}>{c.label}</Text>
           </Text>
@@ -64,14 +65,14 @@ export function SuggestionList({
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    box: { marginTop: Space[3], backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, overflow: 'hidden' },
+    box: { marginTop: Space[3], backgroundColor: C.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
     row: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Space[3], paddingHorizontal: Space[4] },
-    line: { borderTopWidth: 1, borderTopColor: Colors.line },
-    pressed: { backgroundColor: Colors.bgSoft },
-    rowText: { ...T.text.body, fontSize: T.bodyLg, color: Colors.ink, flexShrink: 1 },
+    line: { borderTopWidth: 1, borderTopColor: C.line },
+    pressed: { backgroundColor: C.bgSoft },
+    rowText: { ...T.text.body, fontSize: T.bodyLg, color: C.ink, flexShrink: 1 },
     term: { flex: 1 },
     strong: { fontFamily: T.text.bodyStrong.fontFamily },
-    count: { ...T.text.caption, color: Colors.ink3Text },
+    count: { ...T.text.caption, color: C.ink3Text },
   });

@@ -4,7 +4,7 @@
 // real cards arrive.
 import { useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
-import { Colors, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Radius, Space, useType, type TypeScale, type Palette, useColors } from '@/constants/theme';
 
 function useReduceMotion() {
   const [reduce, setReduce] = useState(false);
@@ -21,6 +21,7 @@ function useReduceMotion() {
 }
 
 export function Skeleton({ width, height, radius = Radius.sm, style }: { width?: DimensionValue; height: number; radius?: number; style?: StyleProp<ViewStyle> }) {
+  const C = useColors();
   const reduce = useReduceMotion();
   const [pulse] = useState(() => new Animated.Value(1));
   useEffect(() => {
@@ -41,7 +42,7 @@ export function Skeleton({ width, height, radius = Radius.sm, style }: { width?:
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[{ width, height, borderRadius: radius, backgroundColor: Colors.bgSoft, opacity: pulse }, style]}
+      style={[{ width, height, borderRadius: radius, backgroundColor: C.bgSoft, opacity: pulse }, style]}
     />
   );
 }
@@ -98,17 +99,17 @@ export function GridSkeleton({ rows = 3 }: { rows?: number }) {
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
     card: {
-      backgroundColor: Colors.surface,
+      backgroundColor: C.surface,
       borderRadius: Radius.md,
       borderWidth: 1,
-      borderColor: Colors.line,
+      borderColor: C.line,
       overflow: 'hidden',
       paddingBottom: Space[3],
     },
-    imageWrap: { backgroundColor: Colors.surface2, padding: Space[3] },
+    imageWrap: { backgroundColor: C.surface2, padding: Space[3] },
     image: { width: '100%', aspectRatio: 1, height: undefined },
     text: { paddingHorizontal: Space[3], paddingTop: Space[2], gap: 4, minHeight: T.text.title.lineHeight * 2 },
   });

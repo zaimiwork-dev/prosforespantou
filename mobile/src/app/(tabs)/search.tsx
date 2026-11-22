@@ -34,7 +34,7 @@ import {
   type Selection,
   type SortKey,
 } from '@/components/search/search-model';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 
 const MIN_CHARS = 2;
 const SUGGEST_DEBOUNCE_MS = 150;
@@ -44,6 +44,7 @@ type Status = 'idle' | 'loading' | 'done' | 'error';
 
 export default function SearchScreen() {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const [text, setText] = useState('');
   const [status, setStatus] = useState<Status>('idle');
@@ -226,7 +227,7 @@ export default function SearchScreen() {
     <View>
       <Text style={styles.h1} accessibilityRole="header">Αναζήτηση</Text>
       <View style={styles.field}>
-        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.ink3Text} strokeWidth={2.2} strokeLinecap="round" style={styles.glass} pointerEvents="none">
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={C.ink3Text} strokeWidth={2.2} strokeLinecap="round" style={styles.glass} pointerEvents="none">
           <Circle cx={11} cy={11} r={7} />
           <Path d="M20 20l-4-4" />
         </Svg>
@@ -236,7 +237,7 @@ export default function SearchScreen() {
           onChangeText={onChangeText}
           onSubmitEditing={() => run(text)}
           placeholder="Τι ψάχνεις; π.χ. γάλα, καφές"
-          placeholderTextColor={Colors.ink3Text}
+          placeholderTextColor={C.ink3Text}
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"
@@ -366,39 +367,39 @@ export default function SearchScreen() {
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: Colors.bg },
+    screen: { flex: 1, backgroundColor: C.bg },
     content: { padding: Space[4], paddingBottom: Space[7] },
-    h1: { ...T.text.hero, color: Colors.ink, marginBottom: Space[3] },
+    h1: { ...T.text.hero, color: C.ink, marginBottom: Space[3] },
     field: { justifyContent: 'center' },
     glass: { position: 'absolute', left: Space[4], zIndex: 1 },
     input: {
       minHeight: 56,
       ...T.text.body,
       fontSize: T.bodyLg,
-      color: Colors.ink,
-      backgroundColor: Colors.surface,
+      color: C.ink,
+      backgroundColor: C.surface,
       borderWidth: 1,
-      borderColor: Colors.line2,
+      borderColor: C.line2,
       borderRadius: Radius.pill,
       paddingLeft: 52,
       paddingRight: 52,
     },
     clear: { position: 'absolute', right: 4, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-    clearText: { ...T.text.h2, fontFamily: Fonts.sans500, color: Colors.ink2 },
+    clearText: { ...T.text.h2, fontFamily: Fonts.sans500, color: C.ink2 },
     resultsHead: { marginTop: Space[3] },
-    h2: { ...T.text.h2, color: Colors.ink, marginTop: Space[4], marginBottom: Space[3] },
+    h2: { ...T.text.h2, color: C.ink, marginTop: Space[4], marginBottom: Space[3] },
     h2Gap: { marginTop: Space[6] },
     recentHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
     recentTitle: { flexShrink: 1 },
     clearRecent: { minHeight: 44, justifyContent: 'center', paddingLeft: Space[3] },
-    clearRecentText: { ...T.text.bodyStrong, color: Colors.brand },
+    clearRecentText: { ...T.text.bodyStrong, color: C.brandText },
     wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] },
-    count: { ...T.text.secondary, color: Colors.ink3Text, marginBottom: Space[3] },
+    count: { ...T.text.secondary, color: C.ink3Text, marginBottom: Space[3] },
     skeleton: { marginHorizontal: -Space[4], marginTop: Space[3] },
     state: { alignItems: 'center', paddingVertical: Space[6] },
-    stateText: { ...T.text.body, color: Colors.ink2, textAlign: 'center' },
-    retry: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: Colors.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
+    stateText: { ...T.text.body, color: C.ink2, textAlign: 'center' },
+    retry: { marginTop: Space[5], minHeight: 52, justifyContent: 'center', backgroundColor: C.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6] },
     retryText: { ...T.text.button, color: '#fff' },
   });

@@ -9,15 +9,14 @@ import { setConsentChoice } from '@/lib/analytics';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { ChainTile, TileGrid } from '@/components/chain-tile';
 import { useChainList } from '@/components/filters/use-chain-list';
-import { Colors, Radius, Space, TypeLarge, type TypeScale } from '@/constants/theme';
-
-// Always the large scale here.
-const BIG: TypeScale = TypeLarge;
+import { Radius, Space, useTypeLarge, type TypeScale, type Palette } from '@/constants/theme';
 
 const STEPS = 3;
 
 export default function Onboarding() {
-  const styles = useMemo(() => makeStyles(BIG), []);
+  // Always the large scale here, in the active palette.
+  const BIG = useTypeLarge();
+  const styles = useMemo(() => makeStyles(BIG), [BIG]);
   const [step, setStep] = useState(0);
   const { myChains } = useSettings();
   const { chains, failed, retry } = useChainList();
@@ -120,25 +119,25 @@ export default function Onboarding() {
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: Colors.bg },
+    screen: { flex: 1, backgroundColor: C.bg },
     content: { padding: Space[6], paddingTop: Space[7], flexGrow: 1 },
-    step: { ...T.text.caption, color: Colors.ink3Text, marginBottom: Space[5] },
+    step: { ...T.text.caption, color: C.ink3Text, marginBottom: Space[5] },
     block: { gap: Space[4] },
-    h1: { ...T.text.hero, color: Colors.ink },
-    h1Italic: { ...T.text.heroItalic, color: Colors.brand, marginTop: -Space[3] },
-    text: { ...T.text.body, color: Colors.ink },
-    muted: { ...T.text.body, color: Colors.ink3Text },
+    h1: { ...T.text.hero, color: C.ink },
+    h1Italic: { ...T.text.heroItalic, color: C.brandText, marginTop: -Space[3] },
+    text: { ...T.text.body, color: C.ink },
+    muted: { ...T.text.body, color: C.ink3Text },
     errorBox: { gap: Space[3], alignItems: 'flex-start' },
     footer: { padding: Space[6], paddingTop: Space[3], gap: Space[3] },
-    primary: { backgroundColor: Colors.brand, borderRadius: Radius.pill, minHeight: 56, paddingHorizontal: Space[6], alignItems: 'center', justifyContent: 'center' },
+    primary: { backgroundColor: C.brand, borderRadius: Radius.pill, minHeight: 56, paddingHorizontal: Space[6], alignItems: 'center', justifyContent: 'center' },
     primaryText: { ...T.text.button, color: '#fff' },
     links: { flexDirection: 'row', justifyContent: 'space-between' },
     linkBtn: { minHeight: 52, justifyContent: 'center', paddingHorizontal: Space[2] },
-    linkText: { ...T.text.bodyStrong, color: Colors.brand },
+    linkText: { ...T.text.bodyStrong, color: C.brandText },
     // Equal weight on purpose: refusing must be as easy as accepting.
     choices: { flexDirection: 'row', gap: Space[3] },
-    choice: { flex: 1, minHeight: 56, borderRadius: Radius.pill, borderWidth: 2, borderColor: Colors.brand, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
-    choiceText: { ...T.text.button, color: Colors.brand },
+    choice: { flex: 1, minHeight: 56, borderRadius: Radius.pill, borderWidth: 2, borderColor: C.brandText, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
+    choiceText: { ...T.text.button, color: C.brandText },
   });

@@ -11,7 +11,7 @@ import { formatShortDate } from '@shared/expiry-label';
 import type { ComparisonRow, DealCard } from '@/lib/api';
 import { useChains } from '@/lib/chains';
 import { formatPrice, formatUnitPrice } from '@/lib/format';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 
 type Row = {
   key: string;
@@ -24,6 +24,7 @@ type Row = {
 
 export function ComparisonSection({ current, comparison }: { current: DealCard; comparison: ComparisonRow[] }) {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
   const rows: Row[] = ([
@@ -64,7 +65,7 @@ export function ComparisonSection({ current, comparison }: { current: DealCard; 
         const diff = row.price - cheapest.price;
         const body = (
           <>
-            <View style={[styles.dot, { backgroundColor: chain?.color ?? Colors.ink3 }]} />
+            <View style={[styles.dot, { backgroundColor: chain?.color ?? C.ink3 }]} />
             <View style={styles.mid}>
               <Text style={styles.chain}>{name}</Text>
               {best ? <Text style={styles.best}>Φθηνότερα</Text> : null}
@@ -102,9 +103,9 @@ export function ComparisonSection({ current, comparison }: { current: DealCard; 
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    empty: { ...T.text.body, color: Colors.ink2 },
+    empty: { ...T.text.body, color: C.ink2 },
     similar: {
       marginTop: Space[3],
       minHeight: 52,
@@ -112,11 +113,11 @@ const makeStyles = (T: TypeScale) =>
       justifyContent: 'center',
       borderRadius: Radius.pill,
       borderWidth: 2,
-      borderColor: Colors.brand,
-      backgroundColor: Colors.surface,
+      borderColor: C.brandText,
+      backgroundColor: C.surface,
     },
-    similarText: { ...T.text.button, color: Colors.brand },
-    leadLine: { ...T.text.bodyStrong, color: Colors.good, marginBottom: Space[2] },
+    similarText: { ...T.text.button, color: C.brandText },
+    leadLine: { ...T.text.bodyStrong, color: C.good, marginBottom: Space[2] },
     list: { gap: Space[1] },
     row: {
       flexDirection: 'row',
@@ -131,8 +132,8 @@ const makeStyles = (T: TypeScale) =>
     },
     // Raised: white, hairline border and a soft shadow (elevation on Android).
     rowBest: {
-      backgroundColor: Colors.surface,
-      borderColor: Colors.line,
+      backgroundColor: C.surface,
+      borderColor: C.line,
       shadowColor: '#1C2A22',
       shadowOpacity: 0.12,
       shadowRadius: 10,
@@ -142,12 +143,12 @@ const makeStyles = (T: TypeScale) =>
     pressed: { opacity: 0.85 },
     dot: { width: 12, height: 12, borderRadius: 6 },
     mid: { flex: 1, gap: 2 },
-    chain: { ...T.text.title, fontFamily: Fonts.sans700, color: Colors.ink },
-    sub: { ...T.text.secondary, color: Colors.ink3Text, textAlign: 'right' },
-    note: { ...T.text.secondary, color: Colors.ink3Text },
-    current: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.brand },
-    best: { ...T.text.badge, color: Colors.good },
+    chain: { ...T.text.title, fontFamily: Fonts.sans700, color: C.ink },
+    sub: { ...T.text.secondary, color: C.ink3Text, textAlign: 'right' },
+    note: { ...T.text.secondary, color: C.ink3Text },
+    current: { ...T.text.caption, fontFamily: Fonts.sans700, color: C.brandText },
+    best: { ...T.text.badge, color: C.good },
     right: { alignItems: 'flex-end', flexShrink: 0 },
-    price: { ...T.text.price, color: Colors.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-    diff: { ...T.text.caption, fontFamily: Fonts.sans700, color: Colors.accentText },
+    price: { ...T.text.price, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    diff: { ...T.text.caption, fontFamily: Fonts.sans700, color: C.accentText },
   });

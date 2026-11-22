@@ -24,7 +24,7 @@ import { track } from '@/lib/analytics';
 import { getSettings, useSettings } from '@/lib/settings';
 import { useChainList } from '@/components/filters/use-chain-list';
 import { FilterSheet, NO_FILTERS, SORTS, activeCount, effectiveChains, type Filters } from '@/components/filters/filter-sheet';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 
 const PAGE = 24;
 
@@ -48,6 +48,7 @@ const NO_CATEGORIES: { id: string; label: string; full: string; offers: number }
 
 export default function DealsScreen() {
   const T = useType();
+  const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const { width } = useWindowDimensions();
   const { chains } = useChainList();
@@ -206,14 +207,14 @@ export default function DealsScreen() {
           accessibilityRole="button"
           accessibilityLabel={nActive ? `Φίλτρα, ${nActive} ενεργά` : 'Φίλτρα'}
           style={({ pressed }) => [styles.pill, nActive > 0 && styles.pillOn, pressed && { opacity: 0.85 }]}>
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={nActive ? '#fff' : Colors.ink} strokeWidth={2.2} strokeLinecap="round">
+          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={nActive ? '#fff' : C.ink} strokeWidth={2.2} strokeLinecap="round">
             <Path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
             <Path d="M16 4.5v5M8 14.5v5" />
           </Svg>
-          <Text style={[T.text.chip, { color: nActive ? '#fff' : Colors.ink }]}>Φίλτρα</Text>
+          <Text style={[T.text.chip, { color: nActive ? '#fff' : C.ink }]}>Φίλτρα</Text>
           {nActive > 0 ? (
             <View style={styles.count}>
-              <Text style={[T.text.caption, { color: Colors.brand, fontFamily: Fonts.sans900 }]}>{nActive}</Text>
+              <Text style={[T.text.caption, { color: C.brand, fontFamily: Fonts.sans900 }]}>{nActive}</Text>
             </View>
           ) : null}
         </Pressable>
@@ -222,10 +223,10 @@ export default function DealsScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Ταξινόμηση: ${sortLabel}`}
           style={({ pressed }) => [styles.pill, pressed && { opacity: 0.85 }]}>
-          <Text style={[T.text.chip, { color: Colors.ink }]} numberOfLines={1}>
+          <Text style={[T.text.chip, { color: C.ink }]} numberOfLines={1}>
             {sortLabel}
           </Text>
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
             <Path d="M6 9l6 6 6-6" />
           </Svg>
         </Pressable>
@@ -237,7 +238,7 @@ export default function DealsScreen() {
   if (status === 'loading') {
     empty = (
       <View style={styles.state}>
-        <ActivityIndicator size="large" color={Colors.brand} />
+        <ActivityIndicator size="large" color={C.brandText} />
       </View>
     );
   } else if (status === 'error') {
@@ -273,11 +274,11 @@ export default function DealsScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={
-          <View style={styles.footer}>{loadingMore ? <ActivityIndicator color={Colors.brand} /> : null}</View>
+          <View style={styles.footer}>{loadingMore ? <ActivityIndicator color={C.brandText} /> : null}</View>
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.brand} colors={[Colors.brand]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.brandText} colors={[C.brandText]} />}
         contentContainerStyle={styles.content}
       />
       <FilterSheet
@@ -294,13 +295,13 @@ export default function DealsScreen() {
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: Colors.bg },
+    screen: { flex: 1, backgroundColor: C.bg },
     content: { paddingBottom: Space[7] },
     titleBlock: { paddingHorizontal: Space[4], paddingTop: Space[4], paddingBottom: Space[3] },
-    h2: { ...T.text.h2, color: Colors.ink },
-    sub: { ...T.text.body, color: Colors.ink3Text, marginTop: 2 },
+    h2: { ...T.text.h2, color: C.ink },
+    sub: { ...T.text.body, color: C.ink3Text, marginTop: 2 },
     pillRow: { flexDirection: 'row', gap: Space[2], paddingHorizontal: Space[4], paddingBottom: Space[3], alignItems: 'center' },
     pill: {
       minHeight: 48,
@@ -310,16 +311,16 @@ const makeStyles = (T: TypeScale) =>
       paddingHorizontal: Space[4],
       borderRadius: Radius.pill,
       borderWidth: 1,
-      borderColor: Colors.line2,
-      backgroundColor: Colors.surface,
+      borderColor: C.line2,
+      backgroundColor: C.surface,
     },
-    pillOn: { backgroundColor: Colors.brand, borderColor: Colors.brand },
+    pillOn: { backgroundColor: C.brand, borderColor: C.brand },
     count: { minWidth: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
     row: { paddingHorizontal: Space[4], gap: Space[3], marginBottom: Space[3] },
     state: { alignItems: 'center', padding: Space[6], paddingTop: Space[7] },
-    stateTitle: { ...T.text.bodyStrong, color: Colors.ink, textAlign: 'center' },
-    stateText: { ...T.text.body, color: Colors.ink2, marginTop: Space[2], textAlign: 'center' },
-    button: { marginTop: Space[5], backgroundColor: Colors.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6], minHeight: 52, justifyContent: 'center' },
+    stateTitle: { ...T.text.bodyStrong, color: C.ink, textAlign: 'center' },
+    stateText: { ...T.text.body, color: C.ink2, marginTop: Space[2], textAlign: 'center' },
+    button: { marginTop: Space[5], backgroundColor: C.brand, borderRadius: Radius.pill, paddingHorizontal: Space[6], minHeight: 52, justifyContent: 'center' },
     buttonText: { ...T.text.button, color: '#fff' },
     footer: { paddingVertical: Space[5] },
   });

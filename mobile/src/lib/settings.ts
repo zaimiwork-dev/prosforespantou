@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type TextSize = 'normal' | 'large';
 export type Consent = 'accepted' | 'rejected' | null;
+// «Εμφάνιση»: follow the phone (default), or always light / always dark.
+export type Appearance = 'system' | 'light' | 'dark';
 
 export type Settings = {
   textSize: TextSize;
@@ -13,10 +15,11 @@ export type Settings = {
   myChains: string[];
   onboarded: boolean;
   consent: Consent;
+  appearance: Appearance;
 };
 
 const KEY = 'settings.v1';
-const DEFAULTS: Settings = { textSize: 'normal', myChains: [], onboarded: false, consent: null };
+const DEFAULTS: Settings = { textSize: 'normal', myChains: [], onboarded: false, consent: null, appearance: 'system' };
 
 let state: Settings = DEFAULTS;
 let loaded = false;
@@ -35,6 +38,7 @@ async function load() {
         myChains: Array.isArray(p.myChains) ? p.myChains.filter((c) => typeof c === 'string') : [],
         onboarded: p.onboarded === true,
         consent: p.consent === 'accepted' || p.consent === 'rejected' ? p.consent : null,
+        appearance: p.appearance === 'light' || p.appearance === 'dark' ? p.appearance : 'system',
       };
     }
   } catch {

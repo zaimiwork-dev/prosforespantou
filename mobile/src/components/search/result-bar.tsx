@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Chip } from '@/components/chip';
-import { Colors, Fonts, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 import { SORT_LABELS, SORT_ORDER, type Facet, type SortKey } from './search-model';
 
 export function ResultBar({
@@ -34,6 +34,7 @@ export function ResultBar({
   onSort: (s: SortKey) => void;
 }) {
   const T = useType();
+  const C = T.c;
   const s = useMemo(() => makeStyles(T), [T]);
   const [open, setOpen] = useState(false);
   const any = selected.chains.length + selected.categories.length > 0;
@@ -76,7 +77,7 @@ export function ResultBar({
         style={s.sortPill}>
         <Text style={s.sortLabel}>Ταξινόμηση:</Text>
         <Text style={s.sortValue} numberOfLines={2}>{SORT_LABELS[sort]}</Text>
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.ink2} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.ink2} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
           <Path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
         </Svg>
       </Pressable>
@@ -103,12 +104,12 @@ export function ResultBar({
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
     chipsRow: { marginHorizontal: -Space[4], marginBottom: Space[3], flexGrow: 0 },
     chips: { paddingHorizontal: Space[4], gap: Space[2], alignItems: 'center' },
     clear: { minHeight: 44, justifyContent: 'center', paddingRight: Space[2] },
-    clearText: { ...T.text.bodyStrong, color: Colors.brand },
+    clearText: { ...T.text.bodyStrong, color: C.brandText },
     sortPill: {
       minHeight: 48,
       flexDirection: 'row',
@@ -116,20 +117,20 @@ const makeStyles = (T: TypeScale) =>
       gap: Space[2],
       alignSelf: 'stretch',
       paddingHorizontal: Space[4],
-      backgroundColor: Colors.surface,
+      backgroundColor: C.surface,
       borderWidth: 1,
-      borderColor: Colors.line2,
+      borderColor: C.line2,
       borderRadius: Radius.pill,
       marginBottom: Space[3],
     },
-    sortLabel: { ...T.text.chip, fontFamily: Fonts.sans500, color: Colors.ink3Text },
-    sortValue: { ...T.text.chip, color: Colors.ink, flex: 1 },
-    options: { backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.line, marginBottom: Space[3] },
+    sortLabel: { ...T.text.chip, fontFamily: Fonts.sans500, color: C.ink3Text },
+    sortValue: { ...T.text.chip, color: C.ink, flex: 1 },
+    options: { backgroundColor: C.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: C.line, marginBottom: Space[3] },
     option: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Space[3], paddingHorizontal: Space[4] },
-    optionLine: { borderTopWidth: 1, borderTopColor: Colors.line },
-    optionText: { ...T.text.body, color: Colors.ink },
+    optionLine: { borderTopWidth: 1, borderTopColor: C.line },
+    optionText: { ...T.text.body, color: C.ink },
     optionOn: { fontFamily: Fonts.sans700 },
-    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: Colors.ink3Text, alignItems: 'center', justifyContent: 'center' },
-    radioOn: { borderColor: Colors.brand },
-    dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.brand },
+    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.ink3Text, alignItems: 'center', justifyContent: 'center' },
+    radioOn: { borderColor: C.brandText },
+    dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.brandText },
   });

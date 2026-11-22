@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius, Space, useType, type TypeScale } from '@/constants/theme';
+import { Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
 
 export type ToastOptions = { message: string; actionLabel?: string; onAction?: () => void; durationMs?: number };
 type Toast = Readonly<ToastOptions & { id: number }>;
@@ -75,7 +75,7 @@ function ToastView({ toast }: { toast: Toast }) {
   );
 }
 
-const makeStyles = (T: TypeScale) =>
+const makeStyles = (T: TypeScale, C: Palette = T.c) =>
   StyleSheet.create({
     wrap: { position: 'absolute', left: Space[4], right: Space[4], alignItems: 'center', zIndex: 1000, elevation: 1000 },
     toast: {
@@ -84,7 +84,7 @@ const makeStyles = (T: TypeScale) =>
       minHeight: 56,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: Colors.ink,
+      backgroundColor: C.toastBg,
       borderRadius: Radius.md,
       paddingLeft: Space[4],
       paddingRight: Space[2],
@@ -93,5 +93,5 @@ const makeStyles = (T: TypeScale) =>
     },
     message: { ...T.text.body, color: '#fff', flex: 1, paddingVertical: Space[2] },
     action: { minHeight: 48, minWidth: 48, paddingHorizontal: Space[3], justifyContent: 'center' },
-    actionText: { ...T.text.bodyStrong, color: Colors.gold },
+    actionText: { ...T.text.bodyStrong, color: C.gold },
   });
