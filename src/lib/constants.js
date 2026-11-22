@@ -26,6 +26,15 @@ export const SUPERMARKETS = [
 // Move an entry back into SUPERMARKETS only once a real adapter feeds it data.
 // e-fresh is the next viable NEW chain (clean JSON API, but barcode-less →
 // needs guarded name-matching; hold until the Groq mapping audit is unblocked).
+// Chains that no longer exist as a separate shop. Κρητικός: bought by Μασούτης
+// (approved May 2026), stores rebranding through end-2026, kritikos-sm.gr
+// 301-redirects to masoutis.gr since ~2026-11-16; its 2,710 offers were
+// soft-deactivated on 2026-11-22 (owner approved). They stay in SUPERMARKETS so
+// old rows still resolve a name and logo, but they are never offered as a store
+// to pick, never get a sitemap URL, and their shelf prices are never compared.
+export const RETIRED_SUPERMARKET_IDS = new Set(["kritikos"]);
+export const ACTIVE_SUPERMARKETS = SUPERMARKETS.filter((s) => !RETIRED_SUPERMARKET_IDS.has(s.id));
+
 export const PARKED_SUPERMARKETS = [
   { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/filadio/" },
   { id: "discountmarkt", name: "Discount Markt", short: "DM", color: "#d62828", bg: "#fff0f0", heroLabel: "Discount", heroSub: "Markt", logo: "discount_markt.png" },

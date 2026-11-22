@@ -18,6 +18,14 @@ export type Settings = {
   appearance: Appearance;
 };
 
+// Chains absorbed by another: a shopper who picked the old one now shops at the
+// new one. Κρητικός → Μασούτης (bought 2026, stores rebranding; retired here
+// 2026-11-22). Order kept, duplicates dropped.
+const MERGED_INTO: Record<string, string> = { kritikos: 'masoutis' };
+export function migrateChains(ids: string[]): string[] {
+  return [...new Set(ids.map((id) => MERGED_INTO[id] ?? id))];
+}
+
 const KEY = 'settings.v1';
 const DEFAULTS: Settings = { textSize: 'normal', myChains: [], onboarded: false, consent: null, appearance: 'system' };
 
@@ -35,7 +43,7 @@ async function load() {
       const p = JSON.parse(raw) as Partial<Settings>;
       state = {
         textSize: p.textSize === 'large' ? 'large' : 'normal',
-        myChains: Array.isArray(p.myChains) ? p.myChains.filter((c) => typeof c === 'string') : [],
+        myChains: Array.isArray(p.myChains) ? migrateChains(p.myChains.filter((c) => typeof c === 'string')) : [],
         onboarded: p.onboarded === true,
         consent: p.consent === 'accepted' || p.consent === 'rejected' ? p.consent : null,
         appearance: p.appearance === 'light' || p.appearance === 'dark' ? p.appearance : 'system',

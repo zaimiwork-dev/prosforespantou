@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { SUPERMARKETS } from "@/lib/constants";
+import { ACTIVE_SUPERMARKETS } from "@/lib/constants";
 import { activePublicDealWhere } from "@/lib/public-deal-filters";
 
 export default async function sitemap() {
@@ -22,7 +22,7 @@ export default async function sitemap() {
     priority: 0.7,
   }));
 
-  const supermarketUrls = SUPERMARKETS.map((sm) => ({
+  const supermarketUrls = ACTIVE_SUPERMARKETS.map((sm) => ({
     url: `${baseUrl}/supermarket/${sm.id}`,
     lastModified: new Date(),
     changeFrequency: "weekly",

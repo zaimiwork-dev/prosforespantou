@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { formatPrice, formatUnitPrice } from '@/lib/format-price';
 import { createAlert, deleteAlert } from '@/actions/alerts';
-import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
+import { SUPERMARKETS, ACTIVE_SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { Icon } from './Icons';
 
 // One criterion chip on a saved alert: icon and text on the same baseline.
@@ -94,7 +94,7 @@ export function AlertsClient({ initialAlerts, token }) {
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#999', marginBottom: 8, textTransform: 'uppercase' }}>Σούπερ Μάρκετ (επιλογή)</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {SUPERMARKETS.map(sm => (
+              {ACTIVE_SUPERMARKETS.map(sm => (
                 <button
                   key={sm.id}
                   type="button"

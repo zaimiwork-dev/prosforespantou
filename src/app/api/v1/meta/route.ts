@@ -3,7 +3,7 @@
 // The app keeps no copy of these, so adding a chain on the server reaches
 // installed apps without an update.
 import * as Sentry from '@sentry/nextjs';
-import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
+import { ACTIVE_SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { getDealCounts } from '@/actions/get-deal-counts';
 import { SITE_ORIGIN } from '@/lib/api/deal-card';
 import { ok, fail } from '@/lib/api/respond';
@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const counts = await getDealCounts();
     return ok({
-      chains: SUPERMARKETS.map((s) => ({
+      chains: ACTIVE_SUPERMARKETS.map((s) => ({
         id: s.id,
         name: s.name,
         short: s.short,

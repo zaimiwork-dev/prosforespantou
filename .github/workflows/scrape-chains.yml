@@ -54,7 +54,7 @@ on:
   schedule:
     - cron: '0 0 * * *'   # daily 00:00 UTC — My Market offers
     - cron: '0 1 * * *'   # daily 01:00 UTC — Sklavenitis offers
-    - cron: '0 2 * * *'   # daily 02:00 UTC — Kritikos offers
+    # (Κρητικός daily offers — retired 2026-11-22: kritikos-sm.gr redirects to masoutis.gr; manual dispatch only)
     - cron: '30 2 * * *'  # daily 02:30 UTC — Bazaar offers
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '30 3 * * *'  # daily 03:30 UTC — Masoutis web offers (site API)
@@ -65,7 +65,7 @@ on:
     - cron: '30 3 * * 0'  # weekly Sun 03:30 UTC — Lidl catalog (e-shop grid)
     - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Wolt barcode enrichment, all four chains in sequence (sklavenitis → mymarket → masoutis → ab)
-    - cron: '0 6 * * 0'   # weekly Sun 06:00 UTC — Kritikos canonical (catalog refresh)
+    # (Κρητικός Sunday catalog — retired 2026-11-22, see above)
     - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
     - cron: '0 7 * * 0'   # weekly Sun 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL)
     - cron: '30 7 * * 0'  # weekly Sun 07:30 UTC — Bazaar full catalog (OpenCart category walk)

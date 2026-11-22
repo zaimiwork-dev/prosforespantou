@@ -91,12 +91,11 @@ describe('EXPECTED_FEEDS', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('monitors every live chain offer feed', () => {
+  it('monitors every live chain offer feed (Κρητικός retired 2026-11-22)', () => {
     const chains = new Set(EXPECTED_FEEDS.map((f) => f.chain));
     expect(chains).toEqual(new Set([
       'ab',
       'bazaar',
-      'kritikos',
       'lidl',
       'masoutis',
       'mymarket',
@@ -106,16 +105,13 @@ describe('EXPECTED_FEEDS', () => {
 
   it('watches a shelf-price feed for every chain that has one', () => {
     // Shelf prices are what «κανονικά ~Y€» is built on, so a silently dead
-    // catalog walk is a product bug, not just an ops one. Kritikos' shelf
-    // series comes from its nightly offers run (BASELINE=1), not a Sunday
-    // catalog job, so it qualifies through 'baseline'.
+    // catalog walk is a product bug, not just an ops one.
     const shelfFeeds = new Set(
       EXPECTED_FEEDS.filter((f) => f.source === 'catalog' || f.source === 'baseline').map((f) => f.chain)
     );
     expect(shelfFeeds).toEqual(new Set([
       'ab',
       'bazaar',
-      'kritikos',
       'lidl',
       'masoutis',
       'mymarket',

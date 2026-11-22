@@ -39,7 +39,8 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   // the free local path over a paid proxy, 2026-07-06). 48h window tolerates one
   // missed night (PC off) without a false alarm; two misses = real 'stale'.
   { chain: 'sklavenitis', source: 'web', maxAgeHours: 48, schedule: 'καθημερινά 02:30 τοπική ώρα — Windows task (dev PC)' },
-  { chain: 'kritikos', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 02:00 UTC — GitHub Actions' },
+  // Κρητικός retired 2026-11-22: kritikos-sm.gr redirects to masoutis.gr (Μασούτης bought the
+  // chain); its feeds are no longer expected. See RETIRED_SUPERMARKET_IDS in lib/constants.js.
   { chain: 'bazaar', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 02:30 UTC — GitHub Actions' },
   { chain: 'ab', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 03:00 UTC — GitHub Actions' },
   { chain: 'masoutis', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 03:30 UTC — GitHub Actions' },
@@ -47,15 +48,6 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 06:00 UTC — GitHub Actions' },
 
   // ── Shelf-price / catalog feeds ───────────────────────────────────────────
-  // Kritikos already walks its whole catalog to find offers, so its shelf-price
-  // series rides along with the nightly offers run (BASELINE=1) instead of a
-  // separate Sunday job. 48h = one missed night tolerated, same as sklavenitis.
-  { chain: 'kritikos', source: 'baseline', maxAgeHours: 48, schedule: 'καθημερινά 02:00 UTC — GitHub Actions (kritikos-offers BASELINE=1)' },
-  // NOTE: kritikos/catalog stays 'never' until the canonical scraper is routed
-  // through ingestCatalog (shipped alongside this row) and the next Sunday run
-  // records its first IngestRun. That is intended — the feed genuinely had no
-  // flight recorder before, and a 'never' is the honest reading of that.
-  { chain: 'kritikos', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 06:00 UTC — GitHub Actions (kritikos-canonical)', graceUntil: '2026-09-22' },
   { chain: 'lidl', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 03:30 UTC — GitHub Actions (lidl-catalog)' },
   { chain: 'ab', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 04:30 UTC — GitHub Actions (ab-catalog)' },
   { chain: 'masoutis', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 06:30 UTC — GitHub Actions (masoutis-catalog)' },

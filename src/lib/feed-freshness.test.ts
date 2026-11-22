@@ -13,8 +13,13 @@ describe('freshShelfChains', () => {
   });
 
   it('a daily baseline feed counts the same as a catalog feed', () => {
-    const fresh = freshShelfChains([run('kritikos', 'baseline', 0.3, 4986)], NOW);
-    expect(fresh.has('kritikos')).toBe(true);
+    const fresh = freshShelfChains([run('masoutis', 'baseline', 0.3, 4986)], NOW);
+    expect(fresh.has('masoutis')).toBe(true);
+  });
+
+  it('a retired chain is never fresh, however recent its last run (Κρητικός, 2026-11-22)', () => {
+    const fresh = freshShelfChains([run('kritikos', 'catalog', 0.3, 4986)], NOW);
+    expect(fresh.has('kritikos')).toBe(false);
   });
 
   it('a chain whose last representative run is older than the window is NOT fresh', () => {

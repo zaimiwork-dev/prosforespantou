@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useShoppingListStore } from '@/lib/store';
-import { SUPERMARKETS, CATEGORIES } from '@/lib/constants';
+import { SUPERMARKETS, ACTIVE_SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { getTextSize, setTextSize } from '@/lib/text-size';
@@ -164,7 +164,7 @@ function PreferredStoresSheetInner({ onClose, intro }) {
             Τα καταστήματά μου
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {SUPERMARKETS.map((sm) => {
+            {ACTIVE_SUPERMARKETS.map((sm) => {
               const isSelected = local.includes(sm.id);
               return (
                 <button

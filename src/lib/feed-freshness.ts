@@ -17,6 +17,8 @@
 // Pure function + one loader. Imported by the server action AND the nightly
 // recompute script (keep it strip-safe: no enums/decorators).
 
+import { RETIRED_SUPERMARKET_IDS } from './constants.js';
+
 export const SHELF_FEED_MAX_AGE_DAYS = 10;
 // Sources that write kind='normal' snapshots. 'wolt' is deliberately absent:
 // the Wolt enrichment runs with WOLT_BASELINE=0 and writes no shelf prices.
@@ -47,6 +49,9 @@ export function freshShelfChains(
   const byChain = new Map<string, { at: number; items: number }[]>();
   for (const r of runs) {
     if (!r.healthOk || !SHELF_BASELINE_SOURCES.includes(r.source)) continue;
+    // A retired chain (Κρητικός, absorbed by Μασούτης) has no shop to check its
+    // shelf prices against any more: never fresh, so never compared or quoted.
+    if (RETIRED_SUPERMARKET_IDS.has(r.chain)) continue;
     const at = new Date(r.finishedAt).getTime();
     if (!Number.isFinite(at) || at < peakCutoff || at > nowMs + 60_000) continue;
     const arr = byChain.get(r.chain) || [];
