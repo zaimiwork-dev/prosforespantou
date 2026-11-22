@@ -21,7 +21,7 @@
 //   LIMIT=200 node src/scripts/verify-comparisons.mjs   # judge up to 200 new pairs
 //   node src/scripts/verify-comparisons.mjs             # judge every new pair (stops cleanly on the daily budget)
 //
-// Groq free tier: openai/gpt-oss-120b, ~200K tokens/day shared with the
+// Groq free tier: openai/gpt-oss-120b (reasoning medium), ~200K tokens/day shared with the
 // nightly resolvers; 8 pairs per request ≈ 1.3K tokens → ~1,200 pairs/day.
 // A daily-budget stop exits 0: the next run resumes where this one stopped.
 //
@@ -42,6 +42,9 @@ const LIMIT = parseInt(process.env.LIMIT || '0', 10) || Infinity;
 const PACE_MS = parseInt(process.env.PACE_MS || '10000', 10);
 const BATCH = 8;
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const REASONING_EFFORT = process.env.REASONING_EFFORT || 'medium';
+// EVAL only: score each of these efforts on the fixture, one after the other.
+const EVAL_EFFORTS = (process.env.EVAL_EFFORTS || 'low,medium').split(',').map((s) => s.trim()).filter(Boolean);
 const EVAL_FILE = process.env.EVAL_FILE || 'src/scripts/fixtures/comparison-eval-pairs.json';
 const VERDICTS = ['same', 'different', 'unsure'];
 
@@ -60,19 +63,32 @@ const publiclyVisible = (d) =>
 
 // ── Groq ─────────────────────────────────────────────────────────────────────
 
-async function judgeBatch(apiKey, rows) {
+// The first prompt (8de40d7) judged the pair as a whole and called rye and
+// wheat toast bread of one brand and size «same» ("identical brand and
+// size"): it never looked at the one word that differed. So the model now has
+// to write down the words found in only one name and classify each before it
+// decides — the difference is always in those words.
+async function judgeBatch(apiKey, rows, effort = REASONING_EFFORT) {
   const list = rows
     .map((r, i) => `${i + 1}. A: "${r.nameA}"\n   B: "${r.nameB}"`)
     .join('\n');
-  const prompt = `Two Greek supermarket chains each list a product. For each numbered pair, decide whether listing A and listing B are the SAME sellable item, so a shopper can fairly compare their prices: same brand, same product line and variant (flavour, scent, colour, shade number, model, type such as rye vs wheat or sensitive vs regular), same size or weight, and the same pack contents (number of pieces, refills, gifts).
+  const prompt = `Two Greek supermarket chains each list a product. For each numbered pair, decide whether listing A and listing B are the SAME sellable item, so a shopper can fairly compare their prices.
 
-The chains write names differently. None of these make items different: word order, capital letters, abbreviations (ΚΤΨ = κατεψυγμένο, ΑΠΟΣΜ/ΚΟ = αποσμητικό), Greek vs Latin spelling or translation of the same word (Vanilla = Βανίλια, Orange = Πορτοκάλι), units written differently (gr = g = γρ.), or one chain adding a generic description (Κατεψυγμένο, Υγρό Απορρυπαντικό Πιάτων, Αφρόλουτρο).
+Step 1. Write down the words that appear in only one of the two names ("onlyA", "onlyB"). Ignore capital letters, accents, word order, and Greek vs Latin spelling of the same word.
 
-Answer "different" when any brand, line, variant, size or pack detail conflicts. Answer "unsure" when a detail you would need is missing from one name (for example one name has no brand, or names a variant the other does not mention). Answer "same" only when you are confident: a wrong "same" shows a shopper a false price comparison.
+Step 2. Classify every such word:
+- NEUTRAL: a generic description the other chain simply left out (Κατεψυγμένο, Υγρό, Απορρυπαντικό, Σώματος, Σπρέι, Ψωμί για), or the same thing written differently (Μέτρια = Medium, Βανίλια = Vanilla, 1,5lt = 1500ml, gr = g = γρ., ΚΤΨ = κατεψυγμένο).
+- DISTINGUISHING: anything that can tell two products of one brand apart — flavour, scent, colour, shade or model number, grain or flour (Σίκαλης = rye, Σίτου = wheat, Ολικής = wholemeal), fat %, age, a product line or edition (Ultra, Platinum, Sensitive, Hyperdry, Exotic, Pink, Mineral, Proglide), size, weight, piece count, refills, gifts.
+
+Step 3. Decide:
+- "different": A and B each have a DISTINGUISHING word of the same kind and they disagree (rye vs wheat, Pink vs Mineral, 2 vs 5 refills, 55/46 vs 66/46), or the brand differs.
+- "unsure": only one name has a DISTINGUISHING word, or one name has no brand.
+- "same": every word found in only one name is NEUTRAL.
+A wrong "same" shows a shopper a false price comparison; when in doubt, choose "unsure".
 
 ${list}
 
-Reply with strict JSON: {"verdicts": [{"v": "same" | "different" | "unsure", "why": "<at most 8 words>"}, ...]} with exactly ${rows.length} entries, in order.`;
+Reply with strict JSON: {"verdicts": [{"onlyA": ["..."], "onlyB": ["..."], "v": "same" | "different" | "unsure", "why": "<at most 8 words>"}, ...]} with exactly ${rows.length} entries, in order.`;
 
   let res;
   try {
@@ -84,11 +100,11 @@ Reply with strict JSON: {"verdicts": [{"v": "same" | "different" | "unsure", "wh
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0,
-        // Same settings as audit-mappings.mjs: gpt-oss reasons first, and a
-        // truncated thought is a hard 400 (json_validate_failed).
-        reasoning_effort: 'low',
+        // gpt-oss reasons first, and a truncated thought is a hard 400
+        // (json_validate_failed) — hence the generous completion budget.
+        reasoning_effort: effort,
         include_reasoning: false,
-        max_completion_tokens: 2048,
+        max_completion_tokens: 4096,
       }),
       signal: AbortSignal.timeout(60000),
     });
@@ -104,12 +120,17 @@ Reply with strict JSON: {"verdicts": [{"v": "same" | "different" | "unsure", "wh
     const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
     const v = parsed.verdicts;
     if (!Array.isArray(v) || v.length !== rows.length) return { error: `bad shape: ${JSON.stringify(v).slice(0, 100)}` };
+    const words = (w) => (Array.isArray(w) ? w.filter((s) => typeof s === 'string').join(', ') : '');
     return {
+      tokens: data.usage?.total_tokens ?? 0,
       verdicts: v.map((x) => {
         const verdict = typeof x === 'string' ? x : x?.v;
+        const why = typeof x?.why === 'string' ? x.why : '';
+        // The owner reviews hidden pairs from this text: keep the word diff.
+        const reason = `${why} [A: ${words(x?.onlyA) || '-'} | B: ${words(x?.onlyB) || '-'}]`.trim();
         return {
           verdict: VERDICTS.includes(verdict) ? verdict : 'unsure',
-          reason: typeof x?.why === 'string' ? x.why.slice(0, 160) : null,
+          reason: reason.slice(0, 300),
         };
       }),
     };
@@ -119,17 +140,18 @@ Reply with strict JSON: {"verdicts": [{"v": "same" | "different" | "unsure", "wh
 }
 
 // Judge rows in batches; onBatch(batch, verdicts) persists each one as it lands.
-// Returns { done, stopped? , fatal? }.
-async function judgeAll(apiKey, rows, onBatch) {
+// Returns { done, tokens, stopped?, fatal? } (tokens = Groq's own count).
+async function judgeAll(apiKey, rows, onBatch, effort = REASONING_EFFORT) {
   let consecutiveErrors = 0;
+  let tokens = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
-    const res = await judgeBatch(apiKey, batch);
+    const res = await judgeBatch(apiKey, batch, effort);
     if (res.error) {
       // A per-DAY 429 never clears inside this run: stop, resume next run.
       if (res.status === 429 && /per\s*day|\bTPD\b|\bRPD\b/i.test(res.error)) {
         console.log(`  Groq daily free-tier budget spent after ${i} pairs — stopping; the next run resumes.`);
-        return { done: i, stopped: 'daily-budget' };
+        return { done: i, tokens, stopped: 'daily-budget' };
       }
       if (res.status === 429) {
         console.log(`  batch ${i / BATCH + 1}: per-minute limit — backing off 60s`);
@@ -143,27 +165,37 @@ async function judgeAll(apiKey, rows, onBatch) {
       // answer for one batch (bad shape, json_validate_failed) might: skip it,
       // its pairs stay unjudged and are asked again next run.
       const softError = !res.status || /json_validate_failed|output_parse/i.test(res.error);
-      if (!softError || consecutiveErrors >= 3) return { done: i, fatal: res.error };
+      if (!softError || consecutiveErrors >= 3) return { done: i, tokens, fatal: res.error };
       await sleep(PACE_MS);
       continue;
     }
     consecutiveErrors = 0;
+    tokens += res.tokens;
     await onBatch(batch, res.verdicts);
     if ((i / BATCH) % 10 === 0) console.log(`  judged ${Math.min(i + BATCH, rows.length)}/${rows.length}`);
     if (i + BATCH < rows.length) await sleep(PACE_MS);
   }
-  return { done: rows.length };
+  return { done: rows.length, tokens };
 }
 
 // ── EVAL: the hand-labelled fixture ─────────────────────────────────────────
 
 async function runEval(apiKey) {
+  for (const effort of EVAL_EFFORTS) {
+    await evalOnce(apiKey, effort);
+    if (process.exitCode) return;
+  }
+}
+
+async function evalOnce(apiKey, effort) {
   const { pairs } = JSON.parse(readFileSync(EVAL_FILE, 'utf8'));
-  console.log(`EVAL: ${pairs.length} hand-labelled pairs, model ${MODEL}`);
+  console.log(`\n════ EVAL: ${pairs.length} hand-labelled pairs, model ${MODEL}, reasoning ${effort}`);
   const got = new Map();
+  const t0 = Date.now();
   const result = await judgeAll(apiKey, pairs, async (batch, verdicts) => {
     batch.forEach((p, j) => got.set(p.n, verdicts[j]));
-  });
+  }, effort);
+  console.log(`  took ${Math.round((Date.now() - t0) / 1000)} s, ${result.tokens} tokens (${Math.round(result.tokens / Math.max(1, result.done))} per pair)`);
 
   const table = {};
   for (const label of VERDICTS) table[label] = { same: 0, different: 0, unsure: 0, unjudged: 0 };
@@ -284,14 +316,15 @@ async function runLive(apiKey) {
   let result = { done: 0 };
   const ask = todo.slice(0, LIMIT);
   if (ask.length > 0) {
-    console.log(`   asking ${MODEL} about ${ask.length} pairs`);
+    console.log(`   asking ${MODEL} (reasoning ${REASONING_EFFORT}) about ${ask.length} pairs`);
     result = await judgeAll(apiKey, ask, async (batch, verdicts) => {
       await prisma.comparisonVerdict.createMany({
-        data: batch.map((p, j) => row(p, verdicts[j], MODEL)),
+        data: batch.map((p, j) => row(p, verdicts[j], `${MODEL} ${REASONING_EFFORT}`)),
         skipDuplicates: true,
       });
       batch.forEach((p, j) => existing.set(p.pairKey, verdicts[j].verdict));
     });
+    console.log(`   judged ${result.done} pairs, ${result.tokens} Groq tokens (${Math.round(result.tokens / Math.max(1, result.done))} per pair)`);
   }
 
   // Where every LIVE pair stands now — the number to watch before switching
