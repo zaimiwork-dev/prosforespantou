@@ -5,9 +5,41 @@ import {
   filterComparable,
   variantConflict,
   quantityConflict,
+  numberConflict,
   COMPARISON_SIMILARITY_FLOOR,
   foldHomoglyphs,
 } from './offer-similarity';
+
+// Real displayed comparisons from 2026-11-22.
+describe('numberConflict (each name has a number the other lacks)', () => {
+  it('rejects the five different products that were being compared', () => {
+    expect(numberConflict('Wella Koleston Βαφή Μαλλιών Νo66/46', 'Koleston Βαφή Μαλλιών Νο55/46 50ml')).toBe(true);
+    expect(numberConflict('Pampers Premium Care Νο2 (4-8kg.) Jumbo Pack 68τεμ.', 'Pampers Premium Care No 4 68τεμ')).toBe(true);
+    expect(numberConflict(
+      'GILLETTE Fusion5 Ξυριστική Μηχανή Proglide & 2 Ανταλλακτικές Κεφαλές',
+      'Gillette Fusion5 Ξυριστική Μηχανή Με Λαβή Βάση Στήριξης +5 Ανταλλακτικές Κεφαλές',
+    )).toBe(true);
+    expect(numberConflict('Vapona Εντομοαπωθητικό Υγρό για 90 Νύχτες Ανταλλακτικό 2x18ml', 'Vapona Εντομοαπωθητικό Υγρό 45 Νύχτες 18ml')).toBe(true);
+    expect(numberConflict('Sanitas Αρωματικές Σακούλες Απορριμμάτων Μικρές 46x56cm 30τεμ', 'SANITAS Σακούλες Απορριμμάτων Μικρές 46x50cm 25lt 30τεμ')).toBe(true);
+  });
+
+  it('keeps the same product written differently', () => {
+    expect(numberConflict('Koleston Βαφή Μαλλιών Νο 7/1 50ml', 'Wella Koleston Βαφή Μαλλιών Νo7/1')).toBe(false);
+    expect(numberConflict('Syoss Oleo Βαφή Ξανθό Σκούρο 6-10', 'Syoss Βαφή Μαλλιών Oleo Intense No6-10 Ξανθό Σκούρο')).toBe(false);
+    expect(numberConflict('K2r Colour Catcher Χρωμοπαγίδα 52Φύλλων', 'K2R Colour Catcher Χρωμοπαγίδα 52 φύλλα')).toBe(false);
+    expect(numberConflict('Dettol Πολυκαθαριστικό 24 Ώρες Ocean Fresh 460ml', 'DETTOL 24 Ώρες Αντιβακτηριδιακό Σπρέι Ocean Fresh 460ml')).toBe(false);
+    // one name just omits a number: not a conflict
+    expect(numberConflict('BIOTEN Glow Expert 4D Κρέμα Ημέρας Spf15 50ml', 'Bioten Κρέμα Ημέρας Glow Expert 4D 50ml')).toBe(false);
+    expect(numberConflict('Softex Classic Pure Χαρτί Υγείας 2 Φύλλων 8αρι 0,496kg', 'SOFTEX Classic Pure Χαρτί Υγείας 2 Φύλλων 8τεμ 496g')).toBe(false);
+    expect(numberConflict('Wet Hankies Υγρά Μαντηλάκια Orange 4x15', 'Wet Hankies Υγρά Μαντηλάκια Πορτοκάλι 4x15τεμ.')).toBe(false);
+  });
+
+  it('is part of filterComparable, so the sheet and the nightly count agree', () => {
+    const rows = [{ n: 'Pampers Premium Care No 4 68τεμ', c: 'mymarket' }, { n: 'Pampers Premium Care Νο2 68τεμ', c: 'sklavenitis' }];
+    const kept = filterComparable('Pampers Premium Care Νο2 (4-8kg.) Jumbo Pack 68τεμ.', rows, (r) => r.n, (r) => r.c);
+    expect(kept.map((r) => r.c)).toEqual(['sklavenitis']);
+  });
+});
 
 describe('variantConflict (flavour/fat/type guard)', () => {
   it('blocks product-type variants that shared one family before 2026-08-23', () => {

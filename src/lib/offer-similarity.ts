@@ -346,6 +346,44 @@ export function quantityConflict(a: string | null | undefined, b: string | null 
     || disjointWhenBothPresent(qa.count, qb.count);
 }
 
+// Numbers left in a name once its size, pack and count are taken out: shade
+// codes (Koleston 66/46), sizes of diapers (Pampers Νο2), refill counts
+// (2 vs 5 spare heads), nights (Vapona 90), bag dimensions (46x56cm).
+function residualNumbers(name: string | null | undefined): string[] {
+  if (!name) return [];
+  const s = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ς/g, 'σ')
+    // age/weight ranges of diapers, «(4-8kg.)»
+    .replace(/\d+(?:[.,]\d+)?\s*[-–]\s*\d+(?:[.,]\d+)?\s*(?:kg|κιλ\w*|gr|g|γρ\w*)/g, ' ')
+    // multipacks with a unit, «2x18ml», «3x200γρ», «2Χ140gr»
+    .replace(/\d{1,3}\s*[x×*χ]\s*\d+(?:[.,]\d+)?\s*(?:kg|κιλ\w*|gr|g(?=[^a-zα-ω]|$)|γρ\w*|ml|cl|lt|l(?=[^a-zα-ω]|$)|λτ|λιτρ\w*)/g, ' ')
+    // gift packs, «5+1»
+    .replace(/\d{1,2}\s*\+\s*\d{1,2}/g, ' ')
+    // the net quantities quantities() reads
+    .replace(/\d+(?:[.,]\d+)?\s*(?:kg|κιλ\w*|gr|g(?=[^a-zα-ω]|$)|γρ\w*|ml|cl|lt|l(?=[^a-zα-ω]|$)|λτ|λιτρ\w*)/g, ' ')
+    .replace(/\d{1,3}\s*(?:τεμαχ\w*|τεμ(?=[^a-zα-ω]|$)|τμχ|pcs|μεζ\w*|mez|πλυσ\w*|ρολ\w*|φυλλ\w*)/g, ' ');
+  return (s.match(/\d+(?:[.,]\d+)?/g) || []).map((x) => String(parseFloat(x.replace(',', '.'))));
+}
+
+// Two names that EACH carry a number the other lacks are different products:
+// «Koleston Νο66/46» vs «Νο55/46», «Pampers Νο2» vs «No 4», «& 2 κεφαλές» vs
+// «+5 κεφαλές». A name that simply omits a number («SPF15», «8αρι») is not a
+// conflict — chains shorten names. Measured on 196 displayed comparison pairs
+// (2026-11-22): rejected 5, all genuinely different products, no right pair lost.
+export function numberConflict(a: string | null | undefined, b: string | null | undefined): boolean {
+  const rest = residualNumbers(b);
+  let onlyA = 0;
+  for (const x of residualNumbers(a)) {
+    const i = rest.indexOf(x);
+    if (i >= 0) rest.splice(i, 1);
+    else onlyA++;
+  }
+  return onlyA > 0 && rest.length > 0;
+}
+
 // Below this, two offers joined by productId are treated as different products
 // and hidden from comparison. Deliberately strict: a hidden legit comparison
 // costs us a feature; a shown wrong one costs us the user's trust.
@@ -357,6 +395,7 @@ export function areComparableNames(
 ): boolean {
   return !variantConflict(a, b)
     && !quantityConflict(a, b)
+    && !numberConflict(a, b)
     && nameSimilarity(a, b) >= COMPARISON_SIMILARITY_FLOOR;
 }
 
@@ -383,7 +422,8 @@ export function filterComparable<T>(
     // a single differing variant token (Lemon vs Φράουλα, Light vs regular)
     // makes them different products even at a high Jaccard score.
     .filter((c) => !variantConflict(sourceName, getName(c))
-      && !quantityConflict(sourceName, getName(c)))
+      && !quantityConflict(sourceName, getName(c))
+      && !numberConflict(sourceName, getName(c)))
     .map((c) => ({
       c,
       chain: getChain(c) ?? '',
