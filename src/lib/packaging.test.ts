@@ -54,6 +54,40 @@ describe('statedPieces', () => {
   it('ignores a count glued to a word', () => {
     expect(statedPieces('Κρέμα SPF50 Αντηλιακό')).toBeNull();
   });
+
+  // 2026-11-22: the AI comparison check found Ariel Pods «21 κάψουλες» shown
+  // as the same item as «40 Μεζ.» — dose words were not read at all.
+  it('reads doses, capsules and tablets as pieces, in either script', () => {
+    expect(statedPieces('ARIEL Pods Big One Απορρυπαντικό Alpine 21 κάψουλες')).toBe(21);
+    expect(statedPieces('Ariel Big One Κάψουλες Alpine 40 Μεζ.')).toBe(40);
+    expect(statedPieces('Ariel Υγρό Απορρυπαντικό Alpine 60Mεζ')).toBe(60);
+    expect(statedPieces('Ariel Υγρό Απορρυπαντικό Alpine 80mez. 3,6lt.')).toBe(80);
+    expect(statedPieces('OMO Σκόνη Τροπικά Λουλούδια 65 πλύσεις')).toBe(65);
+    expect(statedPieces('Finish Quantum 60 tabs')).toBe(60);
+    expect(statedPieces('Softex Silk Χαρτί Υγείας 3 φύλλων 8άρι 0,760kg')).toBe(8);
+  });
+
+  it('adds a bonus written as N+M doses', () => {
+    expect(statedPieces('Skip Υγρό 60+20 μεζ.')).toBe(80);
+  });
+
+  it('does not read a word that only starts like a unit', () => {
+    expect(statedPieces('Μεζεδάκια 2 μεζεδάκια')).toBeNull();
+    expect(statedPieces('Παιχνίδι 3 αριθμοί')).toBeNull();
+  });
+});
+
+describe('samePack with dose counts', () => {
+  it('keeps the same dose count apart from how it is written', () => {
+    expect(samePack('ARIEL Pods Big One Alpine 21 κάψουλες', 'Ariel Big One Κάψουλες Alpine 21Mεζ')).toBe(true);
+    expect(samePack('OMO Σκόνη 65 πλύσεις', 'Omo Σκόνη 65μεζ 3,64kg')).toBe(true);
+    expect(samePack('Softex Silk 8τεμ 760g', 'Softex Silk 8άρι 0,760kg')).toBe(true);
+  });
+
+  it('refuses a different dose count', () => {
+    expect(samePack('ARIEL Pods Big One Alpine 21 κάψουλες', 'Ariel Big One Κάψουλες Alpine 40 Μεζ.')).toBe(false);
+    expect(samePack('Ariel Υγρό Alpine 60Mεζ', 'Ariel Υγρό Alpine 80mez. 3,6lt.')).toBe(false);
+  });
 });
 
 describe('samePack with stated pieces', () => {

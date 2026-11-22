@@ -40,8 +40,17 @@ export function packCount(name: string | null | undefined): number {
 // one Product, priced 8.99€ and 17.98€, rendering as each other's rival.
 // (pack-info.ts parses the same tokens for the €/τεμ. line; this stays
 // self-contained so .mjs scripts can import packaging.ts on its own.)
-const PIECES_MULTI_RE = /(\d{1,3})\s*[x*×χ]\s*(\d{1,3})\s*(?:τεμαχια|τεμ\.?|τμχ|ρολα|ρολοι|ρολ\.?|pcs)(?![α-ωa-z])/;
-const PIECES_RE = /(\d{1,3})\s*(?:τεμαχια|τεμ\.?|τμχ|ρολα|ρολοι|ρολ\.?|pcs)(?![α-ωa-z])/;
+//
+// Doses count as pieces (2026-11-22): «21 κάψουλες», «21Mεζ», «65 πλύσεις»,
+// «60 tabs» all state how many washes the pack holds, and the AI comparison
+// check found Ariel Pods «21 κάψουλες» shown as the same item as «40 Μεζ.»
+// and «29μεζ» because none of those words were read. «8άρι» is 8 pieces.
+// Chains type «μεζ» with a Latin M or e («Mεζ», «mez»), hence [μm][εe][ζz].
+const PIECE_UNIT = String.raw`(?:τεμαχια|τεμ\.?|τμχ|ρολα|ρολοι|ρολ\.?|pcs|καψουλες|καψ\.?|caps|tabs|ταμπλετες|[μm][εe][ζz](?:ουρες)?\.?|πλυσεις|αρι)`;
+const PIECES_MULTI_RE = new RegExp(String.raw`(\d{1,3})\s*[x*×χ]\s*(\d{1,3})\s*${PIECE_UNIT}(?![α-ωa-z])`);
+// «60+20 μεζ» = 80: the bonus is part of the pack.
+const PIECES_PLUS_RE = new RegExp(String.raw`(?<![a-zα-ω0-9])(\d{1,3})\s*\+\s*(\d{1,3})\s*${PIECE_UNIT}(?![α-ωa-z])`);
+const PIECES_RE = new RegExp(String.raw`(\d{1,3})\s*${PIECE_UNIT}(?![α-ωa-z])`);
 
 export function statedPieces(name: string | null | undefined): number | null {
   if (!name) return null;
@@ -49,6 +58,11 @@ export function statedPieces(name: string | null | undefined): number | null {
   const multi = n.match(PIECES_MULTI_RE);
   if (multi) {
     const total = parseInt(multi[1], 10) * parseInt(multi[2], 10);
+    if (total >= 2 && total <= 500) return total;
+  }
+  const plus = n.match(PIECES_PLUS_RE);
+  if (plus) {
+    const total = parseInt(plus[1], 10) + parseInt(plus[2], 10);
     if (total >= 2 && total <= 500) return total;
   }
   const one = n.match(PIECES_RE);
