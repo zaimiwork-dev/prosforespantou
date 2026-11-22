@@ -62,6 +62,31 @@ export function verdictAllows(verdict: Verdict | null | undefined, mode: Verdict
 
 export type VerdictLookup = (key: string) => Verdict | undefined;
 
+// Models whose verdict no automatic judge may change.
+const FINAL_MODELS = new Set(['owner', 'barcode']);
+
+/**
+ * A second judge's verdict on a pair that may already have one (verdicts
+ * imported from an outside judge — e.g. a Claude agent clearing the backlog).
+ * Returns the verdict to store, or null to leave the row alone.
+ *   - owner / barcode rows are final;
+ *   - «different» stays different (any judge seeing a conflict is enough);
+ *   - «same» needs both judges: a second opinion of different/unsure wins;
+ *   - «unsure» is replaced only when `replaceUnsure` (a judge measured better).
+ */
+export function mergeVerdict(
+  existing: { verdict: string; model: string } | undefined,
+  incoming: Verdict,
+  { replaceUnsure = false }: { replaceUnsure?: boolean } = {},
+): Verdict | null {
+  if (!existing) return incoming;
+  if (FINAL_MODELS.has(existing.model)) return null;
+  if (existing.verdict === 'different') return null;
+  if (existing.verdict === 'same') return incoming === 'same' ? null : incoming;
+  if (existing.verdict === 'unsure') return replaceUnsure && incoming !== 'unsure' ? incoming : null;
+  return null;
+}
+
 /**
  * Keep the candidates the verdicts allow next to `source`. A row from the
  * source's own chain (its web + leaflet copy of the same offer) is not a

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterByVerdict, loadVerdictLookup, pairKey, verdictAllows, type Verdict } from './comparison-verdict';
+import { filterByVerdict, loadVerdictLookup, mergeVerdict, pairKey, verdictAllows, type Verdict } from './comparison-verdict';
 
 describe('pairKey', () => {
   it('is the same whichever side comes first', () => {
@@ -55,6 +55,32 @@ describe('filterByVerdict', () => {
     const src = { name: 'Lurpak Βούτυρο 225g', chain: 'ab' };
     const rows = [{ n: 'Lurpak Βούτυρο 225g', c: 'ab' }];
     expect(filterByVerdict(src, rows, (r) => r.n, (r) => r.c, () => undefined, 'require-same')).toEqual(rows);
+  });
+});
+
+describe('mergeVerdict', () => {
+  const groq = (verdict: string) => ({ verdict, model: 'openai/gpt-oss-120b low' });
+
+  it('takes the verdict of a pair nobody judged yet', () => {
+    expect(mergeVerdict(undefined, 'same')).toBe('same');
+  });
+
+  it('never touches an owner or barcode verdict', () => {
+    expect(mergeVerdict({ verdict: 'same', model: 'owner' }, 'different')).toBeNull();
+    expect(mergeVerdict({ verdict: 'same', model: 'barcode' }, 'unsure')).toBeNull();
+  });
+
+  it('keeps «different», and lets a second opinion pull «same» down', () => {
+    expect(mergeVerdict(groq('different'), 'same')).toBeNull();
+    expect(mergeVerdict(groq('same'), 'same')).toBeNull();
+    expect(mergeVerdict(groq('same'), 'different')).toBe('different');
+    expect(mergeVerdict(groq('same'), 'unsure')).toBe('unsure');
+  });
+
+  it('replaces «unsure» only when asked to', () => {
+    expect(mergeVerdict(groq('unsure'), 'same')).toBeNull();
+    expect(mergeVerdict(groq('unsure'), 'same', { replaceUnsure: true })).toBe('same');
+    expect(mergeVerdict(groq('unsure'), 'unsure', { replaceUnsure: true })).toBeNull();
   });
 });
 

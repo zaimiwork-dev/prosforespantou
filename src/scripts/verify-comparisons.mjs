@@ -28,15 +28,27 @@
 // correct pairs kept, 4 of 12 «unsure»-labelled pairs judged «same».
 // A daily-budget stop exits 0: the next run resumes where this one stopped.
 //
+// Outside judge (works locally — no Groq): when a backlog is too big for the
+// free tier, hand the pairs to another judge and import its verdicts.
+//   EXPORT_FILE=pairs.json EXPORT_SCOPE=new,unsure,same node src/scripts/verify-comparisons.mjs
+//   (judge pairs.json by src/scripts/comparison-judge-rules.md → out.json:
+//    [{id, onlyA, onlyB, v, why}])
+//   DRY_RUN=1 IMPORT_FILE=out.json IMPORT_MODEL=<name> REPLACE_UNSURE=1 node …  # report only
+//   IMPORT_FILE=out.json IMPORT_MODEL=<name> REPLACE_UNSURE=1 node …            # write
+// 11-22: Claude Sonnet agents judged the fixture by those rules at 0 of 6
+// wrong shown, 48 of 63 kept, 0 of 12 «unsure» shown and no correct pair
+// called «different» (Groq: 7) — so it may replace Groq's «unsure»; a Groq
+// «same» it disagrees with is pulled down (mergeVerdict).
+//
 // dotenv first (ESM hoist trap).
 import 'dotenv/config';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { samePack } from '../lib/packaging.ts';
 import { areComparableNames } from '../lib/offer-similarity.ts';
-import { pairKey } from '../lib/comparison-verdict.ts';
+import { mergeVerdict, pairKey } from '../lib/comparison-verdict.ts';
 import { RETIRED_SUPERMARKET_IDS } from '../lib/constants.js';
 
 const EVAL = process.env.EVAL === '1';
@@ -49,6 +61,12 @@ const REASONING_EFFORT = process.env.REASONING_EFFORT || 'low';
 // EVAL only: score each of these efforts on the fixture, one after the other.
 const EVAL_EFFORTS = (process.env.EVAL_EFFORTS || 'low').split(',').map((s) => s.trim()).filter(Boolean);
 const EVAL_FILE = process.env.EVAL_FILE || 'src/scripts/fixtures/comparison-eval-pairs.json';
+const EXPORT_FILE = process.env.EXPORT_FILE || '';
+const EXPORT_SCOPE = (process.env.EXPORT_SCOPE || 'new').split(',').map((s) => s.trim()).filter(Boolean);
+const IMPORT_FILE = process.env.IMPORT_FILE || '';
+const IMPORT_MODEL = process.env.IMPORT_MODEL || '';
+const REPLACE_UNSURE = process.env.REPLACE_UNSURE === '1';
+const FINAL_MODELS = new Set(['owner', 'barcode']);
 const VERDICTS = ['same', 'different', 'unsure'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -294,9 +312,9 @@ async function runLive(apiKey) {
   const { default: prisma } = await import('../lib/prisma.ts');
   const now = new Date();
   const { activeCount, pairs } = await livePairs(prisma, now);
-  const existing = new Map(
-    (await prisma.comparisonVerdict.findMany({ select: { pairKey: true, verdict: true } })).map((r) => [r.pairKey, r.verdict])
-  );
+  const existingRows = await prisma.comparisonVerdict.findMany({ select: { pairKey: true, verdict: true, model: true } });
+  const existing = new Map(existingRows.map((r) => [r.pairKey, r.verdict]));
+  const existingFull = new Map(existingRows.map((r) => [r.pairKey, r]));
   const fresh = [...pairs.values()].filter((p) => !existing.has(p.pairKey));
   const proven = fresh.filter((p) => p.proven);
   const todo = fresh.filter((p) => !p.proven).sort((a, b) => b.priority - a.priority);
@@ -307,8 +325,66 @@ async function runLive(apiKey) {
     pairKey: p.pairKey, chainA: p.chainA, nameA: p.nameA, chainB: p.chainB, nameB: p.nameB,
     verdict: v.verdict, reason: v.reason, model,
   });
+  // ── Outside judge: hand the pairs out as a file, take verdicts back ──────
+  // EXPORT_FILE=x.json [EXPORT_SCOPE=new,unsure,same] writes [{id, nameA, nameB}]
+  // (id = pairKey), most visible first. IMPORT_FILE=x.json IMPORT_MODEL=name
+  // reads [{id, v, why, onlyA, onlyB}] back and stores it through
+  // mergeVerdict (lib/comparison-verdict): owner/barcode rows are final,
+  // «different» stays, a «same» needs the second judge to agree, and «unsure»
+  // is replaced only with REPLACE_UNSURE=1. With DRY_RUN=1 the import only
+  // reports what it would change.
+  if (EXPORT_FILE) {
+    const scopes = new Set(EXPORT_SCOPE);
+    const pick = [...pairs.values()].filter((p) => {
+      const e = existingFull.get(p.pairKey);
+      if (!e) return scopes.has('new') && !p.proven;
+      return !FINAL_MODELS.has(e.model) && scopes.has(e.verdict);
+    }).sort((a, b) => b.priority - a.priority);
+    writeFileSync(EXPORT_FILE, JSON.stringify(pick.map((p) => ({ id: p.pairKey, nameA: p.nameA, nameB: p.nameB })), null, 1));
+    console.log(`   exported ${pick.length} pairs (${[...scopes].join(', ')}) to ${EXPORT_FILE}`);
+    await prisma.$disconnect();
+    return;
+  }
+
+  if (IMPORT_FILE) {
+    if (!IMPORT_MODEL) throw new Error('IMPORT_MODEL is required with IMPORT_FILE');
+    const incoming = JSON.parse(readFileSync(IMPORT_FILE, 'utf8'));
+    const counts = { created: 0, updated: 0, unchanged: 0, notLive: 0 };
+    const changes = [];
+    const creates = [];
+    for (const r of incoming) {
+      const p = pairs.get(r.id);
+      if (!p) { counts.notLive++; continue; }
+      const v = VERDICTS.includes(r.v) ? r.v : 'unsure';
+      const words = (w) => (Array.isArray(w) ? w.filter((s) => typeof s === 'string').join(', ') : '');
+      const reason = `${typeof r.why === 'string' ? r.why : ''} [A: ${words(r.onlyA) || '-'} | B: ${words(r.onlyB) || '-'}]`.trim().slice(0, 300);
+      const before = existingFull.get(r.id);
+      const next = mergeVerdict(before, v, { replaceUnsure: REPLACE_UNSURE });
+      if (next === null) { counts.unchanged++; continue; }
+      if (!before) {
+        creates.push(row(p, { verdict: next, reason }, IMPORT_MODEL));
+        counts.created++;
+      } else {
+        changes.push({ p, before, next, reason });
+        counts.updated++;
+      }
+      existing.set(r.id, next);
+    }
+    console.log(`   import from ${IMPORT_FILE} as «${IMPORT_MODEL}»${DRY_RUN ? ' — DRY_RUN, nothing written' : ''}: ${JSON.stringify(counts)}`);
+    for (const c of changes) console.log(`   ${c.before.verdict} → ${c.next}: ${c.p.chainA}: ${c.p.nameA}  <>  ${c.p.chainB}: ${c.p.nameB}`);
+    if (!DRY_RUN) {
+      for (const batch of chunk(creates, 500)) await prisma.comparisonVerdict.createMany({ data: batch, skipDuplicates: true });
+      for (const c of changes) {
+        await prisma.comparisonVerdict.update({
+          where: { pairKey: c.p.pairKey },
+          data: { verdict: c.next, model: IMPORT_MODEL, reason: `${c.reason} · was ${c.before.verdict} (${c.before.model})`.slice(0, 400) },
+        });
+      }
+    }
+  }
+
   if (DRY_RUN) {
-    for (const p of todo.slice(0, 10)) console.log(`   next: ${p.chainA}: ${p.nameA}  <>  ${p.chainB}: ${p.nameB}`);
+    if (!IMPORT_FILE) for (const p of todo.slice(0, 10)) console.log(`   next: ${p.chainA}: ${p.nameA}  <>  ${p.chainB}: ${p.nameB}`);
     await prisma.$disconnect();
     return;
   }
@@ -322,7 +398,7 @@ async function runLive(apiKey) {
   }
 
   let result = { done: 0 };
-  const ask = todo.slice(0, LIMIT);
+  const ask = IMPORT_FILE ? [] : todo.slice(0, LIMIT);
   if (ask.length > 0) {
     console.log(`   asking ${MODEL} (reasoning ${REASONING_EFFORT}) about ${ask.length} pairs`);
     result = await judgeAll(apiKey, ask, async (batch, verdicts) => {
@@ -354,5 +430,5 @@ async function runLive(apiKey) {
 }
 
 const apiKey = process.env.GROQ_API_KEY;
-if (!DRY_RUN && !apiKey) { console.error('❌ GROQ_API_KEY not set'); process.exit(1); }
+if (!DRY_RUN && !EXPORT_FILE && !IMPORT_FILE && !apiKey) { console.error('❌ GROQ_API_KEY not set'); process.exit(1); }
 (EVAL ? runEval(apiKey) : runLive(apiKey)).catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
