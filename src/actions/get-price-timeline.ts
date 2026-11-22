@@ -17,6 +17,7 @@ const EMPTY: PriceTimeline = {
   promos: [],
   stats: {
     shelfNow: null,
+    shelfUsual: null,
     shelfFirst: null,
     shelfChangePct: null,
     shelfChanges: 0,

@@ -15,6 +15,8 @@
 // Pure + strip-safe (no enums/namespaces; no prisma; `now` is injectable) so
 // node scripts can import it and the app can import its types.
 
+import { usualShelfPrice } from './baseline-price.ts';
+
 export type TimelineSnapshot = {
   price: number;
   kind: string | null;
@@ -70,6 +72,10 @@ export type PriceTimeline = {
   }[];
   stats: {
     shelfNow: number | null;
+    // The price this chain usually charges (lib/baseline-price usualShelfPrice):
+    // what «Κανονική τιμή» and the card's «κανονικά ~X €» both say. Optional
+    // for older clients; shelfNow stays the latest step on the chart.
+    shelfUsual: number | null;
     shelfFirst: number | null;
     shelfChangePct: number | null;
     shelfChanges: number;
@@ -220,6 +226,9 @@ export function buildPriceTimeline(input: TimelineInput): PriceTimeline {
 
   // ---- Stats ----
   const shelfNow = shelf.length ? shelf[shelf.length - 1].price : null;
+  const shelfUsual = normals.length
+    ? usualShelfPrice(normals.map((n) => ({ supermarket: null, price: n.price, recordedAt: new Date(n.at) })), new Date(nowMs))
+    : null;
   const shelfFirst = shelf.length ? shelf[0].price : null;
   const distinctShelf = new Set(shelf.map((s) => s.price.toFixed(2))).size;
   const shelfChangePct =
@@ -268,6 +277,7 @@ export function buildPriceTimeline(input: TimelineInput): PriceTimeline {
     promos,
     stats: {
       shelfNow,
+      shelfUsual,
       shelfFirst,
       shelfChangePct,
       shelfChanges: Math.max(0, shelf.length - 1),

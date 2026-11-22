@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeBaseline, shelfPriceFor, isMonoOffer, baselineForCard, BASELINE_MAX_RATIO } from './baseline-price';
+import { computeBaseline, shelfPriceFor, usualShelfPrice, isMonoOffer, baselineForCard, BASELINE_MAX_RATIO } from './baseline-price';
 
 const now = new Date('2026-09-16T12:00:00Z');
 const daysAgo = (n: number) => new Date(now.getTime() - n * 86400000).toISOString();
@@ -30,10 +30,54 @@ describe('shelfPriceFor', () => {
     expect(shelfPriceFor({ supermarket: 'ab', normalSnapshots: snaps, freshChains: fresh, now })?.price).toBe(2.1);
   });
 
+  // Owner 2026-11-22: «κανονικά» is the price the product usually has.
+  it('ignores a shelf price raised just before a promotion (not the highest)', () => {
+    const snaps = [
+      { supermarket: 'ab', price: 5.86, recordedAt: daysAgo(120) },
+      { supermarket: 'ab', price: 9.3, recordedAt: daysAgo(21) }, // raised 3 weeks ago
+    ];
+    expect(shelfPriceFor({ supermarket: 'ab', normalSnapshots: snaps, freshChains: fresh, now })?.price).toBe(5.86);
+  });
+
+  it('ignores a promo price the catalogue reported as the shelf price (not the lowest)', () => {
+    const snaps = [
+      { supermarket: 'ab', price: 8.68, recordedAt: daysAgo(150) },
+      { supermarket: 'ab', price: 5.21, recordedAt: daysAgo(20) },
+    ];
+    expect(shelfPriceFor({ supermarket: 'ab', normalSnapshots: snaps, freshChains: fresh, now })?.price).toBe(8.68);
+  });
+
+  it('accepts a price change that has held 30 days as the new normal', () => {
+    const snaps = [
+      { supermarket: 'ab', price: 2.0, recordedAt: daysAgo(170) },
+      { supermarket: 'ab', price: 2.4, recordedAt: daysAgo(30) },
+    ];
+    expect(shelfPriceFor({ supermarket: 'ab', normalSnapshots: snaps, freshChains: fresh, now })?.price).toBe(2.4);
+  });
+
   it('returns null when the chain’s feed is not alive, or the chain is unknown', () => {
     const snaps = [{ supermarket: 'masoutis', price: 2.1, recordedAt: daysAgo(5) }];
     expect(shelfPriceFor({ supermarket: 'masoutis', normalSnapshots: snaps, freshChains: fresh, now })).toBeNull();
     expect(shelfPriceFor({ supermarket: null, normalSnapshots: snaps, freshChains: fresh, now })).toBeNull();
+  });
+});
+
+describe('usualShelfPrice', () => {
+  const at = (price: number, days: number) => ({ supermarket: 'ab', price, recordedAt: daysAgo(days) });
+
+  it('picks the price held the most days in the last 90, counting the price in force when the window opens', () => {
+    // 3.00 from day 200 → holds days 90..25 inside the window (65 days); 3.50 for the last 25
+    expect(usualShelfPrice([at(3.0, 200), at(3.5, 25)], now)).toBe(3.0);
+  });
+
+  it('gives a tie to the more recent price', () => {
+    expect(usualShelfPrice([at(1.0, 20), at(2.0, 10)], now)).toBe(2.0);
+  });
+
+  it('ignores bad readings and returns null without any', () => {
+    expect(usualShelfPrice([], now)).toBeNull();
+    expect(usualShelfPrice([{ supermarket: 'ab', price: 0, recordedAt: daysAgo(5) }], now)).toBeNull();
+    expect(usualShelfPrice([at(4.2, 5), { supermarket: 'ab', price: Number.NaN, recordedAt: daysAgo(3) }], now)).toBe(4.2);
   });
 });
 

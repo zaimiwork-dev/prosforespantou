@@ -29,7 +29,7 @@ function tl(over: Partial<PriceTimeline> = {}, stats: Partial<PriceTimeline['sta
     ],
     promos: [{ at: iso(20), until: null, price: 1.6, kind: 'mono', ongoing: false }],
     stats: {
-      shelfNow: 2.2, shelfFirst: 2, shelfChangePct: 10, shelfChanges: 1, lowest: { price: 1.6, at: iso(20) },
+      shelfNow: 2.2, shelfUsual: 2.2, shelfFirst: 2, shelfChangePct: 10, shelfChanges: 1, lowest: { price: 1.6, at: iso(20) },
       highest: { price: 2.2, at: iso(60) }, promoCount: 1, currentPrice: 1.6, currentIsLowest: false, suspect: false, ...stats,
     },
     quality: 'ok',
@@ -166,5 +166,12 @@ describe('factsFor dates each fact from its own first observation', () => {
   it('says nothing about a shelf change when no shelf step exists', () => {
     const t = tl({ shelf: [] }, { shelfChangePct: 4.8 });
     expect(factsFor(t, fmt, NOW).map((x) => x.id)).not.toContain('change');
+  });
+});
+
+describe('«Κανονική τιμή» in the summary (owner 2026-11-22: the usual price)', () => {
+  it('says the usual price, not the latest shelf step, when the server sends it', () => {
+    const facts = factsFor(tl({}, { shelfNow: 9.3, shelfUsual: 5.86 }), fmt, NOW);
+    expect(facts.map((f) => f.text)).toContain('Κανονική τιμή: 5,86 €');
   });
 });

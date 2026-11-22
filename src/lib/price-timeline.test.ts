@@ -10,9 +10,34 @@ const build = (i: Partial<TimelineInput>) =>
 describe('real exported cases (2026-11-11, full output)', () => {
   for (const f of fixtures as Array<{ label: string; now: string; input: TimelineInput; expected: unknown }>) {
     it(f.label, () => {
-      expect(buildPriceTimeline({ ...f.input, now: new Date(f.now) })).toEqual(f.expected);
+      // shelfUsual (2026-11-22) came after these cases were exported: every
+      // other field must still match exactly; shelfUsual is checked on its own.
+      const { stats, ...rest } = buildPriceTimeline({ ...f.input, now: new Date(f.now) });
+      const { shelfUsual, ...otherStats } = stats;
+      expect({ ...rest, stats: otherStats }).toEqual(f.expected);
+      const hasShelf = f.input.snapshots.some((s) => s.kind === 'normal');
+      if (hasShelf) expect(shelfUsual).toBeGreaterThan(0);
+      else expect(shelfUsual).toBeNull();
     });
   }
+});
+
+describe('usual shelf price (owner 2026-11-22: «κανονική τιμή» = the price it usually has)', () => {
+  it('keeps the long-held price when the shelf price was raised just before an offer', () => {
+    const t = build({
+      snapshots: [
+        { price: 5.86, kind: 'normal', recordedAt: daysAgo(120) },
+        { price: 9.3, kind: 'normal', recordedAt: daysAgo(21) },
+      ],
+    });
+    expect(t.stats.shelfNow).toBe(9.3); // the chart still shows the real latest step
+    expect(t.stats.shelfUsual).toBe(5.86); // the summary says what it usually costs
+  });
+
+  it('is null without shelf readings', () => {
+    const t = build({ snapshots: [{ price: 1.5, kind: 'mono', recordedAt: daysAgo(3) }] });
+    expect(t.stats.shelfUsual).toBeNull();
+  });
 });
 
 describe('shelf steps', () => {

@@ -157,7 +157,10 @@ export function factsFor(t: PriceTimeline, fmt: PriceFmt, now: number = Date.now
   if (s.lowest && !s.currentIsLowest) {
     out.push({ id: 'lowest', text: `Χαμηλότερη που έχουμε δει: ${fmt(s.lowest.price)} (${formatDay(s.lowest.at, now)})` });
   }
-  if (s.shelfNow != null) out.push({ id: 'shelfNow', text: `Κανονική τιμή: ${fmt(s.shelfNow)}` });
+  // The price it USUALLY costs (owner 2026-11-22), same number as the card's
+  // «κανονικά»; older API responses without shelfUsual fall back to the latest step.
+  const normal = s.shelfUsual ?? s.shelfNow;
+  if (normal != null) out.push({ id: 'shelfNow', text: `Κανονική τιμή: ${fmt(normal)}` });
   const promoSince = t.promos[0]?.at;
   if (s.promoCount >= 2 && promoSince) {
     out.push({ id: 'promos', text: `Σε προσφορά ${s.promoCount} φορές από ${formatMonthFrom(promoSince, now)}` });

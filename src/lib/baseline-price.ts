@@ -41,8 +41,52 @@ export function isMonoOffer(o: { offerType?: string | null; originalPrice?: numb
   return o.originalPrice == null;
 }
 
-// The chain's current shelf price for a product, or null. `normalSnapshots`
-// must already be kind='normal' for that product (any chain; filtered here).
+// ── «κανονικά» = the price the product USUALLY has (owner, 2026-11-22) ──────
+// Not the lowest, not the highest: the price this chain charged for most of the
+// last 90 days. Measured on 1,311 live ΜΟΝΟ offers (2026-11-22): the latest
+// shelf reading — the rule until then — differed from that usual price by 5%+
+// for ~6%, both ways: a wine whose shelf price was raised 5,86 → 9,30 three
+// weeks before a 5,58 offer read «κανονικά 9,30» (a 40% saving nobody gets),
+// and chains whose catalogue reports the promo price as the shelf price lost
+// the real normal price. A price that has itself held NEW_NORMAL_DAYS is a
+// genuine price change and becomes the usual price — the reason the earlier
+// 90-day MEDIAN was rejected (it lagged every real price rise, see above).
+export const USUAL_PRICE_WINDOW_DAYS = 90;
+export const NEW_NORMAL_DAYS = 30;
+
+/**
+ * The price that held the most days in the last USUAL_PRICE_WINDOW_DAYS, from
+ * one chain's `normal` snapshots of one product (each price holds until the
+ * next reading; the reading in force when the window opens counts from the
+ * window start). A latest price that has held NEW_NORMAL_DAYS wins outright.
+ * Ties go to the more recent price. Null when there are no usable readings.
+ */
+export function usualShelfPrice(snapshots: ShelfSnapshotInput[], now: Date = new Date()): number | null {
+  const DAY = 86400000;
+  const rows = snapshots
+    .map((s) => ({ price: s.price, at: new Date(s.recordedAt).getTime() }))
+    .filter((s) => typeof s.price === 'number' && Number.isFinite(s.price) && s.price > 0 && Number.isFinite(s.at) && s.at <= now.getTime())
+    .sort((a, b) => a.at - b.at);
+  if (rows.length === 0) return null;
+  const latest = rows[rows.length - 1];
+  if (now.getTime() - latest.at >= NEW_NORMAL_DAYS * DAY) return latest.price;
+  const start = now.getTime() - USUAL_PRICE_WINDOW_DAYS * DAY;
+  const held = new Map<number, number>();
+  const lastSeen = new Map<number, number>();
+  rows.forEach((s, i) => {
+    lastSeen.set(s.price, s.at);
+    const end = i + 1 < rows.length ? rows[i + 1].at : now.getTime();
+    const from = Math.max(s.at, start);
+    if (end > from) held.set(s.price, (held.get(s.price) ?? 0) + (end - from));
+  });
+  if (held.size === 0) return latest.price;
+  return [...held.entries()].sort((a, b) => b[1] - a[1] || (lastSeen.get(b[0]) ?? 0) - (lastSeen.get(a[0]) ?? 0))[0][0];
+}
+
+// The chain's normal shelf price for a product, or null: its usual price
+// (usualShelfPrice), dated by the feed run that last confirmed the catalogue,
+// and only while that feed is alive. `normalSnapshots` must already be
+// kind='normal' for that product (any chain; filtered here).
 export function shelfPriceFor({
   supermarket,
   normalSnapshots,
@@ -57,7 +101,8 @@ export function shelfPriceFor({
   if (!supermarket) return null;
   const own = normalSnapshots.filter((s) => s.supermarket === supermarket);
   const row = pickShelfRows({ snapshots: own, excludedChains: [], freshChains, now })[0];
-  return row ? { price: row.price, checkedAt: row.checkedAt } : null;
+  if (!row) return null;
+  return { price: usualShelfPrice(own, now) ?? row.price, checkedAt: row.checkedAt };
 }
 
 // A «ΜΟΝΟ» price the chain has been charging for MONTHS is the standing price,
