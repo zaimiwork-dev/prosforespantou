@@ -18,6 +18,7 @@ import { bulkRejectPendingMatches } from "@/actions/admin/bulk-reject-pending-ma
 import { bulkApprovePendingMatches } from "@/actions/admin/bulk-approve-pending-matches";
 import { setFeatured } from "@/actions/admin/set-featured";
 import { getIngestHealth } from "@/actions/admin/get-ingest-health";
+import AdminComparisons from "@/components/AdminComparisons";
 import { SUPERMARKETS, CATEGORIES } from "@/lib/constants";
 import { formatPrice } from "@/lib/format-price";
 
@@ -742,6 +743,7 @@ export function AdminPanel({ onBack }) {
               ["lib", "Library", Icon.Grid],
               ["leaf", "Φυλλάδια", Icon.Book],
               ["review", "Review", Icon.Search],
+              ["cmp", "Συγκρίσεις", Icon.Compare],
               ["health", "Υγεία", Icon.Pulse],
               ["stats", "Αναλυτικά", Icon.Chart],
               ["subs", "Συνδρομητές", Icon.Mail],
@@ -870,6 +872,8 @@ export function AdminPanel({ onBack }) {
               )}
             </div>
           )}
+
+          {tab === "cmp" && <AdminComparisons showMsg={showMsg} />}
 
           {tab === "health" && renderHealthTab()}
 

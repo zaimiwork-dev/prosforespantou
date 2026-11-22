@@ -180,4 +180,11 @@ export const Icon = {
       <path d="M3 12h4l2.5-6 4 13L16 12h5" />
     </svg>
   ),
+  // Two opposing arrows — comparing one thing against another.
+  Compare: ({ size = 16 }) => (
+    <svg {...base(size)} strokeWidth="1.8">
+      <path d="M4 8h14l-3.5-3.5" />
+      <path d="M20 16H6l3.5 3.5" />
+    </svg>
+  ),
 };

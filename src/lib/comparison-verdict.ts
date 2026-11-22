@@ -50,10 +50,15 @@ function hash64(input: string): string {
   return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
 }
 
+/** One chain's listing, normalised the way pairKey() sees it. */
+export function listingKey(chain: string | null | undefined, name: string | null | undefined): string {
+  return `${chain ?? ''}|${normalizeName(name)}`;
+}
+
 /** Order-independent key of a pair of chain-side listings. */
 export function pairKey(chainA: string | null | undefined, nameA: string | null | undefined, chainB: string | null | undefined, nameB: string | null | undefined): string {
-  const a = `${chainA ?? ''}|${normalizeName(nameA)}`;
-  const b = `${chainB ?? ''}|${normalizeName(nameB)}`;
+  const a = listingKey(chainA, nameA);
+  const b = listingKey(chainB, nameB);
   return hash64(a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`);
 }
 
