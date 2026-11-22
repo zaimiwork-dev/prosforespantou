@@ -45,7 +45,7 @@ function SimilarCard({ d }) {
 // by BOTH the bottom sheet (ProductSheet) and the /offer/[id] page — the two
 // used to be parallel implementations and drifted (the sheet lost the validity
 // dates and the verdict). Keep every section here so they can't diverge again.
-export function OfferDetails({ offer, comparison = [], history = null, similar = [], onAdd, compact = false }) {
+export function OfferDetails({ offer, comparison = [], timeline = null, similar = [], onAdd, compact = false }) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   // Some chain CDNs (AB) 403 every off-site fetch — fall back to the category
@@ -236,7 +236,7 @@ export function OfferDetails({ offer, comparison = [], history = null, similar =
         </div>
 
         <PriceComparison offer={offer} comparison={comparison} compact={compact} />
-        <PriceHistory history={history} compact={compact} />
+        <PriceHistory timeline={timeline} price={Number(offer.discountedPrice ?? offer.discounted_price)} compact={compact} />
 
         {similar.length > 0 && (
           <section style={{ marginTop: compact ? 14 : 18 }}>

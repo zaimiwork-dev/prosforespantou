@@ -1,192 +1,264 @@
 'use client';
 
-// Price-history block: honest, readable, touchable.
-// - Step line (prices HOLD between snapshots — diagonal interpolation would
-//   invent prices we never saw).
-// - Date axis (first → last), €-labels for the low/high bounds.
-// - The lowest point is always marked; hovering/tapping anywhere shows the
-//   nearest snapshot's date + price.
-// - Fewer than 3 points: show a "tracking started" note instead of nothing,
-//   so the section reads as functional from day one.
+// «Ιστορικό τιμής» on the website (owner 2026-11-22: refined, readable,
+// actually usable — and the same as the app). Every decision lives in
+// lib/price-history-view.ts, shared with the app; this only draws.
 //
-// Product decision: only GOOD-deal verdicts get a badge — we highlight real
-// lows, stay silent on mediocre prices, and never show a fake-positive.
+// What a shopper reads, top to bottom:
+//   1. the lead sentence — «Συνήθως 2,57 €. Σε προσφορά 6 φορές από τον
+//      Σεπτέμβριο, με χαμηλότερη τιμή 1,53 €.» (plus a green pill when today's
+//      price is the lowest we have seen)
+//   2. the chart: the regular price as a stepped line, offers as red dots with
+//      their period shaded (only when the data says when it ran), the usual
+//      price as a dotted line, today's price as the large dot at the right
+//   3. a reading of whatever the finger or mouse is on, the range chips, a legend
+//
+// The data is the per-SKU, checked timeline (lib/price-timeline via
+// actions/get-price-timeline): one item's own history, never two SKUs mixed.
+// When it cannot be trusted we say so instead of drawing it.
+//
+// Drawn in real pixels (the width is measured), so labels stay 12–13 px on a
+// phone — the old chart scaled a 560-wide drawing down and its text shrank to
+// ~7 px at 390 px.
 
-import { useState } from 'react';
-import { formatPrice, formatNumberEl } from '@/lib/format-price';
-import { isPositiveVerdict } from '@/lib/price-verdict';
-import { formatShortDate } from '@/lib/expiry-label';
-import { Icon } from './Icons';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { formatPrice } from '@/lib/format-price';
+import {
+  RANGES,
+  UNRELIABLE_LINE,
+  chartLabel,
+  domainFor,
+  footnote,
+  formatDay,
+  headlineFor,
+  offerBands,
+  pickAt,
+  shelfPath as buildShelfPath,
+  thinLine,
+  usualLineFor,
+  viewKind,
+  visiblePromos,
+  visibleShelf,
+  xOf,
+  yOf,
+  yScaleFor,
+} from '@/lib/price-history-view';
 
-const VERDICT_STYLE = {
-  lowest: { bg: '#d1fae5', fg: '#065f46', label: 'Χαμηλότερη τιμή που έχουμε δει', icon: Icon.Fire },
-  good:   { bg: '#dcfce7', fg: '#166534', label: 'Καλή τιμή', icon: Icon.Check },
+const HEIGHT = 210;
+const TOP = 16;
+const BOTTOM = 30; // room for the two dates under the plot
+const LEFT = 60; // price labels
+const RIGHT = 14;
+const INSET = 10; // air between the labels and the first point
+
+const card = {
+  border: '1px solid var(--line)',
+  borderRadius: 'var(--r-md)',
+  background: 'var(--surface)',
 };
 
-// Internal drawing space; the svg scales to its container.
-const W = 560;
-const H = 150;
-const PAD_X = 34;
-const PAD_TOP = 14;
-const PAD_BOTTOM = 26;
-
-export function PriceHistory({ history, compact = false }) {
-  const [active, setActive] = useState(null);
-
-  if (!history || !history.points || history.points.length === 0) return null;
-
-  const { points, min, avg, verdict, percentAboveMin, normalPrice } = history;
-
-  const style = VERDICT_STYLE[verdict];
-  const showBadge = isPositiveVerdict(verdict) && style;
-
-  const head = (
-    <div style={{
-      fontSize: 11, fontWeight: 800, letterSpacing: '0.6px',
-      textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 6,
-    }}>
+function Head() {
+  return (
+    <h2 style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--ink-3)', margin: '0 0 8px' }}>
       Ιστορικό τιμής
-    </div>
+    </h2>
   );
+}
 
-  // Tracking just started — say so instead of rendering nothing.
-  if (points.length < 3) {
-    return (
-      <section style={{ marginTop: compact ? 14 : 18 }}>
-        {head}
-        <div style={{
-          border: '1px solid var(--line)', borderRadius: 'var(--r-md)',
-          background: 'var(--surface)', padding: '12px 14px',
-          fontSize: 12, color: 'var(--ink-3)', fontWeight: 500,
-        }}>
-          Παρακολουθούμε την τιμή από τις {formatShortDate(points[0].recordedAt)} —
-          το διάγραμμα χτίζεται όσο μαζεύουμε μετρήσεις.
-        </div>
-      </section>
-    );
-  }
+export function PriceHistory({ timeline, price, compact = false }) {
+  const kind = viewKind(timeline);
+  if (kind === 'none') return null;
+  return (
+    <section style={{ marginTop: compact ? 16 : 22 }}>
+      <Head />
+      {kind === 'chart' ? (
+        <Chart timeline={timeline} price={price} />
+      ) : (
+        <p style={{ ...card, margin: 0, padding: '12px 14px', fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+          {kind === 'thin' ? thinLine(timeline) : UNRELIABLE_LINE}
+        </p>
+      )}
+    </section>
+  );
+}
 
-  const prices = points.map((p) => p.price);
-  const lo = Math.min(...prices);
-  const hi = Math.max(...prices);
-  const span = (hi - lo) || lo * 0.1 || 1;
-  const yLo = lo - span * 0.08;
-  const ySpan = span * 1.16;
-  const innerW = W - PAD_X * 2;
-  const innerH = H - PAD_TOP - PAD_BOTTOM;
-  const x = (i) => PAD_X + (i / (points.length - 1)) * innerW;
-  const y = (price) => PAD_TOP + (1 - (price - yLo) / ySpan) * innerH;
+function Chart({ timeline, price }) {
+  const [range, setRange] = useState('ALL');
+  const [width, setWidth] = useState(0);
+  const [touch, setTouch] = useState(null);
+  // Fixed per mount: the chart is a snapshot of «now», not a ticking clock.
+  const [now] = useState(() => Date.now());
+  const boxRef = useRef(null);
+  const pickedBy = useRef(null); // 'mouse' | 'touch' | 'pen' — who made the reading
 
-  // Step path: hold each price until the next snapshot.
-  let d = `M ${x(0).toFixed(1)} ${y(prices[0]).toFixed(1)}`;
-  for (let i = 1; i < points.length; i++) {
-    d += ` L ${x(i).toFixed(1)} ${y(prices[i - 1]).toFixed(1)} L ${x(i).toFixed(1)} ${y(prices[i]).toFixed(1)}`;
-  }
-  const area = `${d} L ${x(points.length - 1).toFixed(1)} ${(H - PAD_BOTTOM).toFixed(1)} L ${x(0).toFixed(1)} ${(H - PAD_BOTTOM).toFixed(1)} Z`;
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver((entries) => setWidth(Math.round(entries[0].contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  const minIdx = prices.indexOf(lo);
-  const lastIdx = points.length - 1;
+  const shown = Number.isFinite(Number(price)) && Number(price) > 0 ? Number(price) : timeline.stats.currentPrice;
+  const usual = usualLineFor(timeline);
 
-  const pickNearest = (clientX, target) => {
-    const rect = target.getBoundingClientRect();
-    const fx = (clientX - rect.left) / rect.width; // 0..1 across the svg
-    const px = fx * W;
-    const idx = Math.round(((px - PAD_X) / innerW) * (points.length - 1));
-    setActive(Math.max(0, Math.min(points.length - 1, idx)));
+  const m = useMemo(() => {
+    const d = domainFor(timeline, range, now);
+    const shelf = visibleShelf(timeline, d);
+    const promos = visiblePromos(timeline, d);
+    const bands = offerBands(promos);
+    const y = yScaleFor([...shelf.map((s) => s.price), ...promos.map((p) => p.price), ...(shown != null ? [shown] : []), ...(usual != null ? [usual] : [])]);
+    return { d, shelf, promos, bands, y };
+  }, [timeline, range, now, shown, usual]);
+
+  const plotLeft = LEFT + INSET;
+  const plotW = Math.max(width - plotLeft - RIGHT, 1);
+  const plotH = HEIGHT - TOP - BOTTOM;
+  const px = (t) => xOf(t, m.d, plotLeft, plotW);
+  const py = (p) => yOf(p, m.y, TOP, plotH);
+
+  const shelfPath = buildShelfPath(m.shelf, px, py);
+
+  const pick = (clientX) => {
+    const rect = boxRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const t = m.d.t0 + ((clientX - rect.left - plotLeft) / plotW) * (m.d.t1 - m.d.t0);
+    const clamped = Math.min(Math.max(t, m.d.t0), m.d.t1);
+    // A finger is about 24 px wide, expressed in time.
+    setTouch(pickAt(clamped, m.shelf, m.promos, (24 / plotW) * (m.d.t1 - m.d.t0)));
   };
 
-  // Tooltip for the active (or min, as the resting state) point.
-  const tipIdx = active ?? minIdx;
-  const tipIsMin = tipIdx === minIdx;
-  const tipX = x(tipIdx);
-  const tipPrice = prices[tipIdx];
-  const tipLabel = `${formatPrice(tipPrice)} · ${formatShortDate(points[tipIdx].recordedAt)}${tipIsMin ? ' · χαμηλότερη' : ''}`;
-  const tipW = tipLabel.length * 6.4 + 14;
-  const tipBoxX = Math.max(2, Math.min(W - tipW - 2, tipX - tipW / 2));
+  const headline = headlineFor(timeline, formatPrice, now);
+  const note = footnote(timeline, now);
 
   return (
-    <section style={{ marginTop: compact ? 14 : 18 }}>
-      {head}
-
-      <div style={{
-        border: '1px solid var(--line)', borderRadius: 'var(--r-md)',
-        background: 'var(--surface)', padding: compact ? '10px 12px' : '12px 14px',
-      }}>
-        {showBadge && (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            background: style.bg, color: style.fg,
-            fontSize: 11, fontWeight: 800, padding: '4px 10px',
-            borderRadius: 8, letterSpacing: '0.2px', marginBottom: 8,
-          }}>
-            <style.icon size={12} />
-            <span>{style.label}</span>
-          </div>
-        )}
-
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          style={{ width: '100%', height: 'auto', display: 'block', touchAction: 'pan-y', cursor: 'crosshair' }}
-          onPointerMove={(e) => pickNearest(e.clientX, e.currentTarget)}
-          onPointerDown={(e) => pickNearest(e.clientX, e.currentTarget)}
-          onPointerLeave={() => setActive(null)}
-          role="img"
-          aria-label={`Ιστορικό τιμής: χαμηλότερη ${formatNumberEl(lo)} ευρώ, υψηλότερη ${formatNumberEl(hi)} ευρώ`}
-        >
-          {/* low/high guide lines + € labels */}
-          <line x1={PAD_X} x2={W - PAD_X} y1={y(hi)} y2={y(hi)} stroke="var(--line)" strokeDasharray="3 4" />
-          <line x1={PAD_X} x2={W - PAD_X} y1={y(lo)} y2={y(lo)} stroke="#10b981" strokeOpacity="0.45" strokeDasharray="3 4" />
-          <text x={PAD_X - 5} y={y(hi) + 3.5} textAnchor="end" fontSize="10" fill="var(--ink-3)">{formatPrice(hi)}</text>
-          <text x={PAD_X - 5} y={y(lo) + 3.5} textAnchor="end" fontSize="10" fill="#059669">{formatPrice(lo)}</text>
-
-          <path d={area} fill="#009de0" fillOpacity="0.07" />
-          <path d={d} fill="none" stroke="#009de0" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-
-          {/* snapshot dots (skip when dense) */}
-          {points.length <= 40 && points.map((p, i) => (
-            <circle key={i} cx={x(i)} cy={y(prices[i])} r="2.4" fill="#009de0" fillOpacity={i === tipIdx ? 0 : 0.5} />
-          ))}
-
-          {/* the low + the latest snapshot, always visible */}
-          <circle cx={x(minIdx)} cy={y(lo)} r="4" fill="#10b981" stroke="#fff" strokeWidth="1.5" />
-          <circle cx={x(lastIdx)} cy={y(prices[lastIdx])} r="4" fill="#009de0" stroke="#fff" strokeWidth="1.5" />
-
-          {/* active point + tooltip */}
-          <line x1={tipX} x2={tipX} y1={PAD_TOP} y2={H - PAD_BOTTOM} stroke="var(--ink-3)" strokeOpacity="0.25" />
-          <circle cx={tipX} cy={y(tipPrice)} r="4.5" fill={tipIsMin ? '#10b981' : '#009de0'} stroke="#fff" strokeWidth="1.5" />
-          <g>
-            <rect x={tipBoxX} y={0} width={tipW} height={17} rx="5" fill="#1c1e24" fillOpacity="0.88" />
-            <text x={tipBoxX + tipW / 2} y={12} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#fff">
-              {tipLabel}
-            </text>
-          </g>
-
-          {/* date axis */}
-          <text x={PAD_X} y={H - 8} fontSize="10" fill="var(--ink-3)">{formatShortDate(points[0].recordedAt)}</text>
-          <text x={W - PAD_X} y={H - 8} textAnchor="end" fontSize="10" fill="var(--ink-3)">{formatShortDate(points[lastIdx].recordedAt)}</text>
-        </svg>
-
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.45, marginTop: 6 }}>
-          Χαμηλότερη: <strong style={{ color: 'var(--ink)' }}>{formatPrice(lo)}</strong>
-          {' · '}
-          {/* Prefer the real shelf price over an average that blends shelf and
-              promo snapshots — that average describes neither, since the mix
-              just reflects when the scrapers happened to run. Fall back to the
-              average only while a chain has no shelf baseline yet. */}
-          {normalPrice != null ? (
-            <>Κανονική τιμή: <strong style={{ color: 'var(--ink)' }}>{formatPrice(normalPrice)}</strong></>
-          ) : (
-            <>Μέση: <strong style={{ color: 'var(--ink)' }}>{formatPrice(avg ?? min)}</strong></>
-          )}
-          {percentAboveMin > 0 && (
-            <>
-              {' · '}
-              <span>+{percentAboveMin}% από το χαμηλότερο</span>
-            </>
-          )}
-          <span style={{ float: 'right', opacity: 0.8 }}>άγγιξε το διάγραμμα για τιμή/ημερομηνία</span>
+    <div style={{ ...card, padding: '14px 14px 12px' }}>
+      {headline.pill && (
+        <div style={{ display: 'inline-block', background: '#d1fae5', color: '#065f46', fontSize: 13, fontWeight: 800, padding: '5px 12px', borderRadius: 999, marginBottom: 8 }}>
+          {headline.pill}
         </div>
+      )}
+      {headline.sentence && (
+        <p style={{ margin: '0 0 10px', fontSize: 15, lineHeight: 1.5, color: 'var(--ink)', fontWeight: 500 }}>{headline.sentence}</p>
+      )}
+
+      <div aria-live="polite" style={{ minHeight: 24, fontSize: 14, color: touch ? 'var(--ink)' : 'var(--ink-3)', marginBottom: 6 }}>
+        {touch ? (
+          <>
+            <strong style={{ fontWeight: 800 }}>{formatPrice(touch.price)}</strong>
+            {` · ${formatDay(touch.at, now)} · ${touch.kind === 'promo' ? 'Προσφορά' : 'Κανονική τιμή'}`}
+          </>
+        ) : (
+          'Άγγιξε ή σύρε στο διάγραμμα για τιμή και ημερομηνία'
+        )}
       </div>
-    </section>
+
+      <div
+        ref={boxRef}
+        role="img"
+        aria-label={chartLabel(timeline, formatPrice, now)}
+        style={{ position: 'relative', height: HEIGHT, touchAction: 'pan-y', cursor: 'crosshair', userSelect: 'none' }}
+        onPointerDown={(e) => {
+          if (e.pointerType !== 'mouse') e.currentTarget.setPointerCapture?.(e.pointerId);
+          pickedBy.current = e.pointerType;
+          pick(e.clientX);
+        }}
+        onPointerMove={(e) => {
+          if (e.pointerType === 'mouse' || e.buttons) {
+            pickedBy.current = e.pointerType;
+            pick(e.clientX);
+          }
+        }}
+        onPointerLeave={(e) => {
+          // A tap leaves its reading on screen. Browsers follow a touch with
+          // emulated «mouse left» events, so only a reading the MOUSE made
+          // (hovering) is cleared when the mouse leaves.
+          if (e.pointerType === 'mouse' && pickedBy.current === 'mouse') setTouch(null);
+        }}
+      >
+        {width > 0 && (
+          <svg width={width} height={HEIGHT} style={{ display: 'block', overflow: 'visible' }} aria-hidden="true">
+            {m.y.ticks.map((tick) => (
+              <g key={tick}>
+                <line x1={LEFT} x2={plotLeft + plotW} y1={py(tick)} y2={py(tick)} stroke="var(--line)" strokeWidth="1" />
+                <text x={LEFT - 6} y={py(tick) + 4} textAnchor="end" fontSize="12" fill="var(--ink-3)">{formatPrice(tick)}</text>
+              </g>
+            ))}
+
+            {m.bands.map((b, i) => (
+              <rect key={`b${i}`} x={px(b.from)} y={TOP} width={Math.max(px(b.to) - px(b.from), 2)} height={plotH} fill="var(--accent)" fillOpacity="0.1" />
+            ))}
+
+            {/* The dotted usual price. Named in the legend, not on the line: a
+                label at its end sat on top of the price line whenever today's
+                shelf price is the usual one. */}
+            {usual != null && (
+              <line x1={plotLeft} x2={plotLeft + plotW} y1={py(usual)} y2={py(usual)} stroke="var(--ink-3)" strokeWidth="1.5" strokeDasharray="5 5" />
+            )}
+
+            {shelfPath && <path d={shelfPath} fill="none" stroke="var(--ink)" strokeWidth="2.5" strokeLinejoin="round" />}
+
+            {m.promos.map((p, i) => (p.until != null && p.until > p.at ? (
+              <line key={`s${i}`} x1={px(p.at)} x2={px(p.until)} y1={py(p.price)} y2={py(p.price)} stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" />
+            ) : null))}
+            {m.promos.map((p, i) => (
+              <circle key={`p${i}`} cx={px(p.at)} cy={py(p.price)} r="4.5" fill="var(--accent)" />
+            ))}
+
+            {touch && (
+              <g>
+                <line x1={px(touch.at)} x2={px(touch.at)} y1={TOP} y2={TOP + plotH} stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="3 3" />
+                <circle cx={px(touch.at)} cy={py(touch.price)} r="7" fill="var(--surface)" stroke={touch.kind === 'promo' ? 'var(--accent)' : 'var(--ink)'} strokeWidth="3" />
+              </g>
+            )}
+
+            {shown != null && <circle cx={px(m.d.t1)} cy={py(shown)} r="8" fill="var(--accent)" stroke="var(--surface)" strokeWidth="2" />}
+
+            <text x={plotLeft} y={HEIGHT - 8} fontSize="12" fill="var(--ink-3)">{formatDay(m.d.t0, now)}</text>
+            <text x={plotLeft + plotW} y={HEIGHT - 8} textAnchor="end" fontSize="12" fill="var(--ink-3)">Σήμερα</text>
+          </svg>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 8, fontSize: 13, color: 'var(--ink-2)' }}>
+        {m.shelf.length > 0 && <Legend swatch={<span style={{ width: 18, height: 3, background: 'var(--ink)', borderRadius: 2 }} />} label="Κανονική τιμή" />}
+        <Legend swatch={<span style={{ width: 10, height: 10, borderRadius: 5, background: 'var(--accent)' }} />} label="Προσφορά" />
+        {usual != null && <Legend swatch={<span style={{ width: 18, borderTop: '2px dashed var(--ink-3)' }} />} label={`Συνήθως ${formatPrice(usual)}`} />}
+      </div>
+
+      <div role="group" aria-label="Διάστημα" style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        {RANGES.map((r) => {
+          const on = r.key === range;
+          return (
+            <button
+              key={r.key}
+              type="button"
+              aria-pressed={on}
+              aria-label={r.a11y}
+              onClick={() => { setRange(r.key); setTouch(null); }}
+              style={{
+                flex: 1, minHeight: 44, borderRadius: 999, cursor: 'pointer',
+                border: `1px solid ${on ? 'var(--brand)' : 'var(--line-2)'}`,
+                background: on ? 'var(--brand)' : 'var(--surface)',
+                color: on ? '#fff' : 'var(--ink)', fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+              }}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {note && <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{note}</p>}
+    </div>
+  );
+}
+
+function Legend({ swatch, label }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      {swatch}
+      {label}
+    </span>
   );
 }

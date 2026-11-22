@@ -138,8 +138,8 @@ describe('factsFor', () => {
     const f = factsFor(tl({}, { shelfChangePct: -12.4 }), fmt, NOW);
     expect(f.find((x) => x.id === 'change')?.text).toBe('Η κανονική τιμή έπεσε 12% από Ιούλιο');
   });
-  it('builds the screen-reader sentence', () => {
-    expect(chartLabel(tl(), fmt, NOW)).toContain('Κανονική τιμή: 2,20 €.');
+  it('builds the screen-reader sentence from the lead sentence', () => {
+    expect(chartLabel(tl(), fmt, NOW)).toContain('Συνήθως 2,20 €. Η κανονική τιμή ανέβηκε 10% από τον Ιούλιο.');
   });
 });
 

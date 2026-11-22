@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
+import { z } from 'zod';
 import { buildPriceTimeline, selectTimelineSnapshots, type PriceTimeline } from '@/lib/price-timeline';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
 
@@ -79,6 +80,39 @@ export async function getPriceTimeline(
           shelfFeedAliveAt: freshChains.get(options.supermarket) ?? null,
           // A per-SKU series is one pack by construction.
           mixedSkus: !picked.perSku && skus > 1,
+        });
+      } catch (error) {
+        Sentry.captureException(error);
+        return EMPTY;
+      }
+    }
+  );
+}
+
+const discountIdSchema = z.string().uuid();
+
+// The timeline for one OFFER, looked up by its id — for callers that do not
+// hold the offer's chain SKU (the product sheet opens from listing cards,
+// which carry no chainItemcode). Same inputs as the offer page and the app's
+// /api/v1/offers/:id, so all three show the identical history.
+export async function getOfferPriceTimeline(discountId: string): Promise<PriceTimeline> {
+  return await Sentry.withServerActionInstrumentation(
+    'getOfferPriceTimeline',
+    { recordResponse: false },
+    async () => {
+      try {
+        const parsed = discountIdSchema.safeParse(discountId);
+        if (!parsed.success) return EMPTY;
+        const d = await prisma.discount.findUnique({
+          where: { id: parsed.data },
+          select: { productId: true, supermarket: true, chainItemcode: true, discountedPrice: true, validFrom: true, validUntil: true, isActive: true },
+        });
+        if (!d) return EMPTY;
+        const active = d.isActive && d.validUntil.getTime() > Date.now();
+        return await getPriceTimeline(d.productId, {
+          supermarket: d.supermarket,
+          chainItemcode: d.chainItemcode ?? null,
+          offer: { price: Number(d.discountedPrice), firstSeenAt: d.validFrom, active },
         });
       } catch (error) {
         Sentry.captureException(error);

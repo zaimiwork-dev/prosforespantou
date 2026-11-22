@@ -9,7 +9,7 @@ import { Icon } from './Icons';
 import { SUPERMARKETS } from '@/lib/constants';
 import { track } from '@/lib/track';
 import { getPriceComparison } from '@/actions/get-price-comparison';
-import { getPriceHistory } from '@/actions/get-price-history';
+import { getOfferPriceTimeline } from '@/actions/get-price-timeline';
 import { getSimilarOffers } from '@/actions/get-similar-offers';
 import { recordInterest, WEIGHT } from '@/lib/interest-profile';
 import { displayCategoryForProduct } from '@/lib/display-category';
@@ -55,7 +55,7 @@ function ProductSheetInner({ product, onClose, onAdd }) {
   // lands, then either rows or an honest "not found elsewhere" line.
   const [copied, setCopied] = useState(false);
   const [comparison, setComparison] = useState(null);
-  const [history, setHistory] = useState(null);
+  const [timeline, setTimeline] = useState(null);
   const [similar, setSimilar] = useState([]);
 
   useEffect(() => {
@@ -68,15 +68,10 @@ function ProductSheetInner({ product, onClose, onAdd }) {
       .then((rows) => { if (!cancelled) setSimilar(rows || []); })
       .catch(() => {});
     if (productId) {
-      // Judge the verdict against THIS offer's price, not the last snapshot.
-      const offerPrice = Number(product.discountedPrice ?? product.discounted_price);
-      getPriceHistory(productId, {
-        days: 90,
-        // Same chain scoping as the offer page — see get-price-history.ts.
-        supermarket: product.supermarket || product.supermarket_id || null,
-        currentPrice: Number.isFinite(offerPrice) ? offerPrice : null,
-      })
-        .then((h) => { if (!cancelled) setHistory(h); })
+      // The per-SKU, checked timeline, looked up by the offer's id on the
+      // server (listing cards carry no chain SKU) — identical to the offer page.
+      getOfferPriceTimeline(product.id)
+        .then((t) => { if (!cancelled) setTimeline(t); })
         .catch(() => {});
     }
     return () => { cancelled = true; };
@@ -114,7 +109,7 @@ function ProductSheetInner({ product, onClose, onAdd }) {
         </>
       }
     >
-      <OfferDetails offer={product} comparison={comparison} history={history} similar={similar} onAdd={onAdd} compact />
+      <OfferDetails offer={product} comparison={comparison} timeline={timeline} similar={similar} onAdd={onAdd} compact />
       <Link href={`/offer/${product.id}`} className="modal-link" onClick={(e) => {
         // Full navigation, not the pushState'd URL — let Next render the page.
         e.preventDefault();

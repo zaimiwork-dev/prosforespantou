@@ -1,10 +1,12 @@
-// «Ιστορικό τιμής» v2 (DESIGN.md «Product page v2»). The regular (shelf) price
-// is one stepped line; offers are red dots (a short segment only when the data
-// says when they ended or that they still run); the price on screen is the last,
-// larger dot. All decisions live in price-timeline-model.ts; this only draws.
+// «Ιστορικό τιμής» v3 (owner 2026-11-22: refined, readable, the same as the
+// website). Lead sentence on top («Συνήθως 2,57 €. Σε προσφορά 6 φορές…»);
+// the regular (shelf) price is one stepped line; offers are red dots with their
+// period shaded when the data knows it; the usual price is a dotted line; the
+// price on screen is the last, larger dot. All decisions live in the shared
+// src/lib/price-history-view.ts (via price-timeline-model.ts); this only draws.
 import { useMemo, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import type { PriceTimeline } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { Fonts, Radius, Space, useType, type TypeScale, type Palette } from '@/constants/theme';
@@ -13,11 +15,14 @@ import {
   UNRELIABLE_LINE,
   chartLabel,
   domainFor,
-  factsFor,
   footnote,
   formatDay,
+  headlineFor,
+  offerBands,
   pickAt,
+  shelfPath as buildShelfPath,
   thinLine,
+  usualLineFor,
   viewKind,
   visiblePromos,
   visibleShelf,
@@ -62,13 +67,15 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
   const plotW = Math.max(width - left - INSET - RIGHT, 1);
   const plotH = HEIGHT - TOP - BOTTOM;
 
+  const usual = usualLineFor(timeline);
   const m = useMemo(() => {
     const d = domainFor(timeline, range, now);
     const shelf = visibleShelf(timeline, d);
     const promos = visiblePromos(timeline, d);
-    const y = yScaleFor([...shelf.map((s) => s.price), ...promos.map((p) => p.price), price]);
-    return { d, shelf, promos, y };
-  }, [timeline, range, now, price]);
+    const bands = offerBands(promos);
+    const y = yScaleFor([...shelf.map((s) => s.price), ...promos.map((p) => p.price), price, ...(usual != null ? [usual] : [])]);
+    return { d, shelf, promos, bands, y };
+  }, [timeline, range, now, price, usual]);
 
   const px = (t: number) => xOf(t, m.d, left + INSET, plotW);
   const py = (p: number) => yOf(p, m.y, TOP, plotH);
@@ -76,22 +83,22 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
   const pan = useDragPick(m.d, m.shelf, m.promos, left + INSET, plotW, setTouch);
 
   // Shelf as one stepped line: horizontal at each price, vertical at the change.
-  let shelfPath = '';
-  for (let i = 0; i < m.shelf.length; i++) {
-    const s = m.shelf[i];
-    const x0 = px(s.from).toFixed(1);
-    const x1 = px(s.to).toFixed(1);
-    const y = py(s.price).toFixed(1);
-    shelfPath += i === 0 ? `M ${x0} ${y} L ${x1} ${y}` : ` L ${x0} ${y} L ${x1} ${y}`;
-  }
+  const shelfPath = buildShelfPath(m.shelf, px, py);
 
-  const facts = factsFor(timeline, formatPrice, now);
+  const headline = headlineFor(timeline, formatPrice, now);
   const note = footnote(timeline, now);
   const nowX = px(m.d.t1);
   const nowY = py(price);
 
   return (
     <View>
+      {headline.pill ? (
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>{headline.pill}</Text>
+        </View>
+      ) : null}
+      {headline.sentence ? <Text style={styles.sentence}>{headline.sentence}</Text> : null}
+
       <View style={styles.readout} accessibilityLiveRegion="polite">
         {touch ? (
           <Text style={styles.readoutText}>
@@ -116,6 +123,12 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
               {m.y.ticks.map((tick) => (
                 <Line key={tick} x1={left} x2={left + INSET + plotW} y1={py(tick)} y2={py(tick)} stroke={C.line} strokeWidth={1} />
               ))}
+              {m.bands.map((b, i) => (
+                <Rect key={`b${i}`} x={px(b.from)} y={TOP} width={Math.max(px(b.to) - px(b.from), 2)} height={plotH} fill={C.accent} fillOpacity={0.1} />
+              ))}
+              {usual != null ? (
+                <Line x1={left + INSET} x2={left + INSET + plotW} y1={py(usual)} y2={py(usual)} stroke={C.ink3} strokeWidth={1.5} strokeDasharray="5 5" />
+              ) : null}
               {shelfPath ? <Path d={shelfPath} stroke={C.ink} strokeWidth={2.5} fill="none" strokeLinejoin="round" strokeLinecap="butt" /> : null}
               {m.promos.map((p, i) =>
                 p.until != null && p.until > p.at ? (
@@ -145,6 +158,12 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
       <View style={styles.legend}>
         {m.shelf.length > 0 ? <LegendDot color={C.ink} label="Κανονική τιμή" line /> : null}
         <LegendDot color={C.accent} label="Προσφορά" />
+        {usual != null ? (
+          <View style={styles.legendItem}>
+            <View style={{ width: 18, borderTopWidth: 2, borderStyle: 'dashed', borderColor: C.ink3 }} />
+            <Text style={styles.legendText}>{`Συνήθως ${formatPrice(usual)}`}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.chips}>
@@ -167,15 +186,6 @@ function Chart({ timeline, price }: { timeline: PriceTimeline; price: number }) 
         })}
       </View>
 
-      {facts.length > 0 ? (
-        <View style={styles.facts}>
-          {facts.map((f) => (
-            <View key={f.id} style={f.good ? styles.pill : undefined}>
-              <Text style={[styles.fact, f.good && styles.pillText]}>{f.text}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
       {note ? <Text style={styles.foot}>{note}</Text> : null}
     </View>
   );
@@ -239,9 +249,8 @@ const makeStyles = (T: TypeScale, C: Palette = T.c) =>
     chipOn: { backgroundColor: C.brand, borderColor: C.brand },
     chipText: { ...T.text.bodyStrong, color: C.ink },
     chipTextOn: { color: '#fff' },
-    facts: { marginTop: Space[4], gap: Space[2], alignItems: 'flex-start' },
-    fact: { ...T.text.body, color: C.ink },
-    pill: { backgroundColor: C.goodBg, borderRadius: Radius.pill, paddingHorizontal: Space[3], paddingVertical: Space[1] },
-    pillText: { fontFamily: Fonts.sans700, color: C.good },
+    sentence: { ...T.text.body, color: C.ink, marginBottom: Space[2] },
+    pill: { alignSelf: 'flex-start', backgroundColor: C.goodBg, borderRadius: Radius.pill, paddingHorizontal: Space[3], paddingVertical: Space[1], marginBottom: Space[2] },
+    pillText: { ...T.text.body, fontFamily: Fonts.sans700, color: C.good },
     foot: { ...T.text.caption, color: C.ink3Text, marginTop: Space[3] },
   });
