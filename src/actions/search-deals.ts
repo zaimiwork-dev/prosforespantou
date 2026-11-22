@@ -19,18 +19,18 @@ export async function searchDeals(query: string, supermarket?: string) {
       // crowd actual milk out of the window before ranking ever happened.
       //
       // Each row is normalised ONCE: name, description and category joined
-      // with a separator no search term can contain, then one
-      // unaccent(lower()) and one LIKE ANY over the spellings (themselves
-      // normalised once, in the ARRAY subquery). The earlier form ran
-      // unaccent() on three columns for every spelling — 116–329 ms in
-      // Postgres depending on how many spellings a word has; this is ~100 ms
-      // flat and returns the same ids (compared on 11 queries, 2026-11-16).
-      // The remaining cost is that one pass over the live rows; a trigram index
-      // (src/scripts/enable-pg-trgm.mjs, production DDL) would remove it.
+      // with a separator no search term can contain, one f_unaccent(lower()),
+      // one LIKE ANY over the spellings. That exact expression is indexed
+      // (GIN trigram `discounts_search_trgm`, src/scripts/ensure-search-index.mjs),
+      // so Postgres reads only the rows that contain the word: ~100 ms → 2–15 ms
+      // (2026-11-22). The expression here and in the script must stay
+      // identical, or the index is silently not used. f_unaccent is an
+      // IMMUTABLE wrapper of unaccent (indexes refuse STABLE functions).
       //
-      // translate(…,'ς','σ') folds the Greek final sigma so SQL agrees with
-      // normalizeSearchText — Postgres lower('Σ')='σ' but user-typed «καφές»
-      // keeps «ς», and JS-expanded terms are always «σ».
+      // The spellings come from expandSearch(), already lower-case, without
+      // accents and with «ς» as «σ» (normalizeSearchText), so they are passed
+      // as they are; translate(…,'ς','σ') gives the row side the same fold —
+      // Postgres lower('Σ') = 'σ' but stored names keep a final «ς».
       const patterns = expandedTerms.map((term) => `%${term}%`);
       const supermarketClause = supermarket
         ? Prisma.sql`AND supermarket = ${supermarket}`
@@ -47,8 +47,8 @@ export async function searchDeals(query: string, supermarket?: string) {
           AND valid_until > NOW()
           AND (supermarket IS DISTINCT FROM 'mymarket' OR original_price IS NOT NULL OR description IS NOT NULL)
           ${supermarketClause}
-          AND translate(unaccent(lower(product_name || ' ¦ ' || COALESCE(description, '') || ' ¦ ' || COALESCE(category, ''))), 'ς', 'σ')
-              LIKE ANY (ARRAY(SELECT unaccent(lower(t)) FROM unnest(${patterns}::text[]) AS t))
+          AND translate(public.f_unaccent(lower(product_name || ' ¦ ' || COALESCE(description, '') || ' ¦ ' || COALESCE(category, ''))), 'ς', 'σ')
+              LIKE ANY (${patterns}::text[])
         ORDER BY hot_score DESC, id
         LIMIT ${idLimit}
       `;
