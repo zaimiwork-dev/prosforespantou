@@ -21,7 +21,7 @@
 //   LIMIT=200 node src/scripts/verify-comparisons.mjs   # judge up to 200 new pairs
 //   node src/scripts/verify-comparisons.mjs             # judge every new pair (stops cleanly on the daily budget)
 //
-// Groq free tier: openai/gpt-oss-120b (reasoning medium), ~200K tokens/day shared with the
+// Groq free tier: openai/gpt-oss-120b (reasoning low), ~200K tokens/day shared with the
 // nightly resolvers; 8 pairs per request ≈ 1.3K tokens → ~1,200 pairs/day.
 // A daily-budget stop exits 0: the next run resumes where this one stopped.
 //
@@ -42,9 +42,9 @@ const LIMIT = parseInt(process.env.LIMIT || '0', 10) || Infinity;
 const PACE_MS = parseInt(process.env.PACE_MS || '10000', 10);
 const BATCH = 8;
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
-const REASONING_EFFORT = process.env.REASONING_EFFORT || 'medium';
+const REASONING_EFFORT = process.env.REASONING_EFFORT || 'low';
 // EVAL only: score each of these efforts on the fixture, one after the other.
-const EVAL_EFFORTS = (process.env.EVAL_EFFORTS || 'low,medium').split(',').map((s) => s.trim()).filter(Boolean);
+const EVAL_EFFORTS = (process.env.EVAL_EFFORTS || 'low').split(',').map((s) => s.trim()).filter(Boolean);
 const EVAL_FILE = process.env.EVAL_FILE || 'src/scripts/fixtures/comparison-eval-pairs.json';
 const VERDICTS = ['same', 'different', 'unsure'];
 
@@ -65,26 +65,31 @@ const publiclyVisible = (d) =>
 
 // The first prompt (8de40d7) judged the pair as a whole and called rye and
 // wheat toast bread of one brand and size «same» ("identical brand and
-// size"): it never looked at the one word that differed. So the model now has
-// to write down the words found in only one name and classify each before it
-// decides — the difference is always in those words.
+// size"): it never looked at the one word that differed. A second version
+// that made it list the one-sided words and treat any descriptive word as
+// telling products apart showed no wrong pair but hid 29 of 63 correct ones
+// (it called «Βαφή Μαλλιών», «Λακ» or the maker's name in front of the brand a
+// variant). This one separates CONFLICT (both names state a detail, the
+// values differ → different) from OMISSION (one chain did not write it →
+// fine), and stays cautious only about one-sided edition words. Examples in
+// the prompt are deliberately NOT taken from the eval fixture.
 async function judgeBatch(apiKey, rows, effort = REASONING_EFFORT) {
   const list = rows
     .map((r, i) => `${i + 1}. A: "${r.nameA}"\n   B: "${r.nameB}"`)
     .join('\n');
   const prompt = `Two Greek supermarket chains each list a product. For each numbered pair, decide whether listing A and listing B are the SAME sellable item, so a shopper can fairly compare their prices.
 
-Step 1. Write down the words that appear in only one of the two names ("onlyA", "onlyB"). Ignore capital letters, accents, word order, and Greek vs Latin spelling of the same word.
+Step 1. Write down the words that appear in only one of the two names ("onlyA", "onlyB"). Ignore capital letters, accents, word order, and the same word in Greek or English (Vanilla = Βανίλια, Lemon = Λεμόνι, Medium = Μέτρια, XL = Extra Large, 1,5lt = 1500ml, gr = g = γρ.).
 
-Step 2. Classify every such word:
-- NEUTRAL: a generic description the other chain simply left out (Κατεψυγμένο, Υγρό, Απορρυπαντικό, Σώματος, Σπρέι, Ψωμί για), or the same thing written differently (Μέτρια = Medium, Βανίλια = Vanilla, 1,5lt = 1500ml, gr = g = γρ., ΚΤΨ = κατεψυγμένο).
-- DISTINGUISHING: anything that can tell two products of one brand apart — flavour, scent, colour, shade or model number, grain or flour (Σίκαλης = rye, Σίτου = wheat, Ολικής = wholemeal), fat %, age, a product line or edition (Ultra, Platinum, Sensitive, Hyperdry, Exotic, Pink, Mineral, Proglide), size, weight, piece count, refills, gifts.
+Step 2. Mark each such word:
+- OMITTED: something the other chain simply did not write. Chains often leave out the product type (Βαφή Μαλλιών, Σερβιέτες, Αφρόλουτρο, Υγρό Πιάτων, Ταμπόν), the company written before the brand («Nestle Nescafe» = «Nescafe»), a claim or description (Αντιβακτηριδιακό, 24ωρη προστασία, με Ενεργό Χλώριο, Κατεψυγμένο, σε Φάκελο), the ingredients spelled out, the origin, or the size or count (when the other name states no different one). Equivalent units count as the same (45 μεζούρες = 45 πλύσεις).
+- VARIANT: a word that says WHICH product of the brand it is: flavour, scent, colour, shade or model number, grain or flour (Σίκαλης = rye, Σίτου = wheat, Ολικής = wholemeal), fat %, age range, or an edition the brand also sells without it (Ultra, Sensitive, Max, Pro, Light, Zero, 3σε1).
 
 Step 3. Decide:
-- "different": A and B each have a DISTINGUISHING word of the same kind and they disagree (rye vs wheat, Pink vs Mineral, 2 vs 5 refills, 55/46 vs 66/46), or the brand differs.
-- "unsure": only one name has a DISTINGUISHING word, or one name has no brand.
-- "same": every word found in only one name is NEUTRAL.
-A wrong "same" shows a shopper a false price comparison; when in doubt, choose "unsure".
+- "different": the brands differ, or both names state the same kind of detail with different values (rye vs wheat, two different scents, 2 vs 5 refills, shade 5/0 vs 6/0, different sizes).
+- "unsure": a VARIANT word appears in one name only, or one name has no brand at all.
+- "same": every one-sided word is OMITTED and nothing conflicts.
+A wrong "same" shows a shopper a false price comparison.
 
 ${list}
 
