@@ -39,6 +39,21 @@ export type WatchAlert = {
   before: number | null;
 };
 
+// One watch as the app and the website show it (lib/product-watches builds it).
+export type WatchView = {
+  id: string;
+  chain: string;
+  code: string;
+  name: string;
+  onOffer: boolean;
+  onDrop: boolean;
+  targetPrice: number | null;
+  startPrice: number | null;
+  // The best price we can prove right now, and where.
+  now: { chain: string; price: number; kind: 'offer' | 'shelf'; offerId: string | null } | null;
+  createdAt: string;
+};
+
 export const COOLDOWN_HOURS = 20;
 // A «drop» smaller than this is noise (a cent of rounding), not news.
 export const MIN_DROP = 0.05;

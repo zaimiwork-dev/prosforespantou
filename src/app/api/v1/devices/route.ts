@@ -6,7 +6,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
-import { ok, fail, rateLimited } from '@/lib/api/respond';
+import { ok, fail, rateLimited, preflight } from '@/lib/api/respond';
 
 const Body = z.object({ platform: z.enum(['android', 'ios', 'web']) });
 
@@ -22,3 +22,5 @@ export async function POST(req: Request) {
     return fail(500, 'device unavailable');
   }
 }
+
+export const OPTIONS = preflight;

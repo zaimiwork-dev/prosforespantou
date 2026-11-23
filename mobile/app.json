@@ -31,7 +31,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#0F5132"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

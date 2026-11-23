@@ -65,6 +65,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         description: offer.description ?? null,
         active,
         leafletUrl: chain?.leafletUrl ?? null,
+        // The store's own item code (its «slot»): what «Ειδοποίησέ με» watches,
+        // so the app can tell that this item is already watched (2026-11-23).
+        itemCode: offer.chainItemcode ?? null,
       },
       // Offer rows become cards; shelf rows stay a plain chain + price, the
       // «Κανονική τιμή» line the website draws for chains with no offer.

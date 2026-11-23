@@ -4,8 +4,9 @@
 import type { DealCard } from '@shared/api/deal-card';
 import type { PriceTimeline } from '@shared/price-timeline';
 import type { ItemPrices } from '@shared/list-basket';
+import type { WatchView } from '@shared/watch-alerts';
 
-export type { DealCard, PriceTimeline };
+export type { DealCard, PriceTimeline, WatchView };
 
 // EXPO_PUBLIC_API_URL points a dev build at a preview deployment or a local
 // server (e.g. http://192.168.1.20:3000); production builds use the live site.
@@ -65,6 +66,34 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 // rows of its comparison sheet), for the shared src/lib/list-basket.ts.
 export type ListPricesResponse = { items: Record<string, ItemPrices> };
 
+// Writes (POST/PATCH/DELETE) for the phone's own data — «Ειδοποίησέ με».
+// Same timeout rule as get(); the server answers {error} on failure.
+async function send<T>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/v1${path}`, {
+      method,
+      signal: timeout,
+      headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) throw new ApiError(res.status, `${path} → HTTP ${res.status}`);
+    return (await res.json()) as T;
+  } catch (e) {
+    if (!(e instanceof ApiError) && timeout.aborted) throw new ApiError(0, `${path} → timeout`);
+    throw e;
+  }
+}
+
+export type WatchRequest = {
+  offerId?: string;
+  chain?: string;
+  code?: string;
+  onOffer: boolean;
+  onDrop: boolean;
+  targetPrice: number | null;
+};
+
 export type DealSort = 'hot' | 'expiring' | 'discount' | 'newest' | 'price_asc' | 'price_desc';
 
 export type DealsQuery = {
@@ -105,7 +134,8 @@ export type PriceHistory = {
 };
 
 export type OfferResponse = {
-  offer: DealCard & { description: string | null; active: boolean; leafletUrl: string | null };
+  // itemCode: the store's item code (added 2026-11-23; absent from older cached answers).
+  offer: DealCard & { description: string | null; active: boolean; leafletUrl: string | null; itemCode?: string | null };
   comparison: ComparisonRow[];
   history: PriceHistory;
   // Shelf price as steps + promos as points, full history (lib/price-timeline
@@ -157,6 +187,16 @@ export const api = {
     get<SearchResponse>(`/search${query({ q: text, chain })}`, signal),
   suggest: (text: string, signal?: AbortSignal) => get<SuggestResponse>(`/suggest${query({ q: text })}`, signal),
   offer: (id: string, signal?: AbortSignal) => get<OfferResponse>(`/offers/${encodeURIComponent(id)}`, signal),
+  // «Ειδοποίησέ με» (lib/alerts): the phone registers once, then keeps watches.
+  registerDevice: (platform: 'android' | 'ios' | 'web') => send<{ deviceId: string }>('POST', '/devices', { platform }),
+  setPushToken: (deviceId: string, pushToken: string | null) =>
+    send<{ ok: true }>('PATCH', `/devices/${encodeURIComponent(deviceId)}`, { pushToken }),
+  watches: (deviceId: string, signal?: AbortSignal) =>
+    get<{ watches: WatchView[] }>(`/devices/${encodeURIComponent(deviceId)}/watches`, signal),
+  watch: (deviceId: string, body: WatchRequest) =>
+    send<{ watch: WatchView }>('POST', `/devices/${encodeURIComponent(deviceId)}/watches`, body),
+  unwatch: (deviceId: string, watchId: string) =>
+    send<{ ok: true }>('DELETE', `/devices/${encodeURIComponent(deviceId)}/watches/${encodeURIComponent(watchId)}`),
   listPrices: (ids: string[], signal?: AbortSignal) =>
     get<ListPricesResponse>(`/list-prices${query({ ids: [...ids].sort().join(',') })}`, signal),
 };

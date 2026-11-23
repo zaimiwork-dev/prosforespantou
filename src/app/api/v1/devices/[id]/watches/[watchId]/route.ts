@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { removeWatch } from '@/lib/product-watches';
-import { ok, fail, rateLimited } from '@/lib/api/respond';
+import { ok, fail, rateLimited, preflight } from '@/lib/api/respond';
 
 const Id = z.string().uuid();
 
@@ -20,3 +20,5 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string; 
     return fail(500, 'watches unavailable');
   }
 }
+
+export const OPTIONS = preflight;

@@ -33,6 +33,21 @@ export function timed<R extends NextResponse>(res: R, steps: Record<string, numb
   return res;
 }
 
+// CORS preflight for the endpoints that take a JSON body (POST/PATCH/DELETE:
+// the phone's own «Ειδοποίησέ με» data). Phones never send one; the browser
+// preview of the app (expo start --web) does, and was blocked without it.
+export function preflight() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...CORS,
+      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Accept',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 export function fail(status: number, error: string) {
   return NextResponse.json({ error }, { status, headers: { ...CORS, 'Cache-Control': 'no-store' } });
 }

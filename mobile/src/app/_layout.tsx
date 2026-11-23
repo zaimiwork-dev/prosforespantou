@@ -11,6 +11,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, In
 import { NotoSerifDisplay_400Regular, NotoSerifDisplay_400Regular_Italic } from '@expo-google-fonts/noto-serif-display';
 import { useType } from '@/constants/theme';
 import { ToastHost } from '@/components/ui/toast';
+import { NotificationRouter } from '@/components/notification-router';
 import { useSettings, useSettingsLoaded } from '@/lib/settings';
 
 SplashScreen.preventAutoHideAsync();
@@ -59,6 +60,8 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ title: 'Ρυθμίσεις' }} />
         </Stack.Protected>
       </Stack>
+      {/* Tapping a «Ειδοποίησέ με» notification opens its offer. */}
+      {onboarded ? <NotificationRouter /> : null}
       {/* Last child: draws above every screen and the tab bar. */}
       <ToastHost />
     </ThemeProvider>

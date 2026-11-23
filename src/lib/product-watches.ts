@@ -4,7 +4,7 @@
 // The nightly check is src/scripts/fire-product-watches.mjs (rules in
 // lib/watch-alerts).
 import { loadItemPrices, type ListPricesReader } from './list-prices.ts';
-import { lowest, type PricePoint } from './watch-alerts.ts';
+import { lowest, type PricePoint, type WatchView } from './watch-alerts.ts';
 
 type Owner = { deviceId: string } | { subscriberId: string };
 
@@ -16,19 +16,7 @@ export type WatchInput = {
   targetPrice: number | null;
 };
 
-export type WatchView = {
-  id: string;
-  chain: string;
-  code: string;
-  name: string;
-  onOffer: boolean;
-  onDrop: boolean;
-  targetPrice: number | null;
-  startPrice: number | null;
-  // The best price we can prove right now, and where.
-  now: { chain: string; price: number; kind: 'offer' | 'shelf'; offerId: string | null } | null;
-  createdAt: string;
-};
+export type { WatchView };
 
 // A person watching hundreds of products is a bot or a bug.
 export const MAX_WATCHES = 200;

@@ -24,11 +24,13 @@ import {
   type ListItem,
 } from '@/lib/shopping-list';
 import { ListBasketCard } from '@/components/list-basket-card';
+import { WatchesView } from '@/components/watches-view';
+import { useWatches } from '@/lib/alerts';
 import { useListPrices } from '@/lib/list-prices';
 import { atChain, cheaperElsewhere, type CheaperElsewhere } from '@shared/list-basket';
 import { Fonts, Radius, Space, useType, type TypeScale, type Palette, readableOn } from '@/constants/theme';
 
-type Tab = 'list' | 'favourites';
+type Tab = 'list' | 'favourites' | 'alerts';
 
 export default function ListScreen() {
   const T = useType();
@@ -37,14 +39,17 @@ export default function ListScreen() {
   const [tab, setTab] = useState<Tab>('list');
   const { items, loaded } = useShoppingList();
   const { favourites } = useFavourites();
+  const { watches } = useWatches();
   useFocusEffect(useCallback(() => track('page_view', { page: 'list' }), []));
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <Text style={styles.h1} accessibilityRole="header">Λίστα</Text>
       <View style={styles.segment} accessibilityRole="tablist">
-        <SegmentButton label={`Η λίστα μου${items.length ? ` (${items.length})` : ''}`} selected={tab === 'list'} onPress={() => setTab('list')} />
+        <SegmentButton label={`Λίστα${items.length ? ` (${items.length})` : ''}`} selected={tab === 'list'} onPress={() => setTab('list')} />
         <SegmentButton label={`Αγαπημένα${favourites.length ? ` (${favourites.length})` : ''}`} selected={tab === 'favourites'} onPress={() => setTab('favourites')} />
+        {/* «Ειδοποίησέ με» watches (components/watches-view). */}
+        <SegmentButton label={`Ειδοποιήσεις${watches.length ? ` (${watches.length})` : ''}`} selected={tab === 'alerts'} onPress={() => setTab('alerts')} />
       </View>
       {!loaded ? (
         <View style={styles.center}>
@@ -53,7 +58,7 @@ export default function ListScreen() {
       ) : tab === 'list' ? (
         <ShoppingListView items={items} />
       ) : (
-        <FavouritesView />
+        tab === 'favourites' ? <FavouritesView /> : <WatchesView />
       )}
     </SafeAreaView>
   );

@@ -16,6 +16,7 @@ import { useChains } from '@/lib/chains';
 import { favouriteKeyFor, toggleFavourite, useFavourites } from '@/lib/favourites';
 import { formatPrice, formatUnitPrice } from '@/lib/format';
 import { addToList, changeQuantity, useShoppingList } from '@/lib/shopping-list';
+import { WatchButton } from '@/components/watch-sheet';
 import { recordView } from '@/lib/recently-viewed';
 import { noteInterest } from '@/lib/interest';
 import { tap } from '@/lib/haptics';
@@ -178,6 +179,8 @@ function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode
       {offer.verdict && !muted ? <Text style={styles.verdict}>{VERDICT_LABEL[offer.verdict]}</Text> : null}
 
       <ListActions offer={offer} />
+      {/* «Ειδοποίησέ με»: on offer anywhere / cheaper / my price (lib/alerts). */}
+      <WatchButton offerId={offer.id} chain={offer.chain} itemCode={offer.itemCode ?? null} name={offer.title || offer.name} />
 
       {updated ? <Text style={styles.fresh}>Ενημερώθηκε {updated}</Text> : null}
 
