@@ -149,7 +149,7 @@ export function OfferDetails({ offer, comparison = [], timeline = null, similar 
             <div className="od-price-label">{offer.offerType === 'points' ? 'Τιμή' : 'Τιμή προσφοράς'}</div>
             <div className="od-price">{formatPrice(discountedPrice)}</div>
             {offer.offerType === 'points' && (
-              <div className="od-points-note">Προσφορά πόντων για μέλη της κάρτας: η τιμή δεν αλλάζει{description ? `, κερδίζεις ${description}` : ''}.</div>
+              <div className="od-points-note">Προσφορά πόντων για μέλη της κάρτας, η τιμή δεν αλλάζει{description ? `: «${description}»` : ''}.</div>
             )}
           </div>
           {originalPrice && (

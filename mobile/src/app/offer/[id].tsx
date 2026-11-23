@@ -171,7 +171,7 @@ function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode
       </View>
       {offer.points ? (
         <Text style={styles.baseline}>
-          Προσφορά πόντων για μέλη της κάρτας: η τιμή δεν αλλάζει, κερδίζεις {offer.sticker ?? 'πόντους'}.
+          Προσφορά πόντων για μέλη της κάρτας, η τιμή δεν αλλάζει{offer.sticker ? `: «${offer.sticker}»` : ''}.
         </Text>
       ) : null}
       {!struck && !offer.points && offer.baseline ? (
