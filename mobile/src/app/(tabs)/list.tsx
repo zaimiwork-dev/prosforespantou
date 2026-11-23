@@ -25,7 +25,7 @@ import {
 } from '@/lib/shopping-list';
 import { ListBasketCard } from '@/components/list-basket-card';
 import { useListPrices } from '@/lib/list-prices';
-import { cheaperElsewhere, type CheaperElsewhere } from '@shared/list-basket';
+import { atChain, cheaperElsewhere, type CheaperElsewhere } from '@shared/list-basket';
 import { Fonts, Radius, Space, useType, type TypeScale, type Palette, readableOn } from '@/constants/theme';
 
 type Tab = 'list' | 'favourites';
@@ -250,7 +250,7 @@ function ItemRow({ item, first, alt }: { item: ListItem; first: boolean; alt?: C
           <Pressable
             onPress={() => router.push(`/offer/${alt.kind === 'offer' && alt.offerId ? alt.offerId : item.id}`)}
             accessibilityRole="link"
-            accessibilityLabel={`Πιο φθηνά ${altChain?.name ?? alt.chain}: ${formatPrice(alt.price)}, ${formatPrice(alt.savings)} λιγότερα`}
+            accessibilityLabel={`Πιο φθηνά ${atChain(alt.chain, altChain?.name ?? alt.chain)}: ${formatPrice(alt.price)}, ${formatPrice(alt.savings)} λιγότερα`}
             style={styles.cheaper}>
             <Text style={styles.cheaperText}>
               Πιο φθηνά στο {altChain?.short ?? alt.chain}: −{formatPrice(alt.savings)}
