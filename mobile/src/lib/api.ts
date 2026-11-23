@@ -3,6 +3,7 @@
 // field rename there fails this app's type-check instead of a phone.
 import type { DealCard } from '@shared/api/deal-card';
 import type { PriceTimeline } from '@shared/price-timeline';
+import type { ItemPrices } from '@shared/list-basket';
 
 export type { DealCard, PriceTimeline };
 
@@ -59,6 +60,10 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw e;
   }
 }
+
+// GET /api/v1/list-prices — each list item's price at the other chains (the
+// rows of its comparison sheet), for the shared src/lib/list-basket.ts.
+export type ListPricesResponse = { items: Record<string, ItemPrices> };
 
 export type DealSort = 'hot' | 'expiring' | 'discount' | 'newest' | 'price_asc' | 'price_desc';
 
@@ -152,4 +157,6 @@ export const api = {
     get<SearchResponse>(`/search${query({ q: text, chain })}`, signal),
   suggest: (text: string, signal?: AbortSignal) => get<SuggestResponse>(`/suggest${query({ q: text })}`, signal),
   offer: (id: string, signal?: AbortSignal) => get<OfferResponse>(`/offers/${encodeURIComponent(id)}`, signal),
+  listPrices: (ids: string[], signal?: AbortSignal) =>
+    get<ListPricesResponse>(`/list-prices${query({ ids: [...ids].sort().join(',') })}`, signal),
 };

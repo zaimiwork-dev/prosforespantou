@@ -23,6 +23,7 @@ import {
   useShoppingList,
   type ListItem,
 } from '@/lib/shopping-list';
+import { ListBasketCard } from '@/components/list-basket-card';
 import { Fonts, Radius, Space, useType, type TypeScale, type Palette, readableOn } from '@/constants/theme';
 
 type Tab = 'list' | 'favourites';
@@ -124,6 +125,7 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
+        <ListBasketCard items={items} />
         {groups.length > 1 ? (
           <Text style={styles.multi}>
             Σε {groups.length} καταστήματα · υποσύνολο ανά κατάστημα

@@ -1883,6 +1883,36 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 .drawer-multistore b { color: var(--ink); }
 
+/* «Σε ποιο κατάστημα βγαίνει φθηνότερα» — the list priced at each chain
+   (lib/list-basket). Plain sentences, one chain per row. */
+.list-basket {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.list-basket h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; color: var(--ink); }
+.list-basket-lead { margin: 0 0 10px; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.list-basket ul { list-style: none; margin: 0; padding: 0; }
+.list-basket li {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.list-basket-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; }
+.list-basket-body { display: flex; flex-direction: column; gap: 1px; font-size: 14px; line-height: 1.4; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.list-basket-body b { color: var(--ink); font-weight: 700; }
+.list-basket-diff { font-weight: 600; }
+.list-basket-diff.cheaper { color: #1a7f37; }
+.list-basket-diff.dearer, .list-basket-diff.same { color: var(--ink-2); font-weight: 400; }
+.list-basket-more {
+  display: block; width: 100%; min-height: 44px; margin-top: 4px;
+  border: 0; border-top: 1px solid var(--line); background: none;
+  color: var(--brand); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.list-basket-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--ink-2); }
+
 .drawer-foot {
   border-top: 1px solid var(--line);
   padding: 16px 20px;

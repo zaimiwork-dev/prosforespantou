@@ -33,6 +33,9 @@ export type RivalRow = {
   supermarket: string;
   price: number | null;
   rowType: 'offer' | 'shelf';
+  // The rival offer (offer rows whose candidate carried an id) — lets the
+  // shopping list link to it (lib/list-prices).
+  offerId?: string;
 };
 
 type ComparisonArgs = {
@@ -96,7 +99,7 @@ export function comparisonRivals({
   ).slice(0, 8);
   for (const d of comparable) {
     if (d.supermarket && d.supermarket !== source.supermarket) {
-      rows.push({ supermarket: d.supermarket, price: d.discountedPrice ?? null, rowType: 'offer' });
+      rows.push({ supermarket: d.supermarket, price: d.discountedPrice ?? null, rowType: 'offer', ...(d.id ? { offerId: d.id } : {}) });
     }
   }
 

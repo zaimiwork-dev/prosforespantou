@@ -9,10 +9,18 @@ import { track } from '@/lib/track';
 import { SUPERMARKETS } from '@/lib/constants';
 import { Icon } from './Icons';
 import { getCheaperAlternatives } from '@/actions/get-cheaper-alternatives';
+import { getListPrices } from '@/actions/get-list-prices';
+import { basketText, compareBasket } from '@/lib/list-basket';
+
+const chainName = (id) => SUPERMARKETS.find((s) => s.id === id)?.name || id;
+// Stores shown before «Δες και τα άλλα …»: the list itself stays in view.
+const BASKET_ROWS = 3;
 
 export function ShoppingList({ isOpen, onClose }) {
   const { items, addItem, decreaseItem, clearList, getShareText } = useShoppingListStore();
   const [alternatives, setAlternatives] = useState({});
+  const [listPrices, setListPrices] = useState({});
+  const [allChains, setAllChains] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -47,6 +55,9 @@ export function ShoppingList({ isOpen, onClose }) {
     getCheaperAlternatives(ids).then((res) => {
       if (!cancelled) setAlternatives(res || {});
     }).catch(() => {});
+    getListPrices(ids).then((res) => {
+      if (!cancelled) setListPrices(res || {});
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [isOpen, itemIdsKey, items]);
 
@@ -61,6 +72,22 @@ export function ShoppingList({ isOpen, onClose }) {
     }
     return sums;
   }, [items, alternatives]);
+
+  // «Σε ποιο κατάστημα βγαίνει φθηνότερα» (lib/list-basket): the list priced
+  // at each chain from the rows its comparison sheets show.
+  const basket = useMemo(() => basketText(
+    compareBasket(
+      items.map((i) => ({
+        id: i.id,
+        chain: i.supermarket || i.supermarket_id || null,
+        price: Number(i.discountedPrice || i.discounted_price),
+        quantity: i.quantity || 1,
+      })),
+      listPrices,
+    ),
+    formatPrice,
+    chainName,
+  ), [items, listPrices]);
 
   const totalSavings = useMemo(
     () => Array.from(groupSavings.values()).reduce((a, b) => a + b, 0),
@@ -136,6 +163,31 @@ export function ShoppingList({ isOpen, onClose }) {
                   Η λίστα σου απλώνεται σε <b>{groups.length} καταστήματα</b>.
                   Παρακάτω χωρίζεται ανά κατάστημα με επιμέρους σύνολο.
                 </div>
+              )}
+
+              {basket.lead && (
+                <section className="list-basket" aria-labelledby="list-basket-title">
+                  <h3 id="list-basket-title">Σε ποιο κατάστημα βγαίνει φθηνότερα</h3>
+                  <p className="list-basket-lead">{basket.lead}</p>
+                  <ul>
+                    {(allChains ? basket.rows : basket.rows.slice(0, BASKET_ROWS)).map((r) => (
+                      <li key={r.chain}>
+                        <span className="list-basket-dot" style={{ background: SUPERMARKETS.find((s) => s.id === r.chain)?.color || 'var(--ink-3)' }} aria-hidden="true" />
+                        <span className="list-basket-body">
+                          <b>{chainName(r.chain)}</b>
+                          <span>{r.label}</span>
+                          <span className={`list-basket-diff ${r.tone}`}>{r.detail}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {!allChains && basket.rows.length > BASKET_ROWS && (
+                    <button type="button" className="list-basket-more" onClick={() => setAllChains(true)}>
+                      Δες και {basket.rows.length - BASKET_ROWS === 1 ? 'το άλλο κατάστημα' : `τα άλλα ${basket.rows.length - BASKET_ROWS} καταστήματα`}
+                    </button>
+                  )}
+                  <p className="list-basket-note">{basket.note}</p>
+                </section>
               )}
 
               {groups.map((g) => {
