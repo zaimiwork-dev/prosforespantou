@@ -91,11 +91,12 @@ describe('EXPECTED_FEEDS', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('monitors every live chain offer feed (Κρητικός retired 2026-11-22)', () => {
+  it('monitors every live chain offer feed (Κρητικός retired 2026-11-22, Γαλαξίας added 11-23)', () => {
     const chains = new Set(EXPECTED_FEEDS.map((f) => f.chain));
     expect(chains).toEqual(new Set([
       'ab',
       'bazaar',
+      'galaxias',
       'lidl',
       'masoutis',
       'mymarket',
@@ -112,6 +113,7 @@ describe('EXPECTED_FEEDS', () => {
     expect(shelfFeeds).toEqual(new Set([
       'ab',
       'bazaar',
+      'galaxias',
       'lidl',
       'masoutis',
       'mymarket',
@@ -122,8 +124,10 @@ describe('EXPECTED_FEEDS', () => {
   it('gives every weekly feed a window longer than a week', () => {
     // A 7-day window on a 7-day cadence alarms on any run that slips by an
     // hour. Everything that runs weekly must sit above 168h.
+    // Γαλαξίας' leaflet is read daily from its shop (one walk), so the weekly
+    // feeds are the ones whose schedule is not daily.
     const weeklySources = new Set(['wolt', 'leaflet']);
-    for (const feed of EXPECTED_FEEDS.filter((f) => weeklySources.has(f.source))) {
+    for (const feed of EXPECTED_FEEDS.filter((f) => weeklySources.has(f.source) && !f.schedule.startsWith('καθημερινά'))) {
       expect(feed.maxAgeHours).toBeGreaterThan(7 * 24);
     }
   });

@@ -56,6 +56,7 @@ on:
     - cron: '0 1 * * *'   # daily 01:00 UTC — Sklavenitis offers
     # (Κρητικός daily offers — retired 2026-11-22: kritikos-sm.gr redirects to masoutis.gr; manual dispatch only)
     - cron: '30 2 * * *'  # daily 02:30 UTC — Bazaar offers
+    - cron: '15 2 * * *'  # daily 02:15 UTC — Γαλαξίας catalogue + leaflet + web offers (one walk, added 2026-11-23)
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '30 3 * * *'  # daily 03:30 UTC — Masoutis web offers (site API)
     - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
@@ -83,6 +84,7 @@ on:
           - kritikos-offers
           - bazaar-offers
           - bazaar-catalog
+          - galaxias
           - bazaar-resolver-only
           - ab-offers
           - ab-catalog
@@ -290,6 +292,58 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           # Intentionally no PROXY_URL: this tests whether GitHub's direct IP is
           # currently served. One dry-run page only; no writes/deactivation.
+
+  # Γαλαξίας (owner 2026-11-23: «we need offers from galaksias»). One walk of
+  # the shop's public Magento GraphQL (~10k products, ~5 min) feeds three
+  # steps through a cache file: the catalogue FIRST (products + barcodes +
+  # regular prices, so the offers then map by barcode at once), then the
+  # «ΦΥΛΛΑΔΙΟ» leaflet offers, then the web offers. See
+  # src/scripts/lib/galaxias-api.mjs + galaxias-promos.mjs.
+  galaxias:
+    if: github.event.schedule == '15 2 * * *' || github.event.inputs.chain == 'galaxias'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GALAXIAS_CACHE: ${{ runner.temp }}/galaxias-walk.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Γαλαξίας catalogue (walk + products + regular prices)
+        id: g_catalog
+        continue-on-error: true
+        run: node src/scripts/galaxias-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Γαλαξίας leaflet offers («ΦΥΛΛΑΔΙΟ»)
+        id: g_leaflet
+        continue-on-error: true
+        run: node src/scripts/adapters/galaxias.mjs
+        env:
+          FEED: leaflet
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Γαλαξίας web offers
+        id: g_web
+        continue-on-error: true
+        run: node src/scripts/adapters/galaxias.mjs
+        env:
+          FEED: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Gate — fail the job if any step failed
+        if: always()
+        run: |
+          for pair in "catalog:${{ steps.g_catalog.outcome }}" "leaflet:${{ steps.g_leaflet.outcome }}" "web:${{ steps.g_web.outcome }}"; do
+            name="${pair%%:*}"; outcome="${pair##*:}"
+            if [ "$outcome" != "success" ]; then echo "::error::Γαλαξίας $name step: $outcome"; failed=1; fi
+          done
+          [ -z "$failed" ]
 
   bazaar-offers:
     # Daily 02:30 UTC + manual. Scrapes bazaar-online.gr/prosfores (OpenCart,

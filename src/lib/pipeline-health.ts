@@ -48,6 +48,9 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'ab', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 03:00 UTC — GitHub Actions' },
   { chain: 'masoutis', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 03:30 UTC — GitHub Actions' },
   { chain: 'masoutis', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 03:00 UTC — GitHub Actions' },
+  // Γαλαξίας (added 2026-11-23): one daily walk feeds all three.
+  { chain: 'galaxias', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 02:15 UTC — GitHub Actions (galaxias)' },
+  { chain: 'galaxias', source: 'leaflet', maxAgeHours: 36, schedule: 'καθημερινά 02:15 UTC — GitHub Actions (galaxias)' },
   { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 06:00 UTC — GitHub Actions' },
 
   // ── Shelf-price / catalog feeds ───────────────────────────────────────────
@@ -55,6 +58,7 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'ab', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 04:30 UTC — GitHub Actions (ab-catalog)' },
   { chain: 'masoutis', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 06:30 UTC — GitHub Actions (masoutis-catalog)' },
   { chain: 'bazaar', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 07:30 UTC — GitHub Actions (bazaar-catalog)' },
+  { chain: 'galaxias', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 02:15 UTC — GitHub Actions (galaxias)' },
   // My Market's catalog is a continue-on-error STEP inside the mymarket-canonical
   // job, not a job of its own — so it can fail silently while the job stays
   // green. This row is the only place that failure becomes visible.

@@ -828,4 +828,28 @@ export const CHAIN_NATIVE_MAPS: Record<string, Record<string, string | null>> = 
     'Όλα για το μωρό': D.baby,
     'Είδη προσωπικής περιποίησης': D.personal,
   },
+  // Γαλαξίας (galaxias.shop, added 2026-11-23): the level-2 departments of its
+  // Magento catalogue, all 20 seen on the first full walk.
+  galaxias: {
+    'Προσωπική Υγιεινή': D.personal,
+    'Τρόφιμα': D.pantry,
+    'Σνακς': D.snacks,
+    'Απορρυπαντικά': D.home,
+    'Είδη Ψυγείου': D.dairy,
+    'Οικιακής Χρήσης': D.home,
+    'Τυριά, Αλλαντικά': D.cheese,
+    'Κατεψυγμένα': D.frozen,
+    // Soft drinks AND juices together: keywords split them (juice → Πρωινό).
+    'Αναψυκτικά, Χυμοί': null,
+    'Είδη Πρωϊνού': D.breakfast,
+    'Κάβα': D.drinks,
+    'Αρτοποιείο': D.bakery,
+    'Μαναβική': D.fruit,
+    'Ροφήματα': D.breakfast,
+    'Ψαρικά, Κρέας': D.meat,
+    'Κατοικίδια': D.pets,
+    'Έτοιμα Γεύματα': D.deli,
+    'Είδη Πάρτι': D.home,
+    'Βρεφικές Τροφές': D.baby,
+  },
 };
