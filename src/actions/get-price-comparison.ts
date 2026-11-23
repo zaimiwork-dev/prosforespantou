@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
 import { filterByVerdict, loadVerdictLookup, pairKeyOf } from '@/lib/comparison-verdict';
+import { linkedItems, loadLinksFor } from '@/lib/item-links';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 import { pickShelfRows, SHELF_PRICE_MAX_AGE_DAYS } from '@/lib/shelf-comparison';
 import { loadFreshShelfChains } from '@/lib/feed-freshness';
@@ -32,7 +33,15 @@ export async function getPriceComparison(discountId: string) {
         const productId = source.productId;
         const barcode = source.product?.barcode ?? null;
 
-        if (!productId && !barcode) return [];
+        // Cross-chain item links (lib/item-links, 2026-11-22): items at other
+        // chains confirmed to be this same product (barcode, AI check once per
+        // pair of item codes, or the owner), though they sit on another
+        // product record because each chain named it differently.
+        const links = await loadLinksFor(prisma, [{ chain: source.supermarket, code: source.chainItemcode }]);
+        const linked = linkedItems(links, { chain: source.supermarket, code: source.chainItemcode })
+          .filter((l) => l.chain !== source.supermarket);
+
+        if (!productId && !barcode && linked.length === 0) return [];
 
         const matchedProductIds = new Set<string>();
         if (productId) matchedProductIds.add(productId);
@@ -45,19 +54,28 @@ export async function getPriceComparison(discountId: string) {
           for (const p of sameBarcode) matchedProductIds.add(p.id);
         }
 
-        if (matchedProductIds.size === 0) return [];
-
         const now = new Date();
-        const others = await prisma.discount.findMany({
-          where: withPublicDealVisibility({
-            productId: { in: [...matchedProductIds] },
-            isActive: true,
-            validUntil: { gt: now },
-            NOT: { id: discountId },
-          }),
-          include: { store: true, product: true },
-          orderBy: { discountedPrice: 'asc' },
-        });
+        const live = { isActive: true, validUntil: { gt: now }, NOT: { id: discountId } };
+        const [clusterOffers, linkedOffers] = await Promise.all([
+          matchedProductIds.size > 0
+            ? prisma.discount.findMany({
+              where: withPublicDealVisibility({ ...live, productId: { in: [...matchedProductIds] } }),
+              include: { store: true, product: true },
+              orderBy: { discountedPrice: 'asc' },
+            })
+            : Promise.resolve([]),
+          linked.length > 0
+            ? prisma.discount.findMany({
+              where: withPublicDealVisibility({ ...live, OR: linked.map((l) => ({ supermarket: l.chain, chainItemcode: l.code })) }),
+              include: { store: true, product: true },
+              orderBy: { discountedPrice: 'asc' },
+            })
+            : Promise.resolve([]),
+        ]);
+        const seen = new Set<string>();
+        const others = [...clusterOffers, ...linkedOffers]
+          .filter((d) => (seen.has(d.id) ? false : (seen.add(d.id), true)))
+          .sort((a, b) => a.discountedPrice - b.discountedPrice);
 
         // Only OTHER chains, and only like-for-like pack sizes. A row from the
         // shopper's own chain is never a comparison (2026-11-22): its web +
@@ -74,7 +92,7 @@ export async function getPriceComparison(discountId: string) {
         // Before filterComparable, so a hidden row cannot take its chain's slot.
         // KEEP IN LOCKSTEP with lib/comparison-count comparisonRivals.
         // Keyed by each chain's own item code (its «slot»), so a renamed
-        // listing keeps its verdict.
+        // listing keeps its verdict. A linked offer passes on its own link row.
         const sourceSide = { chain: source.supermarket, code: source.chainItemcode, name: source.productName };
         const sideOf = (d: (typeof sameSize)[number]) => ({ chain: d.supermarket, code: d.chainItemcode, name: d.productName });
         const verdictOf = await loadVerdictLookup(prisma, sameSize.map((d) => pairKeyOf(sourceSide, sideOf(d))));
@@ -100,13 +118,20 @@ export async function getPriceComparison(discountId: string) {
         }));
 
         // Shelf-price rows («Κανονική τιμή») for chains with NO active offer on
-        // this product. Barcode-gated: snapshots carry no chain-side name, so
-        // the variant/pack guards can't vet them — only the GTIN-verified
-        // cluster is safe (mapping-only clusters are exactly where the stale
-        // mis-mappings live; the Groq mapping audit is still deferred).
+        // this product, from two trusted sources:
+        //   - the barcode cluster (GTIN-verified products), as before;
+        //   - each LINKED item's own chain (the link is a checked same-item
+        //     verdict on the two chain names) — only that chain's snapshots of
+        //     the linked product, never its other chains (those are not links).
         // Chains that appeared in `others` are excluded even if their offer was
         // dropped by a guard above — the snapshot shares the same mapping risk.
-        if (!barcode) return offerRows;
+        const linkedMappings = linked.length > 0
+          ? await prisma.chainProductMapping.findMany({
+            where: { OR: linked.map((l) => ({ supermarket: l.chain, chainItemcode: l.code })) },
+            select: { productId: true, supermarket: true },
+          })
+          : [];
+        if (!barcode && linkedMappings.length === 0) return offerRows;
 
         const excludedChains = new Set<string>();
         if (source.supermarket) excludedChains.add(source.supermarket);
@@ -116,21 +141,27 @@ export async function getPriceComparison(discountId: string) {
         // snapshot age — shelf snapshots are written only on price change, so
         // a stable price has no recent row. SHELF_PRICE_MAX_AGE_DAYS is only
         // a sanity cap here. No `take`: on-change snapshots are few per chain.
-        const [freshChains, snapshots] = await Promise.all([
+        const since = new Date(now.getTime() - SHELF_PRICE_MAX_AGE_DAYS * 86400000);
+        const select = { supermarket: true, price: true, recordedAt: true };
+        const [freshChains, clusterSnaps, linkedSnaps] = await Promise.all([
           loadFreshShelfChains(prisma, now),
-          prisma.priceSnapshot.findMany({
-            where: {
-              productId: { in: [...matchedProductIds] },
-              kind: 'normal',
-              recordedAt: { gte: new Date(now.getTime() - SHELF_PRICE_MAX_AGE_DAYS * 86400000) },
-              supermarket: { notIn: [...excludedChains] },
-            },
-            orderBy: { recordedAt: 'desc' },
-            select: { supermarket: true, price: true, recordedAt: true },
-          }),
+          barcode
+            ? prisma.priceSnapshot.findMany({
+              where: { productId: { in: [...matchedProductIds] }, kind: 'normal', recordedAt: { gte: since }, supermarket: { notIn: [...excludedChains] } },
+              orderBy: { recordedAt: 'desc' },
+              select,
+            })
+            : Promise.resolve([]),
+          linkedMappings.length > 0
+            ? prisma.priceSnapshot.findMany({
+              where: { OR: linkedMappings.map((m) => ({ productId: m.productId, supermarket: m.supermarket })), kind: 'normal', recordedAt: { gte: since } },
+              orderBy: { recordedAt: 'desc' },
+              select,
+            })
+            : Promise.resolve([]),
         ]);
 
-        const shelfRows = pickShelfRows({ snapshots, excludedChains, freshChains, now });
+        const shelfRows = pickShelfRows({ snapshots: [...clusterSnaps, ...linkedSnaps], excludedChains, freshChains, now });
         return [...offerRows, ...shelfRows];
       } catch (error) {
         Sentry.captureException(error);

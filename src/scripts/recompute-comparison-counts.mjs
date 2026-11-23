@@ -24,7 +24,8 @@ dotenv.config();
 import { comparisonRivals, isCheapestInCluster } from '../lib/comparison-count.ts';
 import { SHELF_PRICE_MAX_AGE_DAYS } from '../lib/shelf-comparison.ts';
 import { loadFreshShelfChains } from '../lib/feed-freshness.ts';
-import { loadVerdictLookup } from '../lib/comparison-verdict.ts';
+import { itemKey, loadVerdictLookup } from '../lib/comparison-verdict.ts';
+import { linkedItems, loadAllLinks } from '../lib/item-links.ts';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 
@@ -100,6 +101,48 @@ async function run() {
   }
   console.log(`   barcode-backed products: ${shelfPids.length}, with fresh shelf snapshots: ${snapsByPid.size}`);
 
+  // Cross-chain item links (lib/item-links) — same rule as the sheet: a
+  // linked item's live offers, else its regular price at ITS OWN chain.
+  const links = await loadAllLinks(prisma);
+  const offersByItem = new Map(); // chain#code → visible live offers
+  for (const o of active) {
+    if (!o.chainItemcode || !publiclyVisible(o)) continue;
+    const k = itemKey({ chain: o.supermarket, code: o.chainItemcode });
+    const arr = offersByItem.get(k) || [];
+    arr.push(o);
+    offersByItem.set(k, arr);
+  }
+  const linkedRefs = new Map(); // chain#code → { chain, code } for every linked item
+  for (const list of links.values()) for (const r of list) linkedRefs.set(itemKey(r), r);
+  const productOfItem = new Map(); // chain#code → productId
+  for (const refs of chunk([...linkedRefs.values()], 500)) {
+    const maps = await prisma.chainProductMapping.findMany({
+      where: { OR: refs.map((r) => ({ supermarket: r.chain, chainItemcode: r.code })) },
+      select: { productId: true, supermarket: true, chainItemcode: true },
+    });
+    for (const m of maps) productOfItem.set(itemKey({ chain: m.supermarket, code: m.chainItemcode }), m.productId);
+  }
+  const linkedSnapsByItem = new Map(); // chain#code → that item's product snapshots AT ITS chain
+  const pidsToLoad = [...new Set(productOfItem.values())];
+  const snapsByPidChain = new Map();
+  for (const ids of chunk(pidsToLoad, 500)) {
+    const snaps = await prisma.priceSnapshot.findMany({
+      where: { productId: { in: ids }, kind: 'normal', recordedAt: { gte: since } },
+      select: { productId: true, supermarket: true, price: true, recordedAt: true },
+    });
+    for (const sn of snaps) {
+      const k = `${sn.productId}|${sn.supermarket}`;
+      const arr = snapsByPidChain.get(k) || [];
+      arr.push(sn);
+      snapsByPidChain.set(k, arr);
+    }
+  }
+  for (const [k, pid] of productOfItem) {
+    const chain = linkedRefs.get(k)?.chain;
+    if (chain) linkedSnapsByItem.set(k, snapsByPidChain.get(`${pid}|${chain}`) || []);
+  }
+  console.log(`   item links: ${linkedRefs.size} linked items, ${[...linkedRefs.keys()].filter((k) => offersByItem.has(k)).length} with a live offer`);
+
   // Compute, then group changed rows by their new (count, cheapest) pair → one
   // updateMany per distinct value instead of 15k single-row updates.
   // The count and the «cheapest» flag come from the SAME rival rows
@@ -111,15 +154,20 @@ async function run() {
   for (const d of active) {
     let count = 0;
     let isCheapest = false;
-    if (d.productId) {
-      const clusterOffers = (byPid.get(d.productId) || []).filter((o) => o.id !== d.id);
+    const linked = linkedItems(links, { chain: d.supermarket, code: d.chainItemcode }).filter((l) => l.chain !== d.supermarket);
+    if (d.productId || linked.length > 0) {
+      const clusterOffers = d.productId ? (byPid.get(d.productId) || []).filter((o) => o.id !== d.id) : [];
+      const linkedOffers = linked.flatMap((l) => offersByItem.get(itemKey(l)) || []).filter((o) => o.id !== d.id);
+      const linkedSnapshots = linked.flatMap((l) => linkedSnapsByItem.get(itemKey(l)) || []);
       const rivals = comparisonRivals({
         source: d,
         clusterOffers,
         barcodeBacked: Boolean(d.product?.barcode),
-        snapshots: snapsByPid.get(d.productId) || [],
+        snapshots: d.productId ? snapsByPid.get(d.productId) || [] : [],
         freshChains,
         verdictOf,
+        linkedOffers,
+        linkedSnapshots,
         now,
       });
       count = new Set(rivals.map((r) => r.supermarket)).size;
