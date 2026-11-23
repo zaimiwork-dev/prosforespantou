@@ -8,9 +8,8 @@ import { useShoppingListStore } from '@/lib/store';
 import { track } from '@/lib/track';
 import { SUPERMARKETS } from '@/lib/constants';
 import { Icon } from './Icons';
-import { getCheaperAlternatives } from '@/actions/get-cheaper-alternatives';
 import { getListPrices } from '@/actions/get-list-prices';
-import { basketText, compareBasket } from '@/lib/list-basket';
+import { atChain, basketText, cheaperElsewhere, compareBasket } from '@/lib/list-basket';
 
 const chainName = (id) => SUPERMARKETS.find((s) => s.id === id)?.name || id;
 // Stores shown before «Δες και τα άλλα …»: the list itself stays in view.
@@ -18,7 +17,6 @@ const BASKET_ROWS = 3;
 
 export function ShoppingList({ isOpen, onClose }) {
   const { items, addItem, decreaseItem, clearList, getShareText } = useShoppingListStore();
-  const [alternatives, setAlternatives] = useState({});
   const [listPrices, setListPrices] = useState({});
   const [allChains, setAllChains] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -52,14 +50,30 @@ export function ShoppingList({ isOpen, onClose }) {
     const ids = items.map((i) => i.id).filter(Boolean);
     if (ids.length === 0) return;
     let cancelled = false;
-    getCheaperAlternatives(ids).then((res) => {
-      if (!cancelled) setAlternatives(res || {});
-    }).catch(() => {});
     getListPrices(ids).then((res) => {
       if (!cancelled) setListPrices(res || {});
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [isOpen, itemIdsKey, items]);
+
+  // The list items as lib/list-basket reads them (unit price, quantity).
+  const basketItems = useMemo(() => items.map((i) => ({
+    id: i.id,
+    chain: i.supermarket || i.supermarket_id || null,
+    price: Number(i.discountedPrice || i.discounted_price),
+    quantity: i.quantity || 1,
+  })), [items]);
+
+  // «Πιο φθηνά στο …» per item — the same prices as the card above
+  // (lib/list-basket cheaperElsewhere), so a tag and a chain row never disagree.
+  const alternatives = useMemo(() => {
+    const out = {};
+    for (const b of basketItems) {
+      const alt = cheaperElsewhere(b, listPrices[b.id]);
+      if (alt) out[b.id] = alt;
+    }
+    return out;
+  }, [basketItems, listPrices]);
 
   const groupSavings = useMemo(() => {
     const sums = new Map();
@@ -75,19 +89,10 @@ export function ShoppingList({ isOpen, onClose }) {
 
   // «Σε ποιο κατάστημα βγαίνει φθηνότερα» (lib/list-basket): the list priced
   // at each chain from the rows its comparison sheets show.
-  const basket = useMemo(() => basketText(
-    compareBasket(
-      items.map((i) => ({
-        id: i.id,
-        chain: i.supermarket || i.supermarket_id || null,
-        price: Number(i.discountedPrice || i.discounted_price),
-        quantity: i.quantity || 1,
-      })),
-      listPrices,
-    ),
-    formatPrice,
-    chainName,
-  ), [items, listPrices]);
+  const basket = useMemo(
+    () => basketText(compareBasket(basketItems, listPrices), formatPrice, chainName),
+    [basketItems, listPrices],
+  );
 
   const totalSavings = useMemo(
     () => Array.from(groupSavings.values()).reduce((a, b) => a + b, 0),
@@ -215,7 +220,7 @@ export function ShoppingList({ isOpen, onClose }) {
                         }
                         const price = Number(item.discountedPrice || item.discounted_price);
                         const alt = alternatives[item.id];
-                        const altSm = alt ? SUPERMARKETS.find((s) => s.id === alt.supermarket) : null;
+                        const altSm = alt ? SUPERMARKETS.find((s) => s.id === alt.chain) : null;
                         return (
                           <div key={item.id} className="list-item">
                             <div className="list-item-img">
@@ -228,14 +233,17 @@ export function ShoppingList({ isOpen, onClose }) {
                             <div className="list-item-body">
                               <h4 className="list-item-name">{name}</h4>
                               <div className="list-item-price">{formatPrice(price * (item.quantity || 1))}</div>
-                              {alt && alt.savings >= 0.10 && (
+                              {alt && (
+                                // An offer there opens that offer; a regular
+                                // shelf price opens this item's own page, whose
+                                // comparison shows it as «Κανονική τιμή».
                                 <a
-                                  href={`/offer/${alt.discountId}`}
+                                  href={`/offer/${alt.kind === 'offer' && alt.offerId ? alt.offerId : item.id}`}
                                   className="cheaper-chip"
                                   style={{ borderColor: altSm?.color, color: altSm?.color }}
-                                  title={`${formatPrice(alt.discountedPrice)} στο ${altSm?.name || alt.supermarket}`}
+                                  title={`${alt.kind === 'shelf' ? 'Κανονική τιμή ' : ''}${formatPrice(alt.price)} ${atChain(alt.chain, chainName(alt.chain))}`}
                                 >
-                                  Πιο φθηνά στο {altSm?.short || alt.supermarket} · −{formatPrice(alt.savings)}
+                                  Πιο φθηνά στο {altSm?.short || alt.chain} · −{formatPrice(alt.savings)}
                                 </a>
                               )}
                             </div>

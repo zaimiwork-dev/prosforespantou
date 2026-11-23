@@ -24,6 +24,8 @@ import {
   type ListItem,
 } from '@/lib/shopping-list';
 import { ListBasketCard } from '@/components/list-basket-card';
+import { useListPrices } from '@/lib/list-prices';
+import { cheaperElsewhere, type CheaperElsewhere } from '@shared/list-basket';
 import { Fonts, Radius, Space, useType, type TypeScale, type Palette, readableOn } from '@/constants/theme';
 
 type Tab = 'list' | 'favourites';
@@ -79,6 +81,17 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
   const [confirming, setConfirming] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
   const { groups, total } = useMemo(() => groupByChain(items), [items]);
+  const prices = useListPrices(items);
+  // «Πιο φθηνά στο …» per item: the same prices as the store card above.
+  const alternatives = useMemo(() => {
+    const out: Record<string, CheaperElsewhere> = {};
+    for (const i of items) {
+      const alt = cheaperElsewhere({ id: i.id, chain: i.chain, price: i.price, quantity: i.quantity }, prices[i.id]);
+      if (alt) out[i.id] = alt;
+    }
+    return out;
+  }, [items, prices]);
+  const savings = items.reduce((s, i) => s + (alternatives[i.id]?.savings ?? 0) * i.quantity, 0);
   const checkedCount = items.filter((i) => i.checked).length;
   const chainOf = (id: string | null) => chains.find((c) => c.id === id);
 
@@ -125,7 +138,7 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ListBasketCard items={items} />
+        <ListBasketCard items={items} prices={prices} />
         {groups.length > 1 ? (
           <Text style={styles.multi}>
             Σε {groups.length} καταστήματα · υποσύνολο ανά κατάστημα
@@ -144,7 +157,7 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
               </View>
               <View style={[styles.groupCard, { borderTopColor: chain?.color ?? C.line }]}>
                 {g.items.map((item, i) => (
-                  <ItemRow key={item.id} item={item} first={i === 0} />
+                  <ItemRow key={item.id} item={item} first={i === 0} alt={alternatives[item.id]} />
                 ))}
               </View>
             </View>
@@ -157,6 +170,11 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
           <Text style={styles.totalLabel}>Συνολικό κόστος</Text>
           <Text style={styles.totalValue}>{formatPrice(total)}</Text>
         </View>
+        {savings >= 0.095 ? (
+          <Text style={styles.footSavings}>
+            Με αλλαγή καταστημάτων η λίστα γίνεται έως {formatPrice(savings)} φθηνότερη
+          </Text>
+        ) : null}
         {shareFailed ? <Text style={styles.footNote}>Δεν άνοιξε η κοινοποίηση. Δοκίμασε ξανά.</Text> : null}
         <View style={styles.footActions}>
           <Pressable style={[styles.footBtn, styles.footBtnPrimary]} onPress={share} accessibilityRole="button">
@@ -179,9 +197,11 @@ function ShoppingListView({ items }: { items: ListItem[] }) {
   );
 }
 
-function ItemRow({ item, first }: { item: ListItem; first: boolean }) {
+function ItemRow({ item, first, alt }: { item: ListItem; first: boolean; alt?: CheaperElsewhere }) {
   const T = useType();
   const styles = useMemo(() => makeStyles(T), [T]);
+  const chains = useChains();
+  const altChain = alt ? chains.find((c) => c.id === alt.chain) : undefined;
   const expired = isExpired(item);
   return (
     <View style={[styles.item, first && styles.itemFirst, expired && styles.itemExpired]}>
@@ -224,6 +244,19 @@ function ItemRow({ item, first }: { item: ListItem; first: boolean }) {
             <Text style={styles.removeText}>Αφαίρεση</Text>
           </Pressable>
         </View>
+        {alt && !expired ? (
+          // An offer there opens that offer; a regular shelf price opens this
+          // item's own page, whose comparison shows it as «Κανονική τιμή».
+          <Pressable
+            onPress={() => router.push(`/offer/${alt.kind === 'offer' && alt.offerId ? alt.offerId : item.id}`)}
+            accessibilityRole="link"
+            accessibilityLabel={`Πιο φθηνά ${altChain?.name ?? alt.chain}: ${formatPrice(alt.price)}, ${formatPrice(alt.savings)} λιγότερα`}
+            style={styles.cheaper}>
+            <Text style={styles.cheaperText}>
+              Πιο φθηνά στο {altChain?.short ?? alt.chain}: −{formatPrice(alt.savings)}
+            </Text>
+          </Pressable>
+        ) : null}
         <View style={styles.stepRow}>
           <View style={styles.stepper}>
             <StepButton label="Μείωση ποσότητας" onPress={() => changeQuantity(item.id, -1)} minus />
@@ -357,6 +390,11 @@ const makeStyles = (T: TypeScale, C: Palette = T.c) =>
     totalLabel: { ...T.text.body, color: C.ink2 },
     totalValue: { ...T.text.price, color: C.ink, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
     footNote: { ...T.text.body, color: C.accentText, marginTop: Space[2] },
+    footSavings: { ...T.text.secondary, color: C.brandText, marginTop: Space[1] },
+    // A text link, not a pill: the column beside the photo is ~200 dp wide and
+    // a bordered pill wrapped mid-phrase there.
+    cheaper: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+    cheaperText: { ...T.text.secondary, fontFamily: Fonts.sans700, color: C.brandText, textDecorationLine: 'underline' },
     footActions: { flexDirection: 'row', gap: Space[3], marginTop: Space[3] },
     footBtn: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.pill, borderWidth: 2, borderColor: C.brandText, backgroundColor: C.surface, paddingHorizontal: Space[3] },
     footBtnPrimary: { backgroundColor: C.brand, borderColor: C.brand },

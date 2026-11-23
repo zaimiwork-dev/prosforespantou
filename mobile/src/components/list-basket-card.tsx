@@ -1,11 +1,11 @@
 // «Σε ποιο κατάστημα βγαίνει φθηνότερα» — the shopping list priced at each
 // chain. Numbers and sentences come from the shared src/lib/list-basket.ts
 // (the website's list says the same thing); the prices are the rows each
-// item's comparison sheet shows (GET /api/v1/list-prices).
-import { useEffect, useMemo, useState } from 'react';
+// item's comparison sheet shows (GET /api/v1/list-prices, read once per list
+// by lib/list-prices useListPrices).
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { basketText, compareBasket, type ItemPrices } from '@shared/list-basket';
-import { api } from '@/lib/api';
 import { useChains } from '@/lib/chains';
 import { formatPrice } from '@/lib/format';
 import type { ListItem } from '@/lib/shopping-list';
@@ -14,25 +14,12 @@ import { Fonts, Radius, Space, useType, type Palette, type TypeScale } from '@/c
 // Stores shown before «Δες και τα άλλα …»: the list itself stays in view.
 const ROWS = 3;
 
-export function ListBasketCard({ items }: { items: ListItem[] }) {
+export function ListBasketCard({ items, prices }: { items: ListItem[]; prices: Record<string, ItemPrices> }) {
   const T = useType();
   const C = T.c;
   const styles = useMemo(() => makeStyles(T), [T]);
   const chains = useChains();
-  const [prices, setPrices] = useState<Record<string, ItemPrices>>({});
   const [all, setAll] = useState(false);
-
-  // Sorted, so the same list asks the same (edge-cached) URL.
-  const idsKey = useMemo(() => [...new Set(items.map((i) => i.id))].sort().join(','), [items]);
-  useEffect(() => {
-    if (!idsKey) return undefined;
-    const ctrl = new AbortController();
-    api.listPrices(idsKey.split(','), ctrl.signal)
-      .then((r) => setPrices(r.items ?? {}))
-      // Offline or a server error: no card, the list itself still works.
-      .catch(() => {});
-    return () => ctrl.abort();
-  }, [idsKey]);
 
   const nameOf = (id: string) => chains.find((c) => c.id === id)?.name ?? id;
   const text = basketText(

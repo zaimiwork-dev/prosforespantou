@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { atChain, basketText, compareBasket, type ItemPrices } from './list-basket';
+import { atChain, basketText, cheaperElsewhere, compareBasket, type ItemPrices } from './list-basket';
 
 const fmt = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
 const NAMES: Record<string, string> = { ab: 'AB Vassilopoulos', sklavenitis: 'Σκλαβενίτης', masoutis: 'Μασούτης', mymarket: 'My Market', lidl: 'Lidl' };
@@ -140,6 +140,32 @@ describe('compareBasket', () => {
     const t = basketText(c, fmt, nameOf);
     expect(t.rows[0]).toMatchObject({ detail: 'ίδια τιμή με τώρα', tone: 'same' });
     expect(t.lead).toBe('Βρήκαμε το προϊόν σου και σε άλλα καταστήματα.');
+  });
+});
+
+describe('cheaperElsewhere', () => {
+  const item = { id: 'a', chain: 'masoutis', price: 4.99, quantity: 2 };
+  it('picks the cheapest other chain, shelf prices included', () => {
+    const p: ItemPrices = {
+      chain: 'masoutis', price: 4.99, live: true,
+      elsewhere: [
+        { chain: 'sklavenitis', price: 4.6, kind: 'offer', offerId: 'o1' },
+        { chain: 'ab', price: 4.5, kind: 'shelf' },
+        { chain: 'masoutis', price: 3, kind: 'offer', offerId: 'own' },
+      ],
+    };
+    expect(cheaperElsewhere(item, p)).toEqual({ chain: 'ab', price: 4.5, kind: 'shelf', offerId: null, savings: 0.49 });
+  });
+  it('prefers an offer on a tie, needs a 0,10 € saving and a live offer', () => {
+    const tie: ItemPrices = {
+      chain: 'masoutis', price: 4.99, live: true,
+      elsewhere: [{ chain: 'ab', price: 4.5, kind: 'shelf' }, { chain: 'lidl', price: 4.5, kind: 'offer', offerId: 'o2' }],
+    };
+    expect(cheaperElsewhere(item, tie)?.chain).toBe('lidl');
+    expect(cheaperElsewhere(item, at('masoutis', 4.99, [['ab', 4.9]]))).toBeNull();
+    expect(cheaperElsewhere(item, at('masoutis', 4.99, [['ab', 4.89]]))?.savings).toBe(0.1);
+    expect(cheaperElsewhere(item, at('masoutis', 4.99, [['ab', 1]], false))).toBeNull();
+    expect(cheaperElsewhere(item, undefined)).toBeNull();
   });
 });
 

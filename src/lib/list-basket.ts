@@ -66,9 +66,10 @@ export type BasketComparison = {
 };
 
 const CENT = 0.005;
-// The headline names a cheaper chain only for a saving worth a trip — the same
-// noise floor as «Πιο φθηνά στο …» (actions/get-cheaper-alternatives). A
-// smaller difference still shows in that chain's row.
+// A saving worth a trip: the headline names a cheaper chain, and an item gets
+// its «Πιο φθηνά στο …» tag (cheaperElsewhere), only from this much. A smaller
+// difference still shows in that chain's row. (The old 10-cent floor of
+// actions/get-cheaper-alternatives, which this file replaced on 2026-11-23.)
 export const MIN_LIST_SAVING = 0.10;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -127,6 +128,33 @@ export function compareBasket(items: BasketItem[], prices: Record<string, ItemPr
   const whole = n > 0 && complete.some((b) => b.moved > 0) ? complete[0] : null;
 
   return { items: n, compared, listTotal: round2(listTotal), chains, whole };
+}
+
+export type CheaperElsewhere = {
+  chain: string;
+  price: number;
+  kind: 'offer' | 'shelf';
+  offerId: string | null;
+  // Per unit: the list price minus the price there.
+  savings: number;
+};
+
+// «Πιο φθηνά στο …» on one list item: the cheapest row its comparison sheet
+// shows at another chain (offer or regular shelf price), when it saves at
+// least MIN_LIST_SAVING a unit. Same prices as the card above, so the tag on
+// an item and the chain rows can never disagree.
+export function cheaperElsewhere(item: BasketItem, p: ItemPrices | undefined, min = MIN_LIST_SAVING): CheaperElsewhere | null {
+  if (!p || !p.live || !Number.isFinite(item.price) || item.price <= 0) return null;
+  let best: ChainPrice | null = null;
+  for (const e of p.elsewhere) {
+    if (!e.chain || e.chain === item.chain || !Number.isFinite(e.price) || e.price <= 0) continue;
+    // On a tie, an offer (a page to open) beats a shelf price.
+    if (!best || e.price < best.price || (e.price === best.price && e.kind === 'offer' && best.kind === 'shelf')) best = e;
+  }
+  if (!best) return null;
+  const savings = round2(item.price - best.price);
+  if (savings < min - CENT) return null;
+  return { chain: best.chain, price: best.price, kind: best.kind, offerId: best.offerId ?? null, savings };
 }
 
 // «στον Σκλαβενίτη», «στα Lidl», «στο My Market»: Greek puts an article
