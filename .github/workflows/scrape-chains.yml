@@ -309,7 +309,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      GALAXIAS_CACHE: ${{ runner.temp }}/galaxias-walk.json
+      # A plain path: the runner context is not available in job-level env
+      # (it made the whole workflow file invalid on 2026-11-23).
+      GALAXIAS_CACHE: /tmp/galaxias-walk.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
