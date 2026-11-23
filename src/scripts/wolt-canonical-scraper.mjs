@@ -62,6 +62,15 @@ if (WOLT_BASELINE && VENUE_SLUGS.length > 1) {
   process.exit(1);
 }
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
+// Time budget (2026-11-23): on a slow Wolt day (HTTP 429 backoffs) the walk ran
+// into the job's 90-minute timeout at category 174/280 of the FIRST venue and
+// was cancelled before ingest — every item collected was lost. Past the budget
+// the walk stops and what it has is ingested (marked partial). Catalog ingest
+// never deletes, so a partial run is safe; the job timeout must exceed it.
+const MAX_MINUTES = process.env.WOLT_MAX_MINUTES ? Number(process.env.WOLT_MAX_MINUTES) : 75;
+const DEADLINE = Date.now() + MAX_MINUTES * 60_000;
+const outOfTime = () => Date.now() > DEADLINE;
+let budgetHit = false;
 const PACE_MS = envInt('PACE_MS', 750);
 const JITTER_MS = envInt('JITTER_MS', 350);
 const RETRY_COOLDOWN_MS = envInt('RETRY_COOLDOWN_MS', 90000);
@@ -156,6 +165,11 @@ async function fetchVenueItems(venueSlug, itemsByKey) {
       console.log(`\n   Wolt category "${c.slug}" failed (${e.message}); will retry after the walk.`);
     }
     if (itemsByKey.size >= LIMIT) break;
+    if (outOfTime()) {
+      budgetHit = true;
+      console.log(`\n   time budget of ${MAX_MINUTES} min reached at category ${catIdx}/${cats.length} of ${venueSlug}; saving what we have`);
+      break;
+    }
     await pace(PACE_MS, JITTER_MS);
   }
 
@@ -164,7 +178,7 @@ async function fetchVenueItems(venueSlug, itemsByKey) {
   // categories (33/132) even with no other Wolt job running, and the backoff
   // inside a single fetch (seconds) is too short to outlast that. Rate limits
   // are bursts, so waiting once and retrying at half speed recovers most of it.
-  if (failed.length && itemsByKey.size < LIMIT) {
+  if (failed.length && itemsByKey.size < LIMIT && !outOfTime()) {
     const retried = failed.length;
     console.log(`\n   ${retried} categories failed on ${venueSlug}; cooling down ${Math.round(RETRY_COOLDOWN_MS / 1000)}s, then one slower pass`);
     await sleep(RETRY_COOLDOWN_MS);
@@ -245,7 +259,9 @@ async function run() {
       console.log(`   Wolt venue "${venue}" failed (${e.message}); continuing with the remaining venues.`);
     }
     if (itemsByKey.size >= LIMIT) break;
+    if (outOfTime()) { budgetHit = true; break; }
   }
+  if (budgetHit) warnings.push(`Time budget of ${MAX_MINUTES} min reached — Wolt enrichment is partial (slow/throttled Wolt); the next run continues.`);
 
   const items = [...itemsByKey.values()];
   const withBarcode = items.map(toCatalogItem).filter(Boolean);
