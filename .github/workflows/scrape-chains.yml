@@ -507,6 +507,19 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Barcode links (stores' items sharing a barcode = proven same product)
+        # 2026-11-23 (owner: «anywhere we get the items from we need the
+        # barcode»): attaches barcodes from item_barcodes (store feeds, Wolt) to
+        # each store's own item codes by exact name, then writes a final 'same'
+        # verdict (model 'barcode') for every cross-store pair sharing one.
+        # BEFORE the AI check, so barcode-proven pairs never spend Groq tokens.
+        # See src/scripts/barcode-links.mjs + src/lib/barcode-links.ts.
+        id: barcode_links
+        continue-on-error: true
+        run: node src/scripts/barcode-links.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
       - name: Verify comparison pairs (AI check of each new pair)
         # Owner decision 2026-11-22: every cross-chain pair the comparison
         # sheet could show is judged once by Groq; different/unsure pairs are
@@ -533,6 +546,19 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Product watches («Ειδοποίησέ με» — app notifications + email)
+        # 2026-11-23 (owner: alerts on ANY product, on offer or not). After the
+        # counts, so tonight's offers, links and barcode matches are in. Rules in
+        # src/lib/watch-alerts.ts; sending in src/scripts/fire-product-watches.mjs.
+        # Email needs RESEND_API_KEY (no key = logged, not sent, alert kept).
+        id: watches
+        continue-on-error: true
+        run: node src/scripts/fire-product-watches.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
       - name: Recompute hotScore (default-sort ranking)
         # Runs last so scores reflect every Discount the resolvers just wrote,
         # fresh price verdicts, the day's recent-window clicks/list-adds, and
@@ -568,7 +594,7 @@ jobs:
         if: always()
         run: |
           failed=""
-          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"             "recompute-verdicts:${{ steps.rc_verdicts.outcome }}"             "recompute-hotness:${{ steps.rc_hotness.outcome }}"             "verify-comparisons:${{ steps.verify_pairs.outcome }}"             "recompute-comparison:${{ steps.rc_compare.outcome }}"             "prune-leaflets:${{ steps.prune_leaflets.outcome }}"; do
+          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"             "recompute-verdicts:${{ steps.rc_verdicts.outcome }}"             "recompute-hotness:${{ steps.rc_hotness.outcome }}"             "barcode-links:${{ steps.barcode_links.outcome }}"             "verify-comparisons:${{ steps.verify_pairs.outcome }}"             "recompute-comparison:${{ steps.rc_compare.outcome }}"             "watches:${{ steps.watches.outcome }}"             "prune-leaflets:${{ steps.prune_leaflets.outcome }}"; do
             name="${pair%%:*}"; outcome="${pair#*:}"
             echo "  $name -> $outcome"
             if [ "$outcome" = "failure" ]; then failed="$failed $name"; fi

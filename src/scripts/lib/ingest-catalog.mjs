@@ -30,6 +30,7 @@
 // Batched for 10k–20k-row catalogs. Safety: 0 valid items → no-op, never deletes.
 
 import { SM_MAPPING, normalizeBarcode, withDbRetry } from './ingest-offers.mjs';
+import { recordItemBarcodes, recordItemNames } from './item-barcodes.mjs';
 import { normItemcode, fetchLatestRows, bumpLastSeen, pickSnapshotIdsToBump, planNormalSnapshots } from './snapshot-seen.mjs';
 import {
   evaluateVolume,
@@ -83,6 +84,9 @@ export async function ingestCatalog({
   // ~4.1k), so filing both under 'catalog' makes the series meaningless and
   // would read as a volume collapse to anything comparing consecutive runs.
   sourceLabel = 'catalog',
+  // item_barcodes.source for barcodes this run records. Default: the store
+  // itself for its own catalog, else the run's source label (e.g. 'wolt').
+  barcodeSource = null,
 } = {}) {
   if (!chain || !SM_MAPPING[chain]) throw new Error(`Unknown chain slug: "${chain}"`);
   if (!Array.isArray(items)) throw new Error('items must be an array');
@@ -369,6 +373,31 @@ export async function ingestCatalog({
     await bumpLastSeen(prisma, pickSnapshotIdsToBump(seenUnchanged, latest), runStart, withDbRetry);
   } catch (e) {
     out.warnings.push(`lastSeenAt bump failed (non-fatal): ${e.message}`);
+  }
+
+  // What this run learned besides prices (2026-11-23): every barcode the source
+  // gave, under its source and item (item_barcodes), and — for a store's own
+  // catalog — the store's own name for each item code. Feeds barcode matching
+  // (src/scripts/barcode-links.mjs). Non-fatal: prices above are already saved.
+  try {
+    const source = barcodeSource ?? (writeMappings ? chain : sourceLabel);
+    const bc = await recordItemBarcodes(prisma, valid
+      .filter((it) => normalizeBarcode(it.barcode))
+      .map((it) => ({
+        source,
+        chain,
+        sourceItemId: String(it.chainItemcode ?? normalizeBarcode(it.barcode)),
+        name: it.name,
+        barcode: it.barcode,
+        // Only a store's own catalog names its item code; Wolt ids are not.
+        chainItemcode: writeMappings ? String(it.chainItemcode) : null,
+        matchedVia: writeMappings ? 'source' : null,
+      })));
+    out.barcodesRecorded = bc.rows;
+    if (writeMappings) out.namesUpdated = (await recordItemNames(prisma, chain, valid)).updated;
+    console.log(`      barcodes recorded: ${bc.rows} (source ${source})${writeMappings ? `, store names updated: ${out.namesUpdated}` : ''}`);
+  } catch (e) {
+    out.warnings.push(`barcode/name recording failed (non-fatal): ${e.message}`);
   }
 
   if (out.errors > 0) {

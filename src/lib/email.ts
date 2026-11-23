@@ -17,7 +17,7 @@
 
 import { Resend } from 'resend';
 import * as Sentry from '@sentry/nextjs';
-import { formatPrice } from './format-price';
+import { formatPrice } from './format-price.ts';
 
 const FROM = process.env.EMAIL_FROM || 'Prosfores Pantou <onboarding@resend.dev>';
 const REPLY_TO = process.env.EMAIL_REPLY_TO;
@@ -179,6 +179,38 @@ ${m.supermarketName} — ${priceLine}
     html: wrap(body, footer),
     text,
   });
+}
+
+// «Ειδοποίησέ με» on a product (lib/watch-alerts): it went on offer, got
+// cheaper, or reached the person's price. title/body from alertText().
+export async function sendWatchAlertEmail(m: {
+  email: string;
+  unsubToken: string;
+  title: string;
+  body: string;
+  productName: string;
+  url: string;
+}) {
+  const text = `${m.title}
+
+${m.body}
+
+Δες την τιμή: ${m.url}
+
+Για διαχείριση ή απενεργοποίηση ειδοποιήσεων: ${BASE_URL}/alerts?token=${encodeURIComponent(m.unsubToken)}`;
+  const html = `
+    <p style="margin:0 0 6px;font-size:13px;color:#6c757d">Προϊόν που παρακολουθείς:</p>
+    <p style="margin:0 0 14px;font-size:18px;font-weight:800">${escapeHtml(m.productName)}</p>
+    <p style="margin:0 0 20px;font-size:16px">${escapeHtml(m.body)}</p>
+    <p style="margin:0 0 20px;text-align:center">
+      <a href="${m.url}" style="display:inline-block;padding:12px 26px;background:#0F5132;color:#fff;text-decoration:none;border-radius:10px;font-weight:800;font-size:14px">
+        Δες την τιμή
+      </a>
+    </p>
+  `;
+  const footer = `Έλαβες αυτή την ειδοποίηση γιατί πάτησες «Ειδοποίησέ με» σε αυτό το προϊόν.<br>
+    <a href="${BASE_URL}/alerts?token=${encodeURIComponent(m.unsubToken)}" style="color:#6c757d">Διαχείριση ειδοποιήσεων</a>`;
+  return await send({ to: m.email, subject: m.title, html: wrap(html, footer), text });
 }
 
 function escapeHtml(s: string): string {

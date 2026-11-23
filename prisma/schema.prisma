@@ -232,6 +232,7 @@ model Subscriber {
   createdAt       DateTime  @default(now()) @map("created_at")
   unsubscribedAt  DateTime? @map("unsubscribed_at")
   alerts          Alert[]
+  watches         ProductWatch[]
 
   @@map("subscribers")
 }
@@ -400,6 +401,10 @@ model ChainProductMapping {
   // Never downgrade 'barcode' to a weaker value on re-bind.
   matchedVia    String?   @map("matched_via")
   verifiedAt    DateTime? @map("verified_at")
+  // The store's OWN name for this item, kept current by every catalog run
+  // (2026-11-23). Product.name can be another store's wording when the item was
+  // matched by name; barcode matching (lib/barcode-links) needs this one.
+  itemName      String?   @map("item_name")
   createdAt     DateTime @default(now()) @map("created_at")
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -518,4 +523,75 @@ model ComparisonVerdict {
   @@index([chainA, codeA])
   @@index([chainB, codeB])
   @@map("comparison_verdicts")
+}
+
+// Barcodes (GTIN/EAN) seen for a store's item, from ANY source we read: the
+// store's own feed, Wolt, a barcode lookup… (owner 2026-11-23: «anywhere we get
+// the items from we need the barcode»). One row per (source, store, source item,
+// barcode). chainItemcode = the store's own item code (its «slot»): set directly
+// when the store itself gave the barcode, or later by a deterministic match
+// (exact name within the same store). Two stores' items sharing a barcode are
+// the same product — a proven comparison link, no AI needed.
+// Created by src/scripts/ensure-alert-tables.mjs (NOT db push).
+model ItemBarcode {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source        String   // 'wolt' | 'bazaar' | 'ab' | 'masoutis' | 'mymarket' | 'sklavenitis' | 'lidl' | 'kritikos' | …
+  chain         String   // the store this listing belongs to
+  sourceItemId  String   @map("source_item_id") // the source's own id (Wolt item id, or the store's item code)
+  name          String   // the listing's name at that source
+  barcode       String   // normalized GTIN
+  chainItemcode String?  @map("chain_itemcode") // the store's own item code, when known
+  matchedVia    String?  @map("matched_via") // 'source' | 'exact-name' | 'owner'
+  firstSeenAt   DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([source, chain, sourceItemId, barcode])
+  @@index([barcode])
+  @@index([chain, chainItemcode])
+  @@map("item_barcodes")
+}
+
+// A phone with the app (no login): where its notifications go. The id is the
+// device's own secret — the app keeps it and sends it to manage its watches.
+model AppDevice {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pushToken  String?        @unique @map("push_token") // Expo push token; null until notifications are allowed
+  platform   String         // 'android' | 'ios' | 'web'
+  createdAt  DateTime       @default(now()) @map("created_at")
+  lastSeenAt DateTime       @default(now()) @map("last_seen_at")
+  disabledAt DateTime?      @map("disabled_at") // Expo answered DeviceNotRegistered
+  watches    ProductWatch[]
+
+  @@map("app_devices")
+}
+
+// «Ειδοποίησέ με» on any product, on offer or not (owner 2026-11-23). Keyed by
+// the store item the person chose; the nightly check follows that item's
+// matches at other stores (barcode + links) and alerts when it goes on offer
+// anywhere, its lowest price drops, or it reaches the person's target price.
+// Delivery: app notification (deviceId) and/or email (subscriberId).
+model ProductWatch {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deviceId          String?     @db.Uuid @map("device_id")
+  subscriberId      String?     @db.Uuid @map("subscriber_id")
+  chain             String
+  chainItemcode     String      @map("chain_itemcode")
+  productId         String?     @db.Uuid @map("product_id")
+  name              String      // as shown when the person started watching
+  onOffer           Boolean     @default(true) @map("on_offer")
+  onDrop            Boolean     @default(true) @map("on_drop")
+  targetPrice       Decimal?    @db.Decimal(10, 2) @map("target_price")
+  startPrice        Decimal?    @db.Decimal(10, 2) @map("start_price") // lowest price across stores when watching began
+  lastNotifiedAt    DateTime?   @map("last_notified_at")
+  lastNotifiedPrice Decimal?    @db.Decimal(10, 2) @map("last_notified_price")
+  notifiedOfferIds  String[]    @default([]) @map("notified_offer_ids") // offers already alerted — never twice
+  isActive          Boolean     @default(true) @map("is_active")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  device            AppDevice?  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  subscriber        Subscriber? @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, chain, chainItemcode])
+  @@unique([subscriberId, chain, chainItemcode])
+  @@index([chain, chainItemcode])
+  @@map("product_watches")
 }
