@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — plain .mjs module without types
 import { galaxiasPrice, ruleKind, ruleActive } from './galaxias-promos.mjs';
 
 const TODAY = '2026-11-23';

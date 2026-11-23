@@ -53,6 +53,10 @@ export type DealCard = {
   // site's card shows it instead of a generic ΜΟΝΟ; null when absent or too
   // long to be a sticker (> 24 chars). Added 2026-11-05.
   sticker: string | null;
+  // A loyalty-points offer (AB Plus, added 2026-11-23): the price is the
+  // REGULAR one and the reward is card points (the sticker says how many).
+  // Never show it as an offer price. Additive: older apps ignore it.
+  points: boolean;
 };
 
 type Row = {
@@ -85,6 +89,7 @@ type Row = {
   product?: { name?: string | null; imageUrl?: string | null; unitInfo?: string | null } | null;
   essential?: { id: string; label: string; chainCount: number } | null;
   description?: string | null;
+  offerType?: string | null;
 };
 
 const iso = (v: Date | string) => new Date(v).toISOString();
@@ -145,5 +150,6 @@ export function toDealCard(row: Row): DealCard {
     featured: row.isFeatured ? { label: row.featuredLabel ?? 'Χορηγούμενο' } : null,
     essential: row.essential ?? null,
     sticker: stickerOf(row.description),
+    points: row.offerType === 'points',
   };
 }

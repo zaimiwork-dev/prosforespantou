@@ -2385,3 +2385,6 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .watch-actions { display: flex; gap: 10px; margin-top: 12px; }
 .watch-actions .btn { flex: 1; min-height: 44px; }
 .hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+
+/* Points offers (AB Plus, 2026-11-23): the price is the regular one. */
+.od-points-note { margin-top: 4px; font-size: 13.5px; line-height: 1.4; color: var(--ink-2); max-width: 260px; }

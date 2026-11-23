@@ -154,6 +154,10 @@ async function matchItem(prisma, item, chain, dryRun) {
 
 function normalizeOfferType(raw, originalPrice) {
   const value = String(raw || '').trim().toLowerCase();
+  // Loyalty-points promotions (owner 2026-11-23: shown, clearly labelled):
+  // the price is the regular one, the reward is card points. Its own kind so
+  // cards can say so and no promo-price snapshot is written for it.
+  if (value === 'points') return 'points';
   if (value === 'strikethrough') return 'strikethrough';
   if (value === 'mono' || value === 'multibuy') return 'mono';
 
@@ -323,7 +327,10 @@ async function writeOffer(prisma, item, productId, storeId, chain, source, runSt
   let snapshotWritten = false;
   let seen = null; // present and price unchanged: the caller bumps lastSeenAt in one batch
   const priceMoved = !existing || existing.discountedPrice !== item.price;
-  if (productId && priceMoved) {
+  // A points offer is at the REGULAR price: recording it as a promo price would
+  // put a fake offer dot in the price history (the catalogue records the
+  // regular price as kind 'normal').
+  if (productId && priceMoved && data.offerType !== 'points') {
     // Per-SKU (SRV-02): with an itemcode the comparison is against THIS SKU's
     // own latest snapshot; without one, today's product-wide rule.
     let last = await prisma.priceSnapshot.findFirst({

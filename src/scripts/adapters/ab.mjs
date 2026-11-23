@@ -6,7 +6,7 @@
 // Usage:
 //   node src/scripts/adapters/ab.mjs            # all real price offers
 //   DRY_RUN=1 node src/scripts/adapters/ab.mjs  # fetch + match, no DB writes
-//   INCLUDE_POINTS=1 ...                        # also ingest loyalty-points "offers"
+//   EXCLUDE_POINTS=1 ...                        # drop the loyalty-points offers (shown since 2026-11-23)
 //
 // How it works:
 //   1. Replays the ProductList GraphQL operation via Apollo persisted-query hash.
@@ -15,7 +15,8 @@
 //      between are normal since 2026-09-17 — see the loop in run().
 //   3. Filters to PRICE-AFFECTING promos by default. AB's PROMOTION_SEARCH
 //      returns ~70% loyalty-points-only items; we skip those because they
-//      aren't really discounts. Set INCLUDE_POINTS=1 to keep them.
+//      aren't really discounts — since 2026-11-23 they are kept and labelled
+//      as points (offerType 'points'); EXCLUDE_POINTS=1 drops them again.
 //
 // PERSISTED-QUERY HASH: tied to AB's frontend build, so an AB redeploy can
 // rotate it and every request then answers "PersistedQueryNotFound". That is
@@ -39,7 +40,8 @@ import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
 const LIMIT = process.env.LIMIT ? parseInt(process.env.LIMIT, 10) : Infinity;
-const INCLUDE_POINTS = process.env.INCLUDE_POINTS === '1';
+// Points offers are ON since 2026-11-23 (owner); EXCLUDE_POINTS=1 drops them.
+const INCLUDE_POINTS = process.env.EXCLUDE_POINTS !== '1';
 const PACE_MS = envInt('PACE_MS', 900);
 const JITTER_MS = envInt('JITTER_MS', 500);
 
@@ -66,6 +68,17 @@ const HEADERS = {
 };
 
 // Promotion types that REALLY change the shelf price. Anything else is loyalty-only.
+// Owner 2026-11-23: AB's loyalty-points promotions are SHOWN, clearly labelled
+// — they are not price cuts. Measured that day (probe PROBE=points): 285 «X
+// Plus points for Y articles» («400 AB Plus πόντοι»), 336 «Fixed Points For
+// Threshold Promotion» («Με 8€-100 ΑΒ Plus πόντοι»), all members-only.
+const POINTS_PROMOS = new Set(['X Plus points for Y articles', 'Fixed Points For Threshold Promotion']);
+// «-0.76€ στα 4» — money off when buying several, for everyone: a price deal
+// that was being dropped with the points (14 on 11-23).
+const MULTIBUY_MONEY_PROMOS = new Set(['Discount X Euros For Y Articles']);
+// AB writes «0.76€»; Greek is «0,76€».
+const greekNumbers = (s) => String(s ?? '').replace(/(\d)\.(\d)/g, '$1,$2').trim();
+
 const PRICE_AFFECTING_PROMOS = new Set([
   'Buy X Get Percentage Off All Products',
   'Grocery Buy X get Y free',
@@ -133,7 +146,10 @@ function toOfferItem(p) {
   const isPriceAffecting = promos.some((pr) =>
     PRICE_AFFECTING_PROMOS.has(pr.promotionType) || pr.percentageDiscount != null
   );
-  if (!isPriceAffecting && !INCLUDE_POINTS) return null;
+  const shown = (pr) => pr.toDisplay !== false && (pr.title || pr.description);
+  const multibuy = promos.find((pr) => MULTIBUY_MONEY_PROMOS.has(pr.promotionType) && shown(pr));
+  const points = promos.find((pr) => POINTS_PROMOS.has(pr.promotionType) && shown(pr));
+  if (!isPriceAffecting && !multibuy && !(points && INCLUDE_POINTS)) return null;
 
   const regular = p.price?.value;
   const discounted = parseEurFormatted(p.price?.discountedPriceFormatted) ?? regular;
@@ -146,6 +162,27 @@ function toOfferItem(p) {
 
   const primaryType = promos.find((pr) => PRICE_AFFECTING_PROMOS.has(pr.promotionType))?.promotionType
     || promos[0].promotionType || null;
+
+  // Not a price promotion: the one-item price stays the regular one and AB's
+  // own short title is the sticker. «−0,76€ στα 4» is a deal for everyone
+  // (mono); points are their own kind so every screen can say «πόντοι».
+  if (!isPriceAffecting) {
+    const promo = multibuy ?? points;
+    return {
+      name: p.name?.trim(),
+      price: discounted,
+      originalPrice: null,
+      chainItemcode: String(p.code),
+      barcode: null,
+      brand: p.manufacturerName?.trim() || null,
+      unit: p.price?.supplementaryPriceLabel2?.trim() || null,
+      category: p.firstLevelCategory?.name?.trim() || 'Άλλο',
+      imageUrl: pickImage(p.images),
+      validUntil: validUntil ? validUntil.toISOString() : undefined,
+      description: greekNumbers(promo.title || promo.description),
+      offerType: multibuy ? 'mono' : 'points',
+    };
+  }
 
   return {
     name: p.name?.trim(),

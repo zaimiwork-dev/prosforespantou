@@ -161,14 +161,20 @@ function OfferContent({ data, banner }: { data: OfferResponse; banner: ReactNode
       <Text style={styles.name}>{offer.title || offer.name}</Text>
       {offer.size ? <Text style={styles.size}>{offer.size}</Text> : null}
 
-      <Text style={styles.priceLabel}>ΤΙΜΗ ΠΡΟΣΦΟΡΑΣ</Text>
+      {/* A points offer is at the regular price: never call it an offer price. */}
+      <Text style={styles.priceLabel}>{offer.points ? 'ΤΙΜΗ' : 'ΤΙΜΗ ΠΡΟΣΦΟΡΑΣ'}</Text>
       <View style={styles.priceRow}>
         <Text style={[styles.price, struck && !muted && styles.priceSale, muted && styles.priceMuted]}>
           {formatPrice(offer.price)}
         </Text>
         {struck ? <Text style={styles.was}>{formatPrice(offer.originalPrice!)}</Text> : null}
       </View>
-      {!struck && offer.baseline ? (
+      {offer.points ? (
+        <Text style={styles.baseline}>
+          Προσφορά πόντων για μέλη της κάρτας: η τιμή δεν αλλάζει, κερδίζεις {offer.sticker ?? 'πόντους'}.
+        </Text>
+      ) : null}
+      {!struck && !offer.points && offer.baseline ? (
         <Text style={styles.baseline}>κανονικά ~{formatPrice(offer.baseline.price)}</Text>
       ) : null}
       {offer.unit ? (
