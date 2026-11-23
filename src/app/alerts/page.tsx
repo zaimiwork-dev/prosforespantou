@@ -43,7 +43,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
             <p style={{ color: '#666' }}>{res.error === 'Email not confirmed' ? 'Παρακαλούμε επιβεβαιώστε πρώτα το email σας για να διαχειριστείτε τις ειδοποιήσεις.' : res.error}</p>
           </div>
         ) : (
-          <AlertsClient initialAlerts={res.alerts} token={token} />
+          <AlertsClient initialAlerts={res.alerts} initialWatches={res.watches} token={token} />
         )}
       </main>
       <Footer />

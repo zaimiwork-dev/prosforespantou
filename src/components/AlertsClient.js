@@ -1,15 +1,18 @@
 'use client';
 import { useState } from 'react';
 import { formatPrice, formatUnitPrice } from '@/lib/format-price';
-import { createAlert, deleteAlert } from '@/actions/alerts';
+import { createAlert, deleteAlert, deleteWatch } from '@/actions/alerts';
+import { atChain } from '@/lib/list-basket';
 import { SUPERMARKETS, ACTIVE_SUPERMARKETS, CATEGORIES } from '@/lib/constants';
 import { Icon } from './Icons';
 
 // One criterion chip on a saved alert: icon and text on the same baseline.
 const CRIT = { display: 'inline-flex', alignItems: 'center', gap: 4 };
 
-export function AlertsClient({ initialAlerts, token }) {
+export function AlertsClient({ initialAlerts, initialWatches = [], token }) {
   const [alerts, setAlerts] = useState(initialAlerts || []);
+  // «Ειδοποίησέ με» products (actions/watch-product), with today's best price.
+  const [watches, setWatches] = useState(initialWatches || []);
   const [keyword, setKeyword] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [selectedSMs, setSelectedSMs] = useState([]);
@@ -58,6 +61,18 @@ export function AlertsClient({ initialAlerts, token }) {
     }
   };
 
+  const handleDeleteWatch = async (id) => {
+    if (pendingDelete !== id) {
+      setPendingDelete(id);
+      setTimeout(() => setPendingDelete((cur) => (cur === id ? null : cur)), 5000);
+      return;
+    }
+    setPendingDelete(null);
+    const res = await deleteWatch(token, id);
+    if (res.success) setWatches(watches.filter((w) => w.id !== id));
+  };
+  const chainName = (id) => SUPERMARKETS.find((sm) => sm.id === id)?.name || id;
+
   const toggleSM = (id) => {
     setSelectedSMs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
@@ -68,6 +83,45 @@ export function AlertsClient({ initialAlerts, token }) {
     <div>
       <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Οι ειδοποιήσεις μου</h1>
       <p style={{ color: '#666', marginBottom: 32 }}>Θα σε ενημερώσουμε αμέσως μόλις βρεθεί προσφορά που ταιριάζει στα κριτήριά σου.</p>
+
+      {watches.length > 0 && (
+        <section style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 12px' }}>Προϊόντα που παρακολουθείς</h2>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {watches.map((w) => (
+              <div key={w.id} style={{ background: '#fff', padding: 16, borderRadius: 16, border: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{w.name}</div>
+                  {w.now ? (
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F5132' }}>
+                      Τώρα {formatPrice(w.now.price)} {atChain(w.now.chain, chainName(w.now.chain))}{w.now.kind === 'offer' ? ' · σε προσφορά' : ''}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 14, color: '#666' }}>Δεν έχουμε σημερινή τιμή</div>
+                  )}
+                  <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>
+                    Σε ειδοποιούμε {[w.onOffer && 'όταν μπει σε προσφορά', w.onDrop && 'όταν πέσει η τιμή', w.targetPrice != null && `όταν φτάσει τα ${formatPrice(w.targetPrice)}`].filter(Boolean).join(', ')}.
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteWatch(w.id)}
+                  aria-label={`Σταμάτα την ειδοποίηση: ${w.name}`}
+                  style={{
+                    background: pendingDelete === w.id ? '#e63946' : 'none',
+                    color: pendingDelete === w.id ? '#fff' : '#e63946',
+                    border: 'none', borderRadius: 10, cursor: 'pointer',
+                    padding: pendingDelete === w.id ? '8px 12px' : 8,
+                    fontWeight: 800, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, flex: 'none',
+                  }}
+                >
+                  <Icon.Trash size={16} />
+                  {pendingDelete === w.id && 'Διαγραφή;'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div style={{ background: '#fff', padding: 24, borderRadius: 20, border: '1px solid #eee', marginBottom: 40, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>Προσθήκη νέας ειδοποίησης</h3>

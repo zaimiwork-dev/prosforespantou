@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './Icons';
 import { PriceHistory } from './PriceHistory';
+import { WatchByEmail } from './WatchByEmail';
 import { PriceComparison } from './PriceComparison';
 import { SUPERMARKETS, categoryFullName } from '@/lib/constants';
 import { track } from '@/lib/track';
@@ -234,6 +235,8 @@ export function OfferDetails({ offer, comparison = [], timeline = null, similar 
             {added ? <><Icon.Check size={16} /> Προστέθηκε</> : 'Προσθήκη στη λίστα'}
           </button>
         </div>
+        {/* «Ειδοποίησέ με» by email: on offer anywhere / cheaper / my price. */}
+        <WatchByEmail offerId={offer.id} />
 
         <PriceComparison offer={offer} comparison={comparison} compact={compact} />
         <PriceHistory timeline={timeline} price={Number(offer.discountedPrice ?? offer.discounted_price)} compact={compact} />
