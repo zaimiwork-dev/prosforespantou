@@ -5,7 +5,8 @@ import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { samePack } from '@/lib/packaging';
 import { filterComparable } from '@/lib/offer-similarity';
-import { filterByVerdict, loadVerdictLookup, pairKeyOf } from '@/lib/comparison-verdict';
+import { filterByVerdict, itemKey, loadVerdictLookup, pairKeyOf } from '@/lib/comparison-verdict';
+import { linkedItems, loadLinksFor } from '@/lib/item-links';
 import { withPublicDealVisibility } from '@/lib/public-deal-filters';
 
 export interface CheaperAlternative {
@@ -73,12 +74,22 @@ export async function getCheaperAlternatives(
           if (bc) for (const pid of barcodeToProductIds.get(bc) ?? []) allProductIds.add(pid);
         }
 
-        if (allProductIds.size === 0) return {};
+        // Cross-chain item links (lib/item-links): items at other chains
+        // confirmed to be the same product though they sit on another product
+        // record — the same rule the comparison sheet follows.
+        const links = await loadLinksFor(prisma, sources.map((s) => ({ chain: s.supermarket, code: s.chainItemcode })));
+        const linkedOf = new Map(sources.map((s) => [s.id, linkedItems(links, { chain: s.supermarket, code: s.chainItemcode })]));
+        const linkedRefs = [...new Map([...linkedOf.values()].flat().map((r) => [itemKey(r), r])).values()];
+
+        if (allProductIds.size === 0 && linkedRefs.length === 0) return {};
 
         const now = new Date();
         const candidates = await prisma.discount.findMany({
           where: withPublicDealVisibility({
-            productId: { in: [...allProductIds] },
+            OR: [
+              ...(allProductIds.size > 0 ? [{ productId: { in: [...allProductIds] } }] : []),
+              ...linkedRefs.map((r) => ({ supermarket: r.chain, chainItemcode: r.code })),
+            ],
             isActive: true,
             validUntil: { gt: now },
             id: { notIn: parsed.data },
@@ -96,10 +107,17 @@ export async function getCheaperAlternatives(
         });
 
         const byProductId = new Map<string, typeof candidates>();
+        const byItem = new Map<string, typeof candidates>();
         for (const c of candidates) {
-          if (!c.productId) continue;
-          if (!byProductId.has(c.productId)) byProductId.set(c.productId, []);
-          byProductId.get(c.productId)!.push(c);
+          if (c.productId) {
+            if (!byProductId.has(c.productId)) byProductId.set(c.productId, []);
+            byProductId.get(c.productId)!.push(c);
+          }
+          if (c.chainItemcode) {
+            const k = itemKey({ chain: c.supermarket, code: c.chainItemcode });
+            if (!byItem.has(k)) byItem.set(k, []);
+            byItem.get(k)!.push(c);
+          }
         }
 
         const eligibleBySource = new Map<string, typeof candidates>();
@@ -110,16 +128,21 @@ export async function getCheaperAlternatives(
           if (bc) for (const pid of barcodeToProductIds.get(bc) ?? []) matched.add(pid);
 
           const eligible: typeof candidates = [];
-          for (const pid of matched) {
-            for (const c of byProductId.get(pid) ?? []) {
-              if (c.supermarket === s.supermarket) continue;
-              if (s.discountedPrice - c.discountedPrice < MIN_SAVINGS) continue;
-              // Like-for-like pack only — don't call a 12-pack "cheaper" than a single.
-              if (!samePack(s.productName, c.productName)) continue;
-              // Mis-mapped productIds join different products — never claim a
-              // DIFFERENT product is "the same thing, cheaper elsewhere".
-              eligible.push(c);
-            }
+          const pool = [
+            ...[...matched].flatMap((pid) => byProductId.get(pid) ?? []),
+            ...(linkedOf.get(s.id) ?? []).flatMap((r) => byItem.get(itemKey(r)) ?? []),
+          ];
+          const seen = new Set<string>();
+          for (const c of pool) {
+            if (seen.has(c.id)) continue;
+            seen.add(c.id);
+            if (c.supermarket === s.supermarket) continue;
+            if (s.discountedPrice - c.discountedPrice < MIN_SAVINGS) continue;
+            // Like-for-like pack only — don't call a 12-pack "cheaper" than a single.
+            if (!samePack(s.productName, c.productName)) continue;
+            // Mis-mapped productIds join different products — never claim a
+            // DIFFERENT product is "the same thing, cheaper elsewhere".
+            eligible.push(c);
           }
           eligibleBySource.set(s.id, eligible);
         }
