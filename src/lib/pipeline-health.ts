@@ -31,6 +31,9 @@ export type FeedSpec = {
 // Weekly feeds get 9 days: cadence (7d) plus slack, so one skipped Sunday
 // warns rather than pages, and two consecutive misses alarm.
 const WEEKLY = 9 * 24;
+// Daily catalogs (since 2026-11-23) get 48h: GitHub starts schedules hours
+// late, so one missed or late night warns; two in a row page.
+const DAILY_CATALOG = 48;
 
 // Keep in sync with .github/workflows/scrape-chains.yml and vercel.json.
 export const EXPECTED_FEEDS: FeedSpec[] = [
@@ -48,17 +51,17 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 06:00 UTC — GitHub Actions' },
 
   // ── Shelf-price / catalog feeds ───────────────────────────────────────────
-  { chain: 'lidl', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 03:30 UTC — GitHub Actions (lidl-catalog)' },
-  { chain: 'ab', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 04:30 UTC — GitHub Actions (ab-catalog)' },
-  { chain: 'masoutis', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 06:30 UTC — GitHub Actions (masoutis-catalog)' },
-  { chain: 'bazaar', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 07:30 UTC — GitHub Actions (bazaar-catalog)' },
+  { chain: 'lidl', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 03:45 UTC — GitHub Actions (lidl-catalog)' },
+  { chain: 'ab', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 04:30 UTC — GitHub Actions (ab-catalog)' },
+  { chain: 'masoutis', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 06:30 UTC — GitHub Actions (masoutis-catalog)' },
+  { chain: 'bazaar', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 07:30 UTC — GitHub Actions (bazaar-catalog)' },
   // My Market's catalog is a continue-on-error STEP inside the mymarket-canonical
   // job, not a job of its own — so it can fail silently while the job stays
   // green. This row is the only place that failure becomes visible.
-  { chain: 'mymarket', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 05:30 UTC — GitHub Actions (βήμα continue-on-error μέσα στο mymarket-canonical)' },
+  { chain: 'mymarket', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 06:00 UTC — GitHub Actions (mymarket-catalog)' },
   // Sklavenitis' CI catalog job is a permanent no-op without PROXY_URL; the run
   // that actually happens is the owner's Windows scheduled task.
-  { chain: 'sklavenitis', source: 'catalog', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 04:00 τοπική ώρα — Windows task (dev PC)' },
+  { chain: 'sklavenitis', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 03:00 τοπική ώρα — Windows task (dev PC)' },
 
   // ── Wolt GTIN enrichment (supplemental canonical catalog) ─────────────────
   { chain: 'sklavenitis', source: 'wolt', maxAgeHours: WEEKLY, schedule: 'κάθε Κυριακή 05:00 UTC — GitHub Actions (sklavenitis-canonical)', graceUntil: '2026-09-22' },

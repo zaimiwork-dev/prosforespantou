@@ -21,7 +21,7 @@ $settings = New-ScheduledTaskSettingsSet `
 
 $defs = @(
   @{ Name = 'Sklavenitis Offers';  Args = '-Job offers';  Trigger = (New-ScheduledTaskTrigger -Daily -At 02:30) },
-  @{ Name = 'Sklavenitis Catalog'; Args = '-Job catalog'; Trigger = (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 04:00) }
+  @{ Name = 'Sklavenitis Catalog'; Args = '-Job catalog'; Trigger = (New-ScheduledTaskTrigger -Daily -At 04:00) }
 )
 
 foreach ($d in $defs) {

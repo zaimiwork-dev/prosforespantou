@@ -62,13 +62,17 @@ on:
     - cron: '0 3 * * 4'   # weekly Thu 03:00 UTC — Masoutis leaflet offers (site API)
     - cron: '0 8 * * *'   # daily 08:00 UTC — pipeline-health watchdog (staleness alarm)
     - cron: '0 6 * * 4'   # weekly Thu 06:00 UTC — Lidl offers (vision OCR over leaflet)
-    - cron: '30 3 * * 0'  # weekly Sun 03:30 UTC — Lidl catalog (e-shop grid)
-    - cron: '30 4 * * 0'  # weekly Sun 04:30 UTC — AB full catalog (CATEGORY walk)
+    - cron: '45 3 * * *'  # daily 03:45 UTC — Lidl catalog (e-shop grid)
+    - cron: '30 4 * * *'  # daily 04:30 UTC — AB full catalog (CATEGORY walk)
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Wolt barcode enrichment, all four chains in sequence (sklavenitis → mymarket → masoutis → ab)
     # (Κρητικός Sunday catalog — retired 2026-11-22, see above)
-    - cron: '30 6 * * 0'  # weekly Sun 06:30 UTC — Masoutis full catalog (site API)
-    - cron: '0 7 * * 0'   # weekly Sun 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL)
-    - cron: '30 7 * * 0'  # weekly Sun 07:30 UTC — Bazaar full catalog (OpenCart category walk)
+    - cron: '0 6 * * *'   # daily 06:00 UTC — My Market full catalog (own job since 2026-11-23)
+    - cron: '30 6 * * *'  # daily 06:30 UTC — Masoutis full catalog (site API)
+    - cron: '0 7 * * *'   # daily 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL; until then the dev PC runs it daily)
+    - cron: '30 7 * * *'  # daily 07:30 UTC — Bazaar full catalog (OpenCart category walk)
+    # Catalogs (= every product's REGULAR price) run DAILY since 2026-11-23 —
+    # owner: «each and every product ... always up to date». They were weekly
+    # (Sunday), so a shelf price could be 7 days old. Public repo: no minute cost.
   workflow_dispatch:
     inputs:
       chain:
@@ -106,6 +110,7 @@ on:
           - ab-canonical
           - kritikos-canonical
           - masoutis-catalog
+          - mymarket-catalog
           - sklavenitis-catalog
           - shrink-images
           - image-hosts
@@ -316,7 +321,7 @@ jobs:
     # Weekly Sun 07:30 UTC + manual. Walks bazaar-online.gr's 16 OpenCart
     # departments (?page=N&limit=100) into barcode/SKU-keyed Products +
     # kind='normal' shelf-price baselines. On-offer cards skip the baseline.
-    if: github.event.schedule == '30 7 * * 0' || github.event.inputs.chain == 'bazaar-catalog'
+    if: github.event.schedule == '30 7 * * *' || github.event.inputs.chain == 'bazaar-catalog'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -649,7 +654,7 @@ jobs:
     # Weekly Sun 04:30 UTC + manual. Walks AB's ~14 root categories via the
     # ProductList CATEGORY listing → SKU-keyed Products + shelf-price baselines
     # (+ self-hosted images). Auto-links AB offers as SKU mappings fill in.
-    if: github.event.schedule == '30 4 * * 0' || github.event.inputs.chain == 'ab-catalog'
+    if: github.event.schedule == '30 4 * * *' || github.event.inputs.chain == 'ab-catalog'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -915,7 +920,7 @@ jobs:
     # Weekly Sun 03:30 UTC + manual. Walks Lidl's e-shop categories via the search
     # API (sitemap → /q/api/search, paged to completion) → SKU-keyed Products +
     # shelf-price baselines for the full assortment. Complements the offers adapter.
-    if: github.event.schedule == '30 3 * * 0' || github.event.inputs.chain == 'lidl-catalog'
+    if: github.event.schedule == '45 3 * * *' || github.event.inputs.chain == 'lidl-catalog'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -983,18 +988,27 @@ jobs:
           # Outlast a Wolt 429 inside one fetch: 5s, 10s, 20s, 40s.
           FETCH_RETRIES: '4'
           FETCH_BACKOFF_MS: '5000'
-      - name: My Market full catalog (site listing -> Product + shelf-price baseline)
-        # Runs even when the Wolt step above fails: it reads mymarket.gr, not
-        # Wolt, so a Wolt rate limit must not cost the week's shelf prices too
-        # (on 2026-10-04 it did — this step was skipped).
-        if: ${{ !cancelled() }}
-        # Walks mymarket.gr's product departments from /sitemap/categories-tree,
-        # not /offers. Normal cards write shelf-price baselines; current offer
-        # cards only create/keep the SKU mapping so promo prices are not stored
-        # as normal shelf prices. Wolt step above still adds GTINs for the
-        # subset it covers. See src/scripts/mymarket-catalog.mjs.
-        continue-on-error: true
-        run: node src/scripts/mymarket-catalog.mjs
+      # The My Market catalog step moved to its own DAILY job (mymarket-catalog)
+      # on 2026-11-23; this Sunday job is the Wolt GTIN enrichment only.
+
+  # My Market full catalog — DAILY (was a step of the Sunday mymarket-canonical
+  # job until 2026-11-23). Walks mymarket.gr's product departments from
+  # /sitemap/categories-tree, not /offers. Normal cards write shelf-price
+  # baselines; current offer cards only create/keep the SKU mapping so promo
+  # prices are not stored as normal shelf prices. See src/scripts/mymarket-catalog.mjs.
+  mymarket-catalog:
+    if: github.event.schedule == '0 6 * * *' || github.event.inputs.chain == 'mymarket-catalog'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - run: node src/scripts/mymarket-catalog.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
@@ -1142,7 +1156,7 @@ jobs:
     # SKU-keyed Products + normal shelf-price baselines. Current official web
     # and leaflet offer Itemcodes are excluded from normal baselines so MONO
     # promos don't poison the reference price.
-    if: github.event.schedule == '30 6 * * 0' || github.event.inputs.chain == 'masoutis-catalog'
+    if: github.event.schedule == '30 6 * * *' || github.event.inputs.chain == 'masoutis-catalog'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -1186,7 +1200,7 @@ jobs:
     # without PROXY_URL this job no-ops (exit 0) rather than hammering a block.
     # Set the PROXY_URL secret to make it autonomous; until then run it locally
     # from a residential IP.
-    if: github.event.schedule == '0 7 * * 0' || github.event.inputs.chain == 'sklavenitis-catalog'
+    if: github.event.schedule == '0 7 * * *' || github.event.inputs.chain == 'sklavenitis-catalog'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:

@@ -6,7 +6,8 @@
 # have rotated on/off since June). Owner chose the free local path over a paid
 # proxy, so a Windows Scheduled Task runs this wrapper:
 #   - Sklavenitis Offers   daily 02:30 local  -> -Job offers
-#   - Sklavenitis Catalog  weekly Sun 04:00   -> -Job catalog (catalog + image mirror)
+#   - Sklavenitis Catalog  daily 03:00 local  -> -Job catalog (catalog + image mirror)
+#     (weekly until 2026-11-23; daily so regular prices are never a week old)
 # Registration: scripts\windows\register-sklavenitis-tasks.ps1 (run once).
 #
 # Behavior on a 403 night: the adapter fails fast, this wrapper exits non-zero,

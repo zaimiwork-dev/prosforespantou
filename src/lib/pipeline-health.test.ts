@@ -121,10 +121,22 @@ describe('EXPECTED_FEEDS', () => {
 
   it('gives every weekly feed a window longer than a week', () => {
     // A 7-day window on a 7-day cadence alarms on any run that slips by an
-    // hour. Everything that runs on Sundays must sit above 168h.
-    const weeklySources = new Set(['catalog', 'wolt', 'leaflet']);
+    // hour. Everything that runs weekly must sit above 168h.
+    const weeklySources = new Set(['wolt', 'leaflet']);
     for (const feed of EXPECTED_FEEDS.filter((f) => weeklySources.has(f.source))) {
       expect(feed.maxAgeHours).toBeGreaterThan(7 * 24);
+    }
+  });
+
+  it('expects every catalog (regular prices) daily, with one late night of slack', () => {
+    // Daily since 2026-11-23 (owner: «always up to date»). GitHub starts
+    // schedules hours late, so the window is more than a day — but a catalog
+    // two days old must alarm, not wait out a week.
+    const catalogs = EXPECTED_FEEDS.filter((f) => f.source === 'catalog');
+    expect(catalogs.length).toBeGreaterThan(0);
+    for (const feed of catalogs) {
+      expect(feed.maxAgeHours).toBeGreaterThan(36);
+      expect(feed.maxAgeHours).toBeLessThanOrEqual(48);
     }
   });
 
