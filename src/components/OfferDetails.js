@@ -232,7 +232,7 @@ export function OfferDetails({ offer, comparison = [], timeline = null, similar 
             onClick={handleAdd}
             disabled={added}
           >
-            {added ? <><Icon.Check size={16} /> Προστέθηκε</> : 'Προσθήκη στη λίστα'}
+            {added ? <><Icon.Check size={16} /> Προστέθηκε</> : <><span className="od-add-long">Προσθήκη στη λίστα</span><span className="od-add-short">Στη λίστα</span></>}
           </button>
         </div>
         {/* «Ειδοποίησέ με» by email: on offer anywhere / cheaper / my price. */}

@@ -2271,6 +2271,15 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 .od-add:hover { background: var(--brand-2); }
 .od-add.added { background: var(--good); color: #fff; }
+/* At phone width the full label needed ~215 px beside the star and the
+   stepper (~157 px left) and ran past the card's edge; the short label is the
+   app's own wording. min-width:0 lets the flex item shrink at all. */
+.od-add { min-width: 0; }
+.od-add-short { display: none; }
+@media (max-width: 440px) {
+  .od-add-long { display: none; }
+  .od-add-short { display: inline; }
+}
 
 /* PriceComparison */
 .pc-head {
