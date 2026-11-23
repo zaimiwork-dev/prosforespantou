@@ -32,6 +32,34 @@ function url(vars) {
   return `${AB_ENDPOINT}?operationName=ProductList&variables=${variables}&extensions=${ext}`;
 }
 
+// PROBE=points (2026-11-23, owner: show AB's points offers, labelled): what do
+// the ~600 promotions the adapter skips look like? Tally promotionType across
+// the whole listing and print a few raw non-price promotions, then stop.
+if (process.env.PROBE === 'points') {
+  const PRICE = new Set(['Buy X Get Percentage Off All Products', 'Grocery Buy X get Y free', 'Grocery Multi-buy', 'Price Promotion', 'percentageDiscount']);
+  const tally = {};
+  const samples = [];
+  let pages = null;
+  for (let page = 0; page < 40; page++) {
+    const res = await fetch(url({ lazyLoadCount: 50, pageNumber: page }), { headers: AB_API_HEADERS });
+    const pl = (await res.json()).data?.productList;
+    pages ??= pl?.pagination?.totalPages;
+    for (const p of pl?.products || []) {
+      const promos = p.potentialPromotions || [];
+      for (const pr of promos) tally[pr.promotionType] = (tally[pr.promotionType] || 0) + 1;
+      const priceAffecting = promos.some((pr) => PRICE.has(pr.promotionType) || pr.percentageDiscount != null);
+      if (!priceAffecting && promos.length && samples.length < 8) {
+        samples.push({ code: p.code, name: p.name, price: p.price, promos });
+      }
+    }
+    if (pages != null && page + 1 >= pages) break;
+    await new Promise((r) => setTimeout(r, 900));
+  }
+  console.log('promotionType tally:', JSON.stringify(tally, null, 1));
+  for (const s of samples) console.log('\nNON-PRICE SAMPLE:', JSON.stringify(s).slice(0, 1500));
+  process.exit(0);
+}
+
 const VARIANTS = [
   ['size 10, hideUnavailableProducts OFF', { hideUnavailableProducts: false }],
   ['size 500', { lazyLoadCount: 500 }],

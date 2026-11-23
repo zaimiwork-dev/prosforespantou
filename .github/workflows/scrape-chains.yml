@@ -133,6 +133,11 @@ on:
         required: false
         default: ''
         type: string
+      probe:
+        description: 'ab-offers-probe only: «points» = show what AB loyalty-points promotions look like'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -789,6 +794,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          # PROBE=points prints what AB's loyalty-points promotions look like.
+          PROBE: ${{ github.event.inputs.probe || '' }}
 
   ab-resolver-only:
     if: github.event.inputs.chain == 'ab-resolver-only'
