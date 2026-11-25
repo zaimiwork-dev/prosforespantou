@@ -57,6 +57,7 @@ on:
     # (Κρητικός daily offers — retired 2026-11-22: kritikos-sm.gr redirects to masoutis.gr; manual dispatch only)
     - cron: '30 2 * * *'  # daily 02:30 UTC — Bazaar offers
     - cron: '15 2 * * *'  # daily 02:15 UTC — Γαλαξίας catalogue + leaflet + web offers (one walk, added 2026-11-23)
+    - cron: '15 22 * * *' # daily 22:15 UTC = 00:15 Athens — Γαλαξίας again: its offers end at midnight Greek time and GitHub starts scheduled runs hours late (11-25: 2,111 offers ended before the 02:15 run started)
     - cron: '45 2 * * *'  # daily 02:45 UTC — Market In catalogue + leaflet + web-only offers (added 2026-11-23)
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '30 3 * * *'  # daily 03:30 UTC — Masoutis web offers (site API)
@@ -308,7 +309,7 @@ jobs:
   # «ΦΥΛΛΑΔΙΟ» leaflet offers, then the web offers. See
   # src/scripts/lib/galaxias-api.mjs + galaxias-promos.mjs.
   galaxias:
-    if: github.event.schedule == '15 2 * * *' || github.event.inputs.chain == 'galaxias'
+    if: github.event.schedule == '15 2 * * *' || github.event.schedule == '15 22 * * *' || github.event.inputs.chain == 'galaxias'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
