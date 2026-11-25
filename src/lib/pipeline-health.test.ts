@@ -91,11 +91,12 @@ describe('EXPECTED_FEEDS', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('monitors every live chain offer feed (Κρητικός retired 2026-11-22, Γαλαξίας + Market In added 11-23)', () => {
+  it('monitors every live chain offer feed (Κρητικός retired 2026-11-22, Γαλαξίας + Market In added 11-23, Discount Markt 11-25)', () => {
     const chains = new Set(EXPECTED_FEEDS.map((f) => f.chain));
     expect(chains).toEqual(new Set([
       'ab',
       'bazaar',
+      'discountmarkt',
       'galaxias',
       'lidl',
       'marketin',

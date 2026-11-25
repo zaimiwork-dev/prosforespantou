@@ -25,6 +25,7 @@ export const SM_MAPPING = {
   marketin: 'Market In',
   galaxias: 'Γαλαξίας',
   efresh: 'e-fresh',
+  discountmarkt: 'Discount Markt',
 };
 
 // ── Barcode normalization (GTIN-14 → GTIN-13) ───────────────────────────────

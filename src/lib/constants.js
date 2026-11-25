@@ -6,7 +6,8 @@
 // prints its status from CI, the one context that reaches www.ab.gr).
 // Watch the odd spellings: kritikos "fulladia/fulladio", marketin "filadio",
 // sklavenitis "katalogoi_" (trailing underscore). No leaflet page exists on
-// galaxias.shop or discountmarkt.gr — no link rather than a wrong one.
+// galaxias.shop — no link rather than a wrong one. discountmarkt.gr's is
+// /offer-brochures/ (a 3D flipbook of the weekly PDF).
 export const SUPERMARKETS = [
   { id: "ab", name: "AB Vassilopoulos", short: "AB", color: "#E63946", bg: "#fff0f0", heroLabel: "AB", heroSub: "Vassilopoulos", logo: "ab.png", leafletUrl: "https://www.ab.gr/promotions/leaflet" },
   { id: "sklavenitis", name: "Σκλαβενίτης", short: "ΣΚ", color: "#1D3557", bg: "#f0f3ff", heroLabel: "Σκλαβε-", heroSub: "νίτης", logo: "sklavenitis.png", leafletUrl: "https://www.sklavenitis.gr/katalogoi_/" },
@@ -21,6 +22,11 @@ export const SUPERMARKETS = [
   // shop; adapters/marketin.mjs reads its leaflet + web-only offer listings and
   // marketin-catalog.mjs its whole catalogue (lib/marketin-api).
   { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/filadio/" },
+  // Discount Markt out of the parked list 2026-11-25: no shop exists, so Claude
+  // agents read its weekly leaflet (src/scripts/discountmarkt-leaflet.mjs,
+  // rules in src/scripts/leaflet-reading-rules.md; every price checked against
+  // the leaflet's own unit price).
+  { id: "discountmarkt", name: "Discount Markt", short: "DM", color: "#d62828", bg: "#fff0f0", heroLabel: "Discount", heroSub: "Markt", logo: "discount_markt.png", leafletUrl: "https://discountmarkt.gr/offer-brochures/" },
   { id: "kritikos", name: "Κρητικός", short: "ΚΡ", color: "#e85d04", bg: "#fff4ed", heroLabel: "Κρητι-", heroSub: "κός", logo: "kritikos.avif", leafletUrl: "https://kritikos-sm.gr/fulladia/fulladio/" },
 ];
 
@@ -28,12 +34,10 @@ export const SUPERMARKETS = [
 // store with ZERO offers dead-ended users on empty pages). Recon verdicts:
 //   marketin      — UNPARKED 2026-11-23 (the 07-07 verdict was wrong: the shop
 //                   lists its leaflet offers as products at /el-gr/ALL/1-1)
-//   discountmarkt — WordPress brochure site; PDF leaflet viewer, no product data
+//   discountmarkt — UNPARKED 2026-11-25: still no shop (WordPress brochure site),
+//                   but Claude agents read the weekly leaflet PDF — see above
 //   galaxias      — (was: under-construction shell) UNPARKED 2026-11-23, see above
 // Move an entry back into SUPERMARKETS only once a real adapter feeds it data.
-// 2026-11-23: Discount Markt still has offers only as a weekly leaflet PDF of
-// images (discountmarkt.gr has no shop, none found on Wolt/efood/Box) — it
-// needs vision reading first.
 // e-fresh is the next viable NEW chain (clean JSON API, but barcode-less →
 // needs guarded name-matching; hold until the Groq mapping audit is unblocked).
 // Chains that no longer exist as a separate shop. Κρητικός: bought by Μασούτης
@@ -45,9 +49,7 @@ export const SUPERMARKETS = [
 export const RETIRED_SUPERMARKET_IDS = new Set(["kritikos"]);
 export const ACTIVE_SUPERMARKETS = SUPERMARKETS.filter((s) => !RETIRED_SUPERMARKET_IDS.has(s.id));
 
-export const PARKED_SUPERMARKETS = [
-  { id: "discountmarkt", name: "Discount Markt", short: "DM", color: "#d62828", bg: "#fff0f0", heroLabel: "Discount", heroSub: "Markt", logo: "discount_markt.png" },
-];
+export const PARKED_SUPERMARKETS = [];
 
 // `label` is the SHORT form for space-tight chips ("Φρούτα & λαχ."). Anywhere
 // with room (listing page titles, active-filter chips) must show the full

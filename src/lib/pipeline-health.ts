@@ -55,6 +55,9 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   // Market In (added 2026-11-23). Its «WEB ONLY» listing is often empty — the
   // adapter then records no run, so only the leaflet feed is watched.
   { chain: 'marketin', source: 'leaflet', maxAgeHours: 36, schedule: 'καθημερινά 02:45 UTC — GitHub Actions (marketin)' },
+  // Discount Markt (added 2026-11-25): no shop — Claude agents read the weekly
+  // leaflet (src/scripts/discountmarkt-leaflet.mjs). A week + a day of grace.
+  { chain: 'discountmarkt', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε εβδομάδα — ανάγνωση φυλλαδίου από Claude agents (discountmarkt-leaflet.mjs)' },
 
   // ── Shelf-price / catalog feeds ───────────────────────────────────────────
   { chain: 'lidl', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 03:45 UTC — GitHub Actions (lidl-catalog)' },
