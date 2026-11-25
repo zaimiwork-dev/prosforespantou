@@ -852,4 +852,21 @@ export const CHAIN_NATIVE_MAPS: Record<string, Record<string, string | null>> = 
     'Είδη Πάρτι': D.home,
     'Βρεφικές Τροφές': D.baby,
   },
+  // Market In (www.market-in.gr, added 2026-11-23): its top departments, as
+  // lib/marketin-api.mjs names them from the product URL's first segment.
+  marketin: {
+    'Μαναβική': D.fruit,
+    'Κρεοπωλείο': D.meat,
+    'Τυροκομικά - Αλλαντικά': D.cheese,
+    // Pantry, canned, breakfast and snacks share one department: keywords split them.
+    'Τρόφιμα': null,
+    'Κάβα': D.drinks,
+    'Βρεφικά': D.baby,
+    'Γαλακτοκομικά - Ψυγείου': D.dairy,
+    'Κατεψυγμένα': D.frozen,
+    'Προσωπική Φροντίδα': D.personal,
+    'Καθαριότητα': D.home,
+    'Όλα για το Σπίτι': D.home,
+    'Κατοικίδια': D.pets,
+  },
 };

@@ -57,6 +57,7 @@ on:
     # (Κρητικός daily offers — retired 2026-11-22: kritikos-sm.gr redirects to masoutis.gr; manual dispatch only)
     - cron: '30 2 * * *'  # daily 02:30 UTC — Bazaar offers
     - cron: '15 2 * * *'  # daily 02:15 UTC — Γαλαξίας catalogue + leaflet + web offers (one walk, added 2026-11-23)
+    - cron: '45 2 * * *'  # daily 02:45 UTC — Market In catalogue + leaflet + web-only offers (added 2026-11-23)
     - cron: '0 3 * * *'   # daily 03:00 UTC — AB offers
     - cron: '30 3 * * *'  # daily 03:30 UTC — Masoutis web offers (site API)
     - cron: '0 4 * * *'   # daily 04:00 UTC — Combined LLM resolver (all chains)
@@ -85,6 +86,7 @@ on:
           - bazaar-offers
           - bazaar-catalog
           - galaxias
+          - marketin
           - bazaar-resolver-only
           - ab-offers
           - ab-catalog
@@ -118,6 +120,7 @@ on:
           - image-hosts
           - verify-comparisons
           - verify-comparisons-eval
+          - item-links
       limit:
         description: 'Cap items for a *-resolver-only smoke run (blank = no cap)'
         required: false
@@ -352,6 +355,59 @@ jobs:
           done
           [ -z "$failed" ]
 
+  # Market In (owner 2026-11-23: «market in literally has an online shop»).
+  # www.market-in.gr is server-rendered (eshopkey): the catalogue walk (every
+  # department, ~4,500 products, ~3 min) runs FIRST so the offers map to
+  # products by item code at once; then the «ΦΥΛΛΑΔΙΟ ΠΡΟΣΦΟΡΩΝ» listing and
+  # the «WEB ONLY» listing. Before the 04:00 resolvers job, whose item_links
+  # step links the new products to the other stores the same night.
+  # See src/scripts/lib/marketin-api.mjs.
+  marketin:
+    if: github.event.schedule == '45 2 * * *' || github.event.inputs.chain == 'marketin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MARKETIN_CACHE: /tmp/marketin-walk.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Market In catalogue (walk + products + regular prices)
+        id: mi_catalog
+        continue-on-error: true
+        run: node src/scripts/marketin-catalog.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Market In leaflet offers («ΦΥΛΛΑΔΙΟ ΠΡΟΣΦΟΡΩΝ»)
+        id: mi_leaflet
+        continue-on-error: true
+        run: node src/scripts/adapters/marketin.mjs
+        env:
+          FEED: leaflet
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Market In web-only offers
+        id: mi_web
+        continue-on-error: true
+        run: node src/scripts/adapters/marketin.mjs
+        env:
+          FEED: web
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Gate — fail the job if any step failed
+        if: always()
+        run: |
+          for pair in "catalog:${{ steps.mi_catalog.outcome }}" "leaflet:${{ steps.mi_leaflet.outcome }}" "web:${{ steps.mi_web.outcome }}"; do
+            name="${pair%%:*}"; outcome="${pair##*:}"
+            if [ "$outcome" != "success" ]; then echo "::error::Market In $name step: $outcome"; failed=1; fi
+          done
+          [ -z "$failed" ]
+
   bazaar-offers:
     # Daily 02:30 UTC + manual. Scrapes bazaar-online.gr/prosfores (OpenCart,
     # server-rendered). Bazaar embeds the GTIN in the image filename, so most
@@ -581,6 +637,30 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Cross-store item links (propose → word-identical → AI check)
+        # 2026-11-23 (owner: «nescafe classic only in galaxias and bazaar …
+        # an item that is on every supermarket»): links the same product
+        # across stores every night instead of in one-off waves. Export →
+        # name-based proposals (also for products already shared by two
+        # stores, one link per store item) → keep the pairs that put a
+        # comparison on screen and were never judged → word-identical pairs
+        # recorded as 'name-exact', the rest judged by Groq (most visible
+        # first, LIMIT, shares the daily budget with the step below).
+        id: item_links
+        continue-on-error: true
+        run: |
+          node src/scripts/link-export.mjs
+          node src/scripts/link-products-offline.mjs > /tmp/link-proposals.log && tail -3 /tmp/link-proposals.log
+          MODE=export LINKS_CANDIDATES="$LINK_OUT_DIR/candidates.jsonl" OUT="$LINK_OUT_DIR" node src/scripts/link-items.mjs
+          LINKS_META="$LINK_OUT_DIR/links-meta.json" node src/scripts/verify-comparisons.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LINK_DATA_DIR: /tmp/link-data
+          LINK_OUT_DIR: /tmp/link-out
+          LINK_ALL_SOURCES: '1'
+          LIMIT: '300'
       - name: Verify comparison pairs (AI check of each new pair)
         # Owner decision 2026-11-22: every cross-chain pair the comparison
         # sheet could show is judged once by Groq; different/unsure pairs are
@@ -655,7 +735,7 @@ jobs:
         if: always()
         run: |
           failed=""
-          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"             "recompute-verdicts:${{ steps.rc_verdicts.outcome }}"             "recompute-hotness:${{ steps.rc_hotness.outcome }}"             "barcode-links:${{ steps.barcode_links.outcome }}"             "verify-comparisons:${{ steps.verify_pairs.outcome }}"             "recompute-comparison:${{ steps.rc_compare.outcome }}"             "watches:${{ steps.watches.outcome }}"             "prune-leaflets:${{ steps.prune_leaflets.outcome }}"; do
+          for pair in             "ab:${{ steps.r_ab.outcome }}"             "sklavenitis:${{ steps.r_sklavenitis.outcome }}"             "bazaar:${{ steps.r_bazaar.outcome }}"             "mymarket:${{ steps.r_mymarket.outcome }}"             "masoutis-web:${{ steps.r_masoutis_web.outcome }}"             "masoutis-leaflet:${{ steps.r_masoutis_leaflet.outcome }}"             "lidl:${{ steps.r_lidl.outcome }}"             "recompute-verdicts:${{ steps.rc_verdicts.outcome }}"             "recompute-hotness:${{ steps.rc_hotness.outcome }}"             "barcode-links:${{ steps.barcode_links.outcome }}"             "item-links:${{ steps.item_links.outcome }}"             "verify-comparisons:${{ steps.verify_pairs.outcome }}"             "recompute-comparison:${{ steps.rc_compare.outcome }}"             "watches:${{ steps.watches.outcome }}"             "prune-leaflets:${{ steps.prune_leaflets.outcome }}"; do
             name="${pair%%:*}"; outcome="${pair#*:}"
             echo "  $name -> $outcome"
             if [ "$outcome" = "failure" ]; then failed="$failed $name"; fi
@@ -674,7 +754,9 @@ jobs:
     #   verify-comparisons-eval  score the model on the hand-labelled pairs in
     #                            src/scripts/fixtures/comparison-eval-pairs.json
     #                            (no database writes)
-    if: github.event.inputs.chain == 'verify-comparisons' || github.event.inputs.chain == 'verify-comparisons-eval'
+    #   item-links               the nightly cross-store link step on demand
+    #                            (limit = Groq cap), then refresh the chips
+    if: github.event.inputs.chain == 'verify-comparisons' || github.event.inputs.chain == 'verify-comparisons-eval' || github.event.inputs.chain == 'item-links'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -686,6 +768,7 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - name: Judge pairs
+        if: github.event.inputs.chain != 'item-links'
         run: node src/scripts/verify-comparisons.mjs
         env:
           EVAL: ${{ github.event.inputs.chain == 'verify-comparisons-eval' && '1' || '' }}
@@ -693,8 +776,23 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: Cross-store item links (same commands as the nightly item_links step)
+        if: github.event.inputs.chain == 'item-links'
+        run: |
+          node src/scripts/link-export.mjs
+          node src/scripts/link-products-offline.mjs > /tmp/link-proposals.log && tail -3 /tmp/link-proposals.log
+          MODE=export LINKS_CANDIDATES="$LINK_OUT_DIR/candidates.jsonl" OUT="$LINK_OUT_DIR" node src/scripts/link-items.mjs
+          LINKS_META="$LINK_OUT_DIR/links-meta.json" node src/scripts/verify-comparisons.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LINK_DATA_DIR: /tmp/link-data
+          LINK_OUT_DIR: /tmp/link-out
+          LINK_ALL_SOURCES: '1'
+          LIMIT: ${{ github.event.inputs.limit || '300' }}
       - name: Recompute comparison counts from the new verdicts
-        if: github.event.inputs.chain == 'verify-comparisons'
+        if: github.event.inputs.chain == 'verify-comparisons' || github.event.inputs.chain == 'item-links'
         run: node src/scripts/recompute-comparison-counts.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

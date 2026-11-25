@@ -52,6 +52,9 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'galaxias', source: 'web', maxAgeHours: 36, schedule: 'καθημερινά 02:15 UTC — GitHub Actions (galaxias)' },
   { chain: 'galaxias', source: 'leaflet', maxAgeHours: 36, schedule: 'καθημερινά 02:15 UTC — GitHub Actions (galaxias)' },
   { chain: 'lidl', source: 'leaflet', maxAgeHours: 8 * 24, schedule: 'κάθε Πέμπτη 06:00 UTC — GitHub Actions' },
+  // Market In (added 2026-11-23). Its «WEB ONLY» listing is often empty — the
+  // adapter then records no run, so only the leaflet feed is watched.
+  { chain: 'marketin', source: 'leaflet', maxAgeHours: 36, schedule: 'καθημερινά 02:45 UTC — GitHub Actions (marketin)' },
 
   // ── Shelf-price / catalog feeds ───────────────────────────────────────────
   { chain: 'lidl', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 03:45 UTC — GitHub Actions (lidl-catalog)' },
@@ -59,6 +62,7 @@ export const EXPECTED_FEEDS: FeedSpec[] = [
   { chain: 'masoutis', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 06:30 UTC — GitHub Actions (masoutis-catalog)' },
   { chain: 'bazaar', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 07:30 UTC — GitHub Actions (bazaar-catalog)' },
   { chain: 'galaxias', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 02:15 UTC — GitHub Actions (galaxias)' },
+  { chain: 'marketin', source: 'catalog', maxAgeHours: DAILY_CATALOG, schedule: 'καθημερινά 02:45 UTC — GitHub Actions (marketin)' },
   // My Market's catalog is a continue-on-error STEP inside the mymarket-canonical
   // job, not a job of its own — so it can fail silently while the job stays
   // green. This row is the only place that failure becomes visible.

@@ -17,17 +17,23 @@ export const SUPERMARKETS = [
   // Γαλαξίας back from the parked list 2026-11-23: galaxias.shop is now a real
   // shop (Magento) and adapters/galaxias.mjs feeds its offers + catalogue.
   { id: "galaxias", name: "Γαλαξίας", short: "ΓΑ", color: "#003f88", bg: "#eef3ff", heroLabel: "Γαλα-", heroSub: "ξίας", logo: "galaxias.jpg" },
+  // Market In out of the parked list 2026-11-23: www.market-in.gr is a real
+  // shop; adapters/marketin.mjs reads its leaflet + web-only offer listings and
+  // marketin-catalog.mjs its whole catalogue (lib/marketin-api).
+  { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/filadio/" },
   { id: "kritikos", name: "Κρητικός", short: "ΚΡ", color: "#e85d04", bg: "#fff4ed", heroLabel: "Κρητι-", heroSub: "κός", logo: "kritikos.avif", leafletUrl: "https://kritikos-sm.gr/fulladia/fulladio/" },
 ];
 
 // Parked chains (removed from the user-facing list 2026-07-07 — selecting a
 // store with ZERO offers dead-ended users on empty pages). Recon verdicts:
-//   marketin      — no scrapable offers source (ASP.NET, flipbook-only leaflet)
+//   marketin      — UNPARKED 2026-11-23 (the 07-07 verdict was wrong: the shop
+//                   lists its leaflet offers as products at /el-gr/ALL/1-1)
 //   discountmarkt — WordPress brochure site; PDF leaflet viewer, no product data
 //   galaxias      — (was: under-construction shell) UNPARKED 2026-11-23, see above
 // Move an entry back into SUPERMARKETS only once a real adapter feeds it data.
-// 2026-11-23: Market In (FlipBuilder flipbook) and Discount Markt (image-only
-// PDF) have offers only as leaflet IMAGES — they need vision reading first.
+// 2026-11-23: Discount Markt still has offers only as a weekly leaflet PDF of
+// images (discountmarkt.gr has no shop, none found on Wolt/efood/Box) — it
+// needs vision reading first.
 // e-fresh is the next viable NEW chain (clean JSON API, but barcode-less →
 // needs guarded name-matching; hold until the Groq mapping audit is unblocked).
 // Chains that no longer exist as a separate shop. Κρητικός: bought by Μασούτης
@@ -40,7 +46,6 @@ export const RETIRED_SUPERMARKET_IDS = new Set(["kritikos"]);
 export const ACTIVE_SUPERMARKETS = SUPERMARKETS.filter((s) => !RETIRED_SUPERMARKET_IDS.has(s.id));
 
 export const PARKED_SUPERMARKETS = [
-  { id: "marketin", name: "Market In", short: "MI", color: "#606c38", bg: "#f4f7ed", heroLabel: "Market", heroSub: "In", logo: "marketin.png", leafletUrl: "https://www.market-in.gr/filadio/" },
   { id: "discountmarkt", name: "Discount Markt", short: "DM", color: "#d62828", bg: "#fff0f0", heroLabel: "Discount", heroSub: "Markt", logo: "discount_markt.png" },
 ];
 
