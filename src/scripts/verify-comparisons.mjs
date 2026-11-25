@@ -42,8 +42,8 @@
 //
 // Cross-store item links (2026-11-23, nightly): LINKS_META=<links-meta.json from
 // link-items.mjs MODE=export> judges the proposed links instead of the live
-// offer pairs. Word-identical pairs (lib/name-exact) are recorded without
-// asking (model 'name-exact'); the rest go to Groq, most visible first, LIMIT
+// offer pairs. Word-identical pairs whose names both state their product's
+// brand (lib/name-exact) are recorded without asking (model 'name-exact'); the rest go to Groq, most visible first, LIMIT
 // per run, stopping cleanly on the daily budget. Pairs already judged are skipped.
 //   LINKS_META=/tmp/link-out/links-meta.json LIMIT=400 node src/scripts/verify-comparisons.mjs
 //
@@ -56,7 +56,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { samePack } from '../lib/packaging.ts';
 import { areComparableNames } from '../lib/offer-similarity.ts';
 import { mergeVerdict, pairKeyOf } from '../lib/comparison-verdict.ts';
-import { sameWordsAndSize } from '../lib/name-exact.ts';
+import { brandKeySet, wordIdenticalLink } from '../lib/name-exact.ts';
 import { RETIRED_SUPERMARKET_IDS } from '../lib/constants.js';
 
 const EVAL = process.env.EVAL === '1';
@@ -449,6 +449,9 @@ async function runLinks(apiKey) {
   const { default: prisma } = await import('../lib/prisma.ts');
   const meta = JSON.parse(readFileSync(LINKS_META, 'utf8'));
   const existing = new Set((await prisma.comparisonVerdict.findMany({ select: { pairKey: true } })).map((r) => r.pairKey));
+  const brandKeys = brandKeySet((await prisma.product.findMany({
+    where: { brand: { not: null } }, select: { brand: true }, distinct: ['brand'],
+  })).map((p) => p.brand));
   const fresh = Object.entries(meta)
     .filter(([id]) => !existing.has(id))
     .map(([id, m]) => ({
@@ -456,9 +459,11 @@ async function runLinks(apiKey) {
       chainA: m.a.chain, codeA: m.a.code, nameA: m.a.name,
       chainB: m.b.chain, codeB: m.b.code, nameB: m.b.name,
       priority: m.priority ?? 0,
+      // Word-identical AND each name states its product's brand (lib/name-exact).
+      exact: wordIdenticalLink(m.a, m.b, brandKeys),
     }));
-  const exact = fresh.filter((p) => sameWordsAndSize(p.nameA, p.nameB));
-  const todo = fresh.filter((p) => !sameWordsAndSize(p.nameA, p.nameB)).sort((a, b) => b.priority - a.priority);
+  const exact = fresh.filter((p) => p.exact);
+  const todo = fresh.filter((p) => !p.exact).sort((a, b) => b.priority - a.priority);
   console.log(`🔗 proposed links: ${Object.keys(meta).length}; new: ${fresh.length} (word-identical: ${exact.length}, for the model: ${todo.length})${DRY_RUN ? ' — DRY_RUN' : ''}`);
   const row = (p, verdict, reason, model) => ({
     pairKey: p.pairKey, chainA: p.chainA, codeA: p.codeA, nameA: p.nameA, chainB: p.chainB, codeB: p.codeB, nameB: p.nameB,
@@ -490,8 +495,7 @@ async function runLinks(apiKey) {
     console.log(`   judged ${result.done} links, ${result.tokens} Groq tokens`);
   }
   await prisma.$disconnect();
-  if (result.fatal) { console.error(`
-❌ stopped: ${result.fatal}`); process.exitCode = 1; }
+  if (result.fatal) { console.error(`\n❌ stopped: ${result.fatal}`); process.exitCode = 1; }
 }
 
 const apiKey = process.env.GROQ_API_KEY;

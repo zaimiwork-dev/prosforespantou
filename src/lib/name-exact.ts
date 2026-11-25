@@ -31,3 +31,44 @@ export function sameWordsAndSize(nameA: string | null | undefined, nameB: string
   if (compareSizes(a.size, b.size) !== 'same') return false;
   return a.key === b.key;
 }
+
+/**
+ * Does the name state the brand on record? AB leaves the brand out of its
+ * names («Φρέσκο Γάλα Πλήρες 1lt» is ΔΕΛΤΑ), so two brandless names can be
+ * word-identical and still be two brands (a store's own label). Compared by
+ * sound (parseName keys), so «ION» = «ΙΟΝ». Unknown or unreadable brand → false.
+ */
+export function statesBrand(name: string | null | undefined, brand: string | null | undefined): boolean {
+  if (!name || !brand) return false;
+  const brandKey = parseName(brand).tokens[0]?.key;
+  if (!brandKey) return false;
+  return parseName(name).tokens.some((t) => t.key === brandKey);
+}
+
+/** First-word sound keys of every known brand (products.brand), for brandOk(). */
+export function brandKeySet(brands: Iterable<string | null | undefined>): Set<string> {
+  const out = new Set<string>();
+  for (const b of brands) {
+    const k = b ? parseName(b).tokens[0]?.key : undefined;
+    if (k) out.add(k);
+  }
+  return out;
+}
+
+type LinkSide = { name?: string | null; brand?: string | null };
+
+// A side's brand is accounted for when its name states the brand on record,
+// or — for the many products with no brand on record (~900 of the first 2,078
+// word-identical links, all right) — when the name STARTS with a known brand.
+// A name starting with a plain word («Φρέσκο Γάλα Πλήρες 1lt») never qualifies,
+// so two stores' own-label goods cannot link without a judge.
+function brandOk(side: LinkSide, brandKeys: Set<string> | null): boolean {
+  if (side.brand) return statesBrand(side.name, side.brand);
+  const first = parseName(side.name).tokens[0]?.key;
+  return !!first && !!brandKeys && brandKeys.has(first);
+}
+
+/** A link that needs no judge: word-identical, and each side's brand accounted for. */
+export function wordIdenticalLink(a: LinkSide, b: LinkSide, brandKeys: Set<string> | null = null): boolean {
+  return sameWordsAndSize(a.name, b.name) && brandOk(a, brandKeys) && brandOk(b, brandKeys);
+}

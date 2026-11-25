@@ -3,9 +3,23 @@
 // barcode»):
 //   recordItemBarcodes — every (source, store, item, barcode) seen → item_barcodes
 //   recordItemNames    — the store's own name for each item code → chain_product_mappings.item_name
+//                        (with the store's own brand field in front when the name lacks it)
 // Both batched (unnest), idempotent, and only touch rows that change.
 // lib/barcode-links + src/scripts/barcode-links.mjs turn them into matches.
 import { normalizeBarcode } from './ingest-offers.mjs';
+import { statesBrand } from '../../lib/name-exact.ts';
+
+// AB gives the brand in its own field and leaves it out of the name
+// («Στιγμιαίος Καφές 200gr» for Nescafe Classic, brand «NESCAFE»). A brandless
+// name cannot be linked to the other stores (or worse, looks like an
+// own-label product), so the brand the store itself sent goes in front when
+// the name does not already state it (2026-11-25).
+export function nameWithBrand(name, brand) {
+  const n = String(name ?? '').replace(/\s+/g, ' ').trim();
+  const b = String(brand ?? '').replace(/\s+/g, ' ').trim();
+  if (!n || !b || b === '-' || statesBrand(n, b)) return n;
+  return `${b} ${n}`;
+}
 
 const BATCH = 1000;
 
@@ -48,7 +62,7 @@ export async function recordItemNames(prisma, chain, items) {
   const byCode = new Map();
   for (const it of items) {
     if (!it?.chainItemcode || !it?.name) continue;
-    byCode.set(String(it.chainItemcode), String(it.name).trim());
+    byCode.set(String(it.chainItemcode), nameWithBrand(it.name, it.brand));
   }
   const pairs = [...byCode];
   let updated = 0;

@@ -109,14 +109,22 @@ function loadItems() {
       else if (c === originChain) name = p.name;
       if (!name) continue;
       const rawName = name;
-      if (c === originChain) name = withBrand(name, p.brand);
+      // AB writes the brand in its own field, not in the name — its own item
+      // names (chain_product_mappings.item_name, exported since 11-23) are
+      // «Στιγμιαίος Καφές 200gr» for Nescafe. products.brand is put in front
+      // for the chain that created the record, and — since 11-25 — for any
+      // chain whose item is tied to the record by barcode or by its own
+      // catalogue (same product for sure, so the brand is right). Never for a
+      // name-matched ('cache') mapping: that brand could be another product's.
+      const via = viaOf.get(k) ?? null;
+      if (c === originChain || via === 'barcode' || via === 'catalog') name = withBrand(name, p.brand);
       const sh = shelfBy.get(k);
       let at = null;
       if (price == null && sh) price = sh.price;
       if (sh && price === sh.price) at = Date.parse(sh.recordedAt);
       items.push({
         id: k, productId: p.id, chain: c, name, rawName, price, at, active,
-        barcode: p.barcode, via: viaOf.get(k) ?? null, nChains: chains.length, fromProductName: !cn,
+        barcode: p.barcode, via, nChains: chains.length, fromProductName: !cn, brand: p.brand ?? null,
       });
     }
   }
@@ -507,8 +515,8 @@ function runJob(items, scorer, thresh) {
   }
   const list = [...proposals.values()];
   fs.writeFileSync(path.join(OUT, 'candidates.jsonl'), list.map((p) => JSON.stringify({
-    a: { productId: p.a.productId, chain: p.a.chain, name: p.a.name, price: p.a.price },
-    b: { productId: p.b.productId, chain: p.b.chain, name: p.b.name, price: p.b.price },
+    a: { productId: p.a.productId, chain: p.a.chain, name: p.a.name, price: p.a.price, brand: p.a.brand ?? null },
+    b: { productId: p.b.productId, chain: p.b.chain, name: p.b.name, price: p.b.price, brand: p.b.brand ?? null },
     score: Number(p.score.toFixed(4)), margin: Number(p.margin.toFixed(4)), reasons: p.reasons,
   })).join('\n') + '\n');
 

@@ -107,8 +107,10 @@ async function exportBacklog(prisma) {
         const rivalForB = offerA != null || shelf.has(`${c.a.productId}|${c.a.chain}`);
         if (!((offerA != null && rivalForA) || (offerB != null && rivalForB))) continue;
         counts.relevant++;
-        const a = { chain: c.a.chain, code: codeA, name: offerA ?? c.a.name, productId: c.a.productId };
-        const b = { chain: c.b.chain, code: codeB, name: offerB ?? c.b.name, productId: c.b.productId };
+        // brand = the product record's brand (lib/name-exact refuses a
+        // word-identical link when a name does not state it).
+        const a = { chain: c.a.chain, code: codeA, name: offerA ?? c.a.name, productId: c.a.productId, brand: c.a.brand ?? null };
+        const b = { chain: c.b.chain, code: codeB, name: offerB ?? c.b.name, productId: c.b.productId, brand: c.b.brand ?? null };
         const id = pairKeyOf(a, b);
         if (existing.has(id)) { counts.alreadyJudged++; continue; }
         if (meta[id]) continue;
