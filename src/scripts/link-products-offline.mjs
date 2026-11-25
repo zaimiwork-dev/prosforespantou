@@ -84,11 +84,16 @@ function loadItems() {
   const shelfBy = new Map();
   for (const s of shelf) shelfBy.set(`${s.productId}|${s.chain}`, s);
 
+  // Which name stands for a store item: a LIVE offer's name, else the store's
+  // own current catalogue name (own, exported since 11-23), else an old offer
+  // name. Old offer names can be stale and brandless (AB «Στιγμιαίος Καφές
+  // 200gr» kept Nescafe out of the proposals on 11-25).
+  const rank = (c) => (c.active ? 2 : c.own ? 1 : 0);
   const cnBy = new Map();
   for (const c of names) {
     const k = `${c.productId}|${c.chain}`;
     const prev = cnBy.get(k);
-    if (!prev || (!prev.active && c.active)) cnBy.set(k, c);
+    if (!prev || rank(c) > rank(prev)) cnBy.set(k, c);
   }
 
   const items = []; // one per (product, chain)

@@ -45,12 +45,12 @@ try {
       select distinct on (product_id, supermarket, product_name)
              product_id as "productId", supermarket as chain, product_name as name,
              discounted_price as price, original_price as was, category,
-             (is_active and valid_until > now()) as active
+             (is_active and valid_until > now()) as active, false as own
       from discounts
       where product_id is not null and supermarket is not null and supermarket <> all($1::text[])
       order by product_id, supermarket, product_name, updated_at desc) d
     union all
-    select m.product_id, m.supermarket, m.item_name, null, null, null, false
+    select m.product_id, m.supermarket, m.item_name, null, null, null, false, true
     from chain_product_mappings m where m.item_name is not null and m.supermarket <> all($1::text[])`));
   jsonl('shelf_prices.jsonl', await q(`
     select distinct on (product_id, supermarket) product_id as "productId", supermarket as chain,
