@@ -70,6 +70,7 @@ on:
     - cron: '0 5 * * 0'   # weekly Sun 05:00 UTC — Wolt barcode enrichment, all four chains in sequence (sklavenitis → mymarket → masoutis → ab)
     # (Κρητικός Sunday catalog — retired 2026-11-22, see above)
     - cron: '0 6 * * *'   # daily 06:00 UTC — My Market full catalog (own job since 2026-11-23)
+    - cron: '20 6 * * *'  # daily 06:20 UTC — Discount Markt: a NEW weekly leaflet is read by Claude (does nothing when unchanged)
     - cron: '30 6 * * *'  # daily 06:30 UTC — Masoutis full catalog (site API)
     - cron: '0 7 * * *'   # daily 07:00 UTC — Sklavenitis full catalog (category walk, needs PROXY_URL; until then the dev PC runs it daily)
     - cron: '30 7 * * *'  # daily 07:30 UTC — Bazaar full catalog (OpenCart category walk)
@@ -123,6 +124,7 @@ on:
           - verify-comparisons-eval
           - item-links
           - discountmarkt-probe
+          - discountmarkt
       limit:
         description: 'Cap items for a *-resolver-only smoke run (blank = no cap)'
         required: false
@@ -797,6 +799,67 @@ jobs:
         if: github.event.inputs.chain == 'verify-comparisons' || github.event.inputs.chain == 'item-links'
         run: node src/scripts/recompute-comparison-counts.mjs
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+  # Discount Markt (owner 2026-11-25: «yes fully automatic»). The store has no
+  # shop — its offers are a weekly PDF of page images. Daily: fetch the PDF; if
+  # it is the one already imported (scraper_state 'discountmarkt.leaflet'),
+  # stop. A NEW leaflet is read by Claude Code (Sonnet) on the owner's plan
+  # (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`; NO ANTHROPIC_API_KEY,
+  # it would take precedence and bill the API) — 8 pages per run, by
+  # src/scripts/leaflet-reading-rules.md — then checked and imported
+  # (src/scripts/discountmarkt-leaflet.mjs). `-f chain=discountmarkt -f probe=force`
+  # re-reads the current leaflet.
+  discountmarkt:
+    if: github.event.schedule == '20 6 * * *' || github.event.inputs.chain == 'discountmarkt'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Fetch the leaflet (stop if already imported)
+        id: fetch
+        run: node src/scripts/discountmarkt-leaflet.mjs
+        env:
+          MODE: fetch
+          OUT: dm-work
+          FORCE: ${{ github.event.inputs.probe == 'force' && '1' || '' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Claude reads the pages
+        if: steps.fetch.outputs.new == '1'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          PAGES: ${{ steps.fetch.outputs.pages }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set — run \`claude setup-token\` and add it as a repo secret"; exit 1
+          fi
+          npm install -g @anthropic-ai/claude-code@latest
+          k=0
+          for start in $(seq 1 8 "$PAGES"); do
+            k=$((k + 1))
+            end=$((start + 7)); [ "$end" -gt "$PAGES" ] && end=$PAGES
+            files=""
+            for p in $(seq "$start" "$end"); do files="$files dm-work/p$(printf '%02d' "$p").jpg"; done
+            echo "batch $k: pages $start-$end"
+            claude -p "Read the rules in src/scripts/leaflet-reading-rules.md and follow them exactly. Then read these leaflet page images with the Read tool, one at a time:$files (the page number is the number in each file name). Write ONE JSON object {\"headers\": [...], \"offers\": [...]} covering exactly these pages with the Write tool to dm-work/read-$k.json. It must be valid JSON. Do nothing else." \
+              --model sonnet --allowedTools "Read,Write" --permission-mode acceptEdits --max-turns 40
+            node -e "const j=JSON.parse(require('fs').readFileSync('dm-work/read-$k.json','utf8')); console.log('   read-$k:', (j.offers||[]).length, 'offers,', (j.headers||[]).length, 'headers')"
+          done
+          ls dm-work/read-*.json | paste -sd, > dm-work/inputs.txt
+      - name: Check and import the offers
+        if: steps.fetch.outputs.new == '1'
+        run: IN="$(cat dm-work/inputs.txt)" node src/scripts/discountmarkt-leaflet.mjs
+        env:
+          MODE: import
+          META: dm-work/meta.json
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
 

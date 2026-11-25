@@ -27,16 +27,34 @@ import path from 'node:path';
 const MODE = process.env.MODE;
 const DRY_RUN = process.env.DRY_RUN === '1';
 
+// The leaflet already imported (scraper_state), so the daily job reads a
+// leaflet once: a new PDF (new bytes) is the only thing that wakes the readers.
+const STATE_KEY = 'discountmarkt.leaflet';
+
 async function fetchStep() {
   const out = process.env.OUT;
   if (!out) throw new Error('OUT is required');
   const { leafletPdfUrl, fetchPdf, pageJpegs } = await import('./lib/discountmarkt-leaflet.mjs');
+  const crypto = await import('node:crypto');
   fs.mkdirSync(out, { recursive: true });
   const url = await leafletPdfUrl();
-  const pages = pageJpegs(await fetchPdf(url));
+  const pdf = await fetchPdf(url);
+  const sha1 = crypto.createHash('sha1').update(pdf).digest('hex');
+  const pages = pageJpegs(pdf);
   pages.forEach((jpg, i) => fs.writeFileSync(path.join(out, `p${String(i + 1).padStart(2, '0')}.jpg`), jpg));
-  fs.writeFileSync(path.join(out, 'meta.json'), JSON.stringify({ pdfUrl: url, pages: pages.length, fetchedAt: new Date().toISOString() }, null, 1));
-  console.log(`📄 ${url}: ${pages.length} pages → ${out}`);
+  fs.writeFileSync(path.join(out, 'meta.json'), JSON.stringify({ pdfUrl: url, sha1, pages: pages.length, fetchedAt: new Date().toISOString() }, null, 1));
+  let isNew = true;
+  if (process.env.DATABASE_URL && process.env.FORCE !== '1') {
+    const { default: prisma } = await import('../lib/prisma.ts');
+    const done = await prisma.scraperState.findUnique({ where: { key: STATE_KEY } });
+    isNew = done?.value !== sha1;
+    await prisma.$disconnect();
+  }
+  console.log(`📄 ${url}: ${pages.length} pages → ${out} — ${isNew ? 'NEW leaflet, to read' : 'already imported, nothing to do'}`);
+  // GitHub Actions: the reading and import steps run only for a new leaflet.
+  if (process.env.GITHUB_OUTPUT) {
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `new=${isNew ? 1 : 0}\npages=${pages.length}\n`);
+  }
 }
 
 async function importStep() {
@@ -103,6 +121,17 @@ async function importStep() {
     siteTotal: offers.length,
   });
   printReport(report);
+  // Remember the leaflet so the daily job does not read it again.
+  if (!DRY_RUN && report.healthOk && process.env.META) {
+    const meta = JSON.parse(fs.readFileSync(process.env.META, 'utf8'));
+    const { default: prisma } = await import('../lib/prisma.ts');
+    await prisma.scraperState.upsert({
+      where: { key: STATE_KEY },
+      create: { key: STATE_KEY, value: meta.sha1, note: `${meta.pdfUrl} · ${offers.length} offers` },
+      update: { value: meta.sha1, note: `${meta.pdfUrl} · ${offers.length} offers` },
+    });
+    console.log(`   remembered leaflet ${meta.sha1.slice(0, 10)} (${meta.pdfUrl})`);
+  }
   process.exit(report.healthOk || DRY_RUN ? 0 : 1);
 }
 
