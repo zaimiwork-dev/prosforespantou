@@ -195,3 +195,16 @@ export async function loadCatalog({ cachePath } = {}) {
 }
 
 export const loadOffers = (feed) => walkListing(feed === 'web' ? WEB_ONLY_PATH : LEAFLET_PATH);
+
+// Listings carry 200×200 thumbnails; the product page has the 800×800 photo,
+// named by a different product code (/Images/Products/<code>_1.jpg), so it can
+// only be read from that page. null when the page has none.
+export async function largeImage(productUrl) {
+  if (!productUrl) return null;
+  const html = await fetchText(productUrl);
+  const m = html.match(/href=['"](\/Images\/Products\/[^'"]+?_1\.(?:jpg|jpeg|png|webp))['"]/i);
+  return m ? new URL(m[1], BASE).href : null;
+}
+
+export const isThumb = (url) => /\/Images\/Products\/Thumbs\//i.test(String(url ?? ''));
+export { sleep, PACE_MS };
