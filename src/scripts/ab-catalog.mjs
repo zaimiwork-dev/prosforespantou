@@ -20,6 +20,7 @@ dotenv.config();
 
 import { ingestCatalog } from './lib/ingest-catalog.mjs';
 import { mirrorImages } from './lib/mirror-images.mjs';
+import { nameWithBrand } from './lib/item-barcodes.mjs';
 import { envInt, fetchWithBackoff, pace } from './lib/polite-http.mjs';
 import { KNOWN_PQ_HASH, resolvePqHash } from './lib/ab-persisted-query.mjs';
 
@@ -84,7 +85,7 @@ function toCatalogItem(p) {
   if (!p.code || !p.name || !(price > 0)) return null;
   return {
     chainItemcode: String(p.code),
-    name: p.name.trim(),
+    name: nameWithBrand(p.name, p.manufacturerName),
     price,                                   // regular shelf price
     imageUrl: pickImage(p.images),
     brand: p.manufacturerName?.trim() || null,

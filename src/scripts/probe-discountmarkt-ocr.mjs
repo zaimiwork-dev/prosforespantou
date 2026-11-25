@@ -65,11 +65,11 @@ For each offer return:
 - "priceFor": "item", "kg" (sold by weight, «το κιλό») or "portion" («Η ΜΕΡΙΔΑ»)
 Reply with strict JSON: {"items": [ ... ]}. No other text.`;
 
-async function readPage(jpeg) {
+async function readPage(jpeg, model = MODEL) {
   // Keep the page readable but well under the request size limit.
   const img = await sharp(jpeg).resize({ width: 1100, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
   const body = {
-    model: MODEL,
+    model,
     messages: [{
       role: 'user',
       content: [
@@ -126,17 +126,28 @@ async function main() {
   if (!apiKey) throw new Error('GROQ_API_KEY not set');
   const models = await (await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${apiKey}` } })).json().catch(() => ({}));
   const ids = (models.data ?? []).map((m) => m.id);
-  console.log(`🔎 Groq models available (${ids.length}): ${ids.filter((id) => /scout|maverick|vision|vl|qwen|llama-4|gemma/i.test(id)).join(', ') || ids.join(', ')}`);
+  console.log(`🔎 Groq models available (${ids.length}): ${ids.join(', ')}`);
   const pdfUrl = await leafletPdfUrl();
   const pdf = await get(pdfUrl, 'buffer');
   const jpegs = pageJpegs(pdf);
-  console.log(`📄 ${pdfUrl}: ${jpegs.length} page images; model ${MODEL}`);
+  // Groq retires models (llama-4-scout, the Lidl reader, is gone): try the
+  // named one, then every listed model that might read images, on page 1.
+  const candidates = [...new Set([MODEL, ...ids.filter((id) => /scout|maverick|vision|vl|qwen|llama-4|gemma|pixtral|kimi/i.test(id))])];
+  let model = null;
+  for (const c of candidates) {
+    const r = await readPage(jpegs[0], c);
+    console.log(`   try ${c}: ${r.error ? r.error.slice(0, 140) : `${r.items.length} items`}`);
+    if (!r.error && r.items.length > 0) { model = c; break; }
+    await sleep(1500);
+  }
+  if (!model) { console.log('❌ no listed Groq model reads the page — free vision is not available'); return; }
+  console.log(`📄 ${pdfUrl}: ${jpegs.length} page images; model ${model}`);
   const report = [];
   const tally = { pages: 0, failedPages: 0, items: 0, ok: 0, mismatch: 0, noPerUnit: 0, noSize: 0, tokens: 0 };
   for (let i = 0; i < jpegs.length; i++) {
     const page = i + 1;
     if (PAGES.length && !PAGES.includes(page)) continue;
-    const r = await readPage(jpegs[i]);
+    const r = await readPage(jpegs[i], model);
     tally.pages++;
     if (r.error) { tally.failedPages++; console.log(`p${page}: ERROR ${r.error}`); continue; }
     tally.tokens += r.tokens;

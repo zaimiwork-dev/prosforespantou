@@ -36,6 +36,10 @@ import {
   AB_PQ_STATE_KEY,
 } from '../lib/ab-persisted-query.mjs';
 import { mirrorImages } from '../lib/mirror-images.mjs';
+// AB writes the brand in its own field and leaves it out of the name
+// («Υγρό Απορρυπαντικό Ρούχων 40 μεζούρες» is PRODERM): the card shows
+// «PRODERM Υγρό …», as AB's own site shows the brand above the name (11-25).
+import { nameWithBrand } from '../lib/item-barcodes.mjs';
 import { envInt, fetchWithBackoff, pace } from '../lib/polite-http.mjs';
 
 const DRY_RUN = process.env.DRY_RUN === '1';
@@ -169,7 +173,7 @@ function toOfferItem(p) {
   if (!isPriceAffecting) {
     const promo = multibuy ?? points;
     return {
-      name: p.name?.trim(),
+      name: nameWithBrand(p.name, p.manufacturerName),
       price: discounted,
       originalPrice: null,
       chainItemcode: String(p.code),
@@ -185,7 +189,7 @@ function toOfferItem(p) {
   }
 
   return {
-    name: p.name?.trim(),
+    name: nameWithBrand(p.name, p.manufacturerName),
     price: discounted,
     originalPrice,
     chainItemcode: String(p.code),
