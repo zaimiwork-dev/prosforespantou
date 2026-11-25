@@ -303,9 +303,12 @@ function candidatesFor(a, index, parse, sameProductOk = false) {
 }
 
 /** best candidate per other chain for source item a, with margin to the runner-up */
-function bestPerChain(a, index, scorer, minScore, sameProductOk = false) {
+function bestPerChain(a, index, scorer, minScore, sameProductOk = false, skipChains = null) {
   const byChain = new Map();
   for (const b of candidatesFor(a, index, scorer.parse, sameProductOk)) {
+    // A chain that already sells this very product record (barcode-linked)
+    // needs no name link: another record there is a variant or a duplicate.
+    if (skipChains && skipChains.has(b.chain)) continue;
     const r = scorer.score(a, b);
     if (r.veto || r.score < minScore) continue;
     if (!byChain.has(b.chain)) byChain.set(b.chain, []);
@@ -477,12 +480,25 @@ function simulateRetrieval(items, truth, scorer, thresh) {
 
 function runJob(items, scorer, thresh) {
   const index = buildIndex(items, scorer.parse);
-  const single = items.filter((i) => i.nChains === 1);
+  // LINK_ALL_SOURCES=1 (2026-11-23): items of a product already sold at two
+  // chains (barcode-linked, e.g. AB + Σκλαβενίτης) also look for their match
+  // at the OTHER chains. Without it a product known at 2 chains never gained a
+  // third — Nescafe Classic 200 g sat as two separate 2-chain records.
+  const ALL = process.env.LINK_ALL_SOURCES === '1';
+  const chainsOf = new Map();
+  for (const i of items) {
+    if (!chainsOf.has(i.productId)) chainsOf.set(i.productId, new Set());
+    chainsOf.get(i.productId).add(i.chain);
+  }
+  const single = ALL ? items : items.filter((i) => i.nChains === 1);
   const proposals = new Map(); // unordered pair key -> proposal
   for (const a of single) {
-    for (const c of bestPerChain(a, index, scorer, thresh)) {
+    for (const c of bestPerChain(a, index, scorer, thresh, false, ALL ? chainsOf.get(a.productId) : null)) {
       const b = c.b;
-      const k = a.productId < b.productId ? `${a.productId}#${b.productId}` : `${b.productId}#${a.productId}`;
+      // Keyed per ITEM pair (product|chain), not product pair: a product sold at
+      // two chains (Bazaar + Γαλαξίας by barcode) must get a link at EACH of them;
+      // a product-pair key kept only the best-scoring one.
+      const k = a.id < b.id ? `${a.id}#${b.id}` : `${b.id}#${a.id}`;
       const prev = proposals.get(k);
       if (!prev || c.r.score > prev.score) {
         proposals.set(k, { a, b, score: c.r.score, margin: c.margin, nCand: c.nCand, reasons: c.r.reasons });

@@ -40,6 +40,13 @@
 // called «different» (Groq: 7) — so it may replace Groq's «unsure»; a Groq
 // «same» it disagrees with is pulled down (mergeVerdict).
 //
+// Cross-store item links (2026-11-23, nightly): LINKS_META=<links-meta.json from
+// link-items.mjs MODE=export> judges the proposed links instead of the live
+// offer pairs. Word-identical pairs (lib/name-exact) are recorded without
+// asking (model 'name-exact'); the rest go to Groq, most visible first, LIMIT
+// per run, stopping cleanly on the daily budget. Pairs already judged are skipped.
+//   LINKS_META=/tmp/link-out/links-meta.json LIMIT=400 node src/scripts/verify-comparisons.mjs
+//
 // dotenv first (ESM hoist trap).
 import 'dotenv/config';
 import dotenv from 'dotenv';
@@ -49,6 +56,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { samePack } from '../lib/packaging.ts';
 import { areComparableNames } from '../lib/offer-similarity.ts';
 import { mergeVerdict, pairKeyOf } from '../lib/comparison-verdict.ts';
+import { sameWordsAndSize } from '../lib/name-exact.ts';
 import { RETIRED_SUPERMARKET_IDS } from '../lib/constants.js';
 
 const EVAL = process.env.EVAL === '1';
@@ -66,6 +74,7 @@ const EXPORT_SCOPE = (process.env.EXPORT_SCOPE || 'new').split(',').map((s) => s
 const IMPORT_FILE = process.env.IMPORT_FILE || '';
 const IMPORT_MODEL = process.env.IMPORT_MODEL || '';
 const REPLACE_UNSURE = process.env.REPLACE_UNSURE === '1';
+const LINKS_META = process.env.LINKS_META || '';
 const FINAL_MODELS = new Set(['owner', 'barcode']);
 const VERDICTS = ['same', 'different', 'unsure'];
 
@@ -435,6 +444,56 @@ async function runLive(apiKey) {
   if (result.fatal) { console.error(`\n❌ stopped: ${result.fatal}`); process.exitCode = 1; }
 }
 
+// ── LINKS: proposed cross-store item links (link-items.mjs MODE=export) ─────
+async function runLinks(apiKey) {
+  const { default: prisma } = await import('../lib/prisma.ts');
+  const meta = JSON.parse(readFileSync(LINKS_META, 'utf8'));
+  const existing = new Set((await prisma.comparisonVerdict.findMany({ select: { pairKey: true } })).map((r) => r.pairKey));
+  const fresh = Object.entries(meta)
+    .filter(([id]) => !existing.has(id))
+    .map(([id, m]) => ({
+      pairKey: id,
+      chainA: m.a.chain, codeA: m.a.code, nameA: m.a.name,
+      chainB: m.b.chain, codeB: m.b.code, nameB: m.b.name,
+      priority: m.priority ?? 0,
+    }));
+  const exact = fresh.filter((p) => sameWordsAndSize(p.nameA, p.nameB));
+  const todo = fresh.filter((p) => !sameWordsAndSize(p.nameA, p.nameB)).sort((a, b) => b.priority - a.priority);
+  console.log(`🔗 proposed links: ${Object.keys(meta).length}; new: ${fresh.length} (word-identical: ${exact.length}, for the model: ${todo.length})${DRY_RUN ? ' — DRY_RUN' : ''}`);
+  const row = (p, verdict, reason, model) => ({
+    pairKey: p.pairKey, chainA: p.chainA, codeA: p.codeA, nameA: p.nameA, chainB: p.chainB, codeB: p.codeB, nameB: p.nameB,
+    verdict, reason: `link · ${reason}`.slice(0, 300), model,
+  });
+  if (DRY_RUN) {
+    for (const p of todo.slice(0, 10)) console.log(`   next: ${p.chainA}: ${p.nameA}  <>  ${p.chainB}: ${p.nameB}`);
+    await prisma.$disconnect();
+    return;
+  }
+  for (const batch of chunk(exact, 500)) {
+    await prisma.comparisonVerdict.createMany({
+      data: batch.map((p) => row(p, 'same', 'same words and size after folding', 'name-exact')),
+      skipDuplicates: true,
+    });
+  }
+  console.log(`   recorded ${exact.length} word-identical links`);
+  let result = { done: 0, tokens: 0 };
+  const ask = apiKey ? todo.slice(0, LIMIT) : [];
+  if (!apiKey && todo.length) console.log('   GROQ_API_KEY not set — only the word-identical links were recorded');
+  if (ask.length > 0) {
+    console.log(`   asking ${MODEL} (reasoning ${REASONING_EFFORT}) about ${ask.length} links`);
+    result = await judgeAll(apiKey, ask, async (batch, verdicts) => {
+      await prisma.comparisonVerdict.createMany({
+        data: batch.map((p, j) => row(p, verdicts[j].verdict, verdicts[j].reason, `${MODEL} ${REASONING_EFFORT}`)),
+        skipDuplicates: true,
+      });
+    });
+    console.log(`   judged ${result.done} links, ${result.tokens} Groq tokens`);
+  }
+  await prisma.$disconnect();
+  if (result.fatal) { console.error(`
+❌ stopped: ${result.fatal}`); process.exitCode = 1; }
+}
+
 const apiKey = process.env.GROQ_API_KEY;
-if (!DRY_RUN && !EXPORT_FILE && !IMPORT_FILE && !apiKey) { console.error('❌ GROQ_API_KEY not set'); process.exit(1); }
-(EVAL ? runEval(apiKey) : runLive(apiKey)).catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
+if (!DRY_RUN && !EXPORT_FILE && !IMPORT_FILE && !LINKS_META && !apiKey) { console.error('❌ GROQ_API_KEY not set'); process.exit(1); }
+(EVAL ? runEval(apiKey) : LINKS_META ? runLinks(apiKey) : runLive(apiKey)).catch((e) => { console.error(`\n❌ ${e.stack || e.message}`); process.exit(1); });
