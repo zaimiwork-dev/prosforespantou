@@ -146,6 +146,31 @@ export function itemCode(o) {
   return 'dm-' + crypto.createHash('sha1').update(key).digest('hex').slice(0, 12);
 }
 
+// A reader's photo box: [x0, y0, x1, y1] as page fractions, at least 4% of the
+// page each way (a sliver is a misread, not a photo). null otherwise.
+export function validBox(b) {
+  if (!Array.isArray(b) || b.length !== 4) return null;
+  const [x0, y0, x1, y1] = b.map(Number);
+  if (![x0, y0, x1, y1].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) return null;
+  if (x1 - x0 < 0.04 || y1 - y0 < 0.04) return null;
+  return [x0, y0, x1, y1];
+}
+
+// The product photo cut out of its page, as a phone-sized JPEG (the cards
+// show no leaflet page, only the pack — like every other store's photo).
+export async function cropPhoto(pageJpeg, box) {
+  const { default: sharp } = await import('sharp');
+  const meta = await sharp(pageJpeg).metadata();
+  const [x0, y0, x1, y1] = box;
+  const left = Math.max(0, Math.floor(x0 * meta.width));
+  const top = Math.max(0, Math.floor(y0 * meta.height));
+  const width = Math.min(meta.width - left, Math.ceil((x1 - x0) * meta.width));
+  const height = Math.min(meta.height - top, Math.ceil((y1 - y0) * meta.height));
+  return sharp(pageJpeg).extract({ left, top, width, height })
+    .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+}
+
 // Check, shape and de-duplicate what the readers wrote. Returns the offers to
 // publish and the ones left out (with the reason), so a run can print both.
 export function prepareOffers(readings) {
@@ -171,6 +196,7 @@ export function prepareOffers(readings) {
       note: o.note ? String(o.note).replace(/\s+/g, ' ').trim() : null,
       check,
       page: o.page,
+      photo: validBox(o.photo),
     });
   }
   return { offers: [...keep.values()], dropped };

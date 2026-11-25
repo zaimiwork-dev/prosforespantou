@@ -15,6 +15,12 @@
 //        stable code from the name (it prints no item codes; no shelf price —
 //        the leaflet price is an offer), and ingests the offers as source
 //        'leaflet' with the leaflet's printed dates.
+//   Photos (11-25): the readers also box each product photo; before the import,
+//   MODE=sheets IN=… OUT=<dir> lays every crop out on numbered contact sheets
+//   (<dir>/photo-sheet-N.jpg + photo-sheets.json); a reviewer writes the
+//   numbers whose photo does not show the named product to
+//   <dir>/photo-reject.json ([numbers]); the import (PHOTO_REJECT=<that file>)
+//   keeps the category icon for those. A sample of 36 crops had 1 wrong.
 //
 // dotenv first (ESM hoist trap) — the ingest modules import prisma.
 import 'dotenv/config';
@@ -57,10 +63,12 @@ async function fetchStep() {
   }
 }
 
-async function importStep() {
-  const files = (process.env.IN || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!files.length) throw new Error('IN is required (comma-separated read-*.json files)');
-  const { prepareOffers, parseHeaderDates } = await import('./lib/discountmarkt-leaflet.mjs');
+// Crop each boxed photo from its page and upload it (path = code + content
+// hash, so a re-run re-uses the object name). Sets o.imageUrl. Without R2
+// credentials, or in DRY_RUN, it only counts.
+// Readings → offers, the same way the import shapes them (shared by both modes).
+async function readOffers(files) {
+  const { prepareOffers } = await import('./lib/discountmarkt-leaflet.mjs');
   const readings = [];
   const headers = [];
   for (const f of files) {
@@ -68,6 +76,83 @@ async function importStep() {
     readings.push(...(j.offers ?? []));
     headers.push(...(j.headers ?? []));
   }
+  return { readings, headers, ...prepareOffers(readings) };
+}
+
+// Numbered contact sheets of every photo crop, 6 × 6 per sheet, each tile
+// labelled «N · name», for the photo reviewer.
+async function sheetsStep() {
+  const files = (process.env.IN || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const out = process.env.OUT;
+  if (!files.length || !out) throw new Error('IN and OUT are required');
+  const pagesDir = process.env.PAGES_DIR || path.dirname(files[0]);
+  const { cropPhoto } = await import('./lib/discountmarkt-leaflet.mjs');
+  const { default: sharp } = await import('sharp');
+  const { offers } = await readOffers(files);
+  const boxed = offers.filter((o) => o.photo);
+  const tile = 260;
+  const cols = 6;
+  const per = 36;
+  const index = {};
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let sheet = 0;
+  for (let i = 0; i < boxed.length; i += per) {
+    sheet++;
+    const tiles = [];
+    for (const [j, o] of boxed.slice(i, i + per).entries()) {
+      const n = i + j + 1;
+      index[n] = o.code;
+      const pageFile = path.join(pagesDir, `p${String(o.page).padStart(2, '0')}.jpg`);
+      const crop = await sharp(await cropPhoto(fs.readFileSync(pageFile), o.photo))
+        .resize({ width: tile, height: tile - 40, fit: 'contain', background: '#ffffff' }).png().toBuffer();
+      const label = Buffer.from(`<svg width="${tile}" height="40"><rect width="100%" height="100%" fill="#eeeeee"/><text x="4" y="16" font-size="14" font-weight="bold" font-family="Arial">${n}</text><text x="4" y="34" font-size="12" font-family="Arial">${esc(o.name.slice(0, 38))}</text></svg>`);
+      tiles.push(await sharp({ create: { width: tile, height: tile, channels: 3, background: '#ffffff' } })
+        .composite([{ input: crop, top: 0, left: 0 }, { input: label, top: tile - 40, left: 0 }]).png().toBuffer());
+    }
+    const rows = Math.ceil(tiles.length / cols);
+    await sharp({ create: { width: cols * tile, height: rows * tile, channels: 3, background: '#bbbbbb' } })
+      .composite(tiles.map((t, k) => ({ input: t, left: (k % cols) * tile, top: Math.floor(k / cols) * tile })))
+      .jpeg({ quality: 80 }).toFile(path.join(out, `photo-sheet-${sheet}.jpg`));
+  }
+  fs.writeFileSync(path.join(out, 'photo-sheets.json'), JSON.stringify(index));
+  console.log(`🖼️ ${boxed.length} photo crops on ${sheet} sheets → ${out}`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `sheets=${sheet}\n`);
+}
+
+async function attachPhotos(offers, pagesDir) {
+  const { cropPhoto } = await import('./lib/discountmarkt-leaflet.mjs');
+  const { resolveR2Config, makeR2Backend } = await import('./lib/r2-storage.mjs');
+  const crypto = await import('node:crypto');
+  const backend = DRY_RUN ? null : makeR2Backend(resolveR2Config());
+  let cut = 0;
+  let uploaded = 0;
+  let failed = 0;
+  for (const o of offers) {
+    if (!o.photo) continue;
+    const pageFile = path.join(pagesDir, `p${String(o.page).padStart(2, '0')}.jpg`);
+    if (!fs.existsSync(pageFile)) continue;
+    try {
+      const jpg = await cropPhoto(fs.readFileSync(pageFile), o.photo);
+      cut++;
+      if (!backend) continue;
+      const key = `discountmarkt/${o.code}-${crypto.createHash('sha1').update(jpg).digest('hex').slice(0, 10)}.jpg`;
+      await backend.upload(key, jpg, 'image/jpeg');
+      o.imageUrl = backend.publicUrlFor(key);
+      uploaded++;
+    } catch (e) {
+      failed++;
+      if (failed <= 3) console.log(`   photo failed for ${o.name}: ${e.message}`);
+    }
+  }
+  const boxed = offers.filter((o) => o.photo).length;
+  console.log(`   photos: ${boxed} boxed, ${cut} cut, ${uploaded} uploaded${backend ? '' : ' (no upload: DRY_RUN or no R2 credentials)'}, ${failed} failed`);
+}
+
+async function importStep() {
+  const files = (process.env.IN || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!files.length) throw new Error('IN is required (comma-separated read-*.json files)');
+  const { parseHeaderDates } = await import('./lib/discountmarkt-leaflet.mjs');
+  const { readings, headers, offers, dropped } = await readOffers(files);
   // Pages can run on their own dates (11-23 leaflet: «ΤΕΤΑΡΤΗ 25/11 έως
   // ΣΑΒΒΑΤΟ 28/11» on the Black Friday page, 23/11–28/11 elsewhere). An offer
   // takes its page's printed dates, else the leaflet's most common ones.
@@ -83,12 +168,25 @@ async function importStep() {
   const common = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
   const dates = common ? { validFrom: common.split('|')[0], validUntil: common.split('|')[1] } : null;
   const datesOf = (page) => datesByPage.get(Number(page)) ?? dates;
-  const { offers, dropped } = prepareOffers(readings);
   const checked = offers.filter((o) => o.check === 'ok').length;
   console.log(`🗞️ Discount Markt leaflet: ${readings.length} readings → ${offers.length} offers (${checked} confirmed by the printed unit price), ${dropped.length} left out`);
   console.log(`   dates: ${dates ? `${dates.validFrom} → ${dates.validUntil}` : 'none printed — default end date'}${[...datesByPage].filter(([, d]) => `${d.validFrom}|${d.validUntil}` !== common).map(([p, d]) => `; p${p}: ${d.validFrom} → ${d.validUntil}`).join('')}`);
   for (const d of dropped) console.log(`   left out p${d.o.page ?? '?'}: ${d.o.name} — ${d.why}`);
   if (offers.length === 0) throw new Error('nothing to import');
+
+  // Product photos cut out of the pages (the readers' `photo` boxes) and
+  // stored in the R2 image bucket; offers without a box keep the category icon.
+  const pagesDir = process.env.PAGES_DIR || path.dirname(process.env.META || files[0]);
+  // The photo reviewer's verdict: crops that do not show the named product
+  // (numbers on the contact sheets → item codes) keep the icon instead.
+  if (process.env.PHOTO_REJECT) {
+    const rejected = JSON.parse(fs.readFileSync(process.env.PHOTO_REJECT, 'utf8'));
+    const index = JSON.parse(fs.readFileSync(path.join(path.dirname(process.env.PHOTO_REJECT), 'photo-sheets.json'), 'utf8'));
+    const codes = new Set((Array.isArray(rejected) ? rejected : []).map((n) => index[n]).filter(Boolean));
+    for (const o of offers) if (codes.has(o.code)) o.photo = null;
+    console.log(`   photo reviewer rejected ${codes.size} crops`);
+  }
+  await attachPhotos(offers, pagesDir);
 
   const { ingestCatalog } = await import('./lib/ingest-catalog.mjs');
   const { ingestOffers, printReport } = await import('./lib/ingest-offers.mjs');
@@ -96,7 +194,7 @@ async function importStep() {
   // price is an offer, never a shelf price.
   const cat = await ingestCatalog({
     chain: 'discountmarkt',
-    items: offers.map((o) => ({ chainItemcode: o.code, name: o.name, price: o.price, baseline: false })),
+    items: offers.map((o) => ({ chainItemcode: o.code, name: o.name, price: o.price, imageUrl: o.imageUrl ?? null, baseline: false })),
     dryRun: DRY_RUN,
   });
   console.log(`   products: ${cat.created} created, ${cat.existing} existing`);
@@ -109,7 +207,7 @@ async function importStep() {
       originalPrice: o.originalPrice,
       chainItemcode: o.code,
       category: null,
-      imageUrl: null,
+      imageUrl: o.imageUrl ?? null,
       validFrom: datesOf(o.page)?.validFrom,
       validUntil: datesOf(o.page)?.validUntil,
       description: o.note,
@@ -135,5 +233,5 @@ async function importStep() {
   process.exit(report.healthOk || DRY_RUN ? 0 : 1);
 }
 
-(MODE === 'fetch' ? fetchStep() : MODE === 'import' ? importStep() : Promise.reject(new Error('MODE=fetch or MODE=import')))
+(MODE === 'fetch' ? fetchStep() : MODE === 'sheets' ? sheetsStep() : MODE === 'import' ? importStep() : Promise.reject(new Error('MODE=fetch, MODE=sheets or MODE=import')))
   .catch((e) => { console.error(`❌ ${e.stack || e.message}`); process.exit(1); });

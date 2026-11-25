@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { parseHeaderDates, unitPriceCheck, multiBuy, displayName, itemCode, prepareOffers } from './discountmarkt-leaflet.mjs';
+import { parseHeaderDates, unitPriceCheck, multiBuy, displayName, itemCode, prepareOffers, validBox } from './discountmarkt-leaflet.mjs';
+
+describe('validBox — a reader\'s photo box', () => {
+  it('keeps a sane box and rejects slivers, out-of-page and malformed ones', () => {
+    expect(validBox([0.05, 0.1, 0.3, 0.32])).toEqual([0.05, 0.1, 0.3, 0.32]);
+    expect(validBox([0.05, 0.1, 0.07, 0.32])).toBeNull();
+    expect(validBox([0.05, 0.1, 1.3, 0.32])).toBeNull();
+    expect(validBox(null)).toBeNull();
+    expect(validBox([0.1, 0.2, 0.3])).toBeNull();
+  });
+});
 
 const kg = (size: string | null, price: number, perUnit: number, extra = {}) =>
   unitPriceCheck({ size, price, perUnit, perUnitOf: 'κιλό', priceFor: 'item', ...extra });

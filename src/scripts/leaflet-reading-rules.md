@@ -18,6 +18,7 @@ Every product box that shows a price («ΜΟΝΟ 0,79», «2,99», «ΑΠΟ 19,9
 - `perUnitOf`: what that line is per: "κιλό", "λίτρο", "τεμάχιο", "μέτρο", "μεζούρα", or null. When the line is a range («από 4,34 – μόνο 3,26»), write the «μόνο» value.
 - `priceFor`: "item" (a pack), "kg" (sold by weight: «το κιλό», «1 κιλό»), or "portion" («Η ΜΕΡΙΔΑ»).
 - `note`: a printed condition that changes who gets the price («ΙΣΧΥΕΙ ΜΟΝΟ ΓΙΑ ΤΑ ΚΑΤΑΣΤΗΜΑΤΑ ΠΟΥ ΔΙΑΘΕΤΟΥΝ ΤΜΗΜΑ ΕΤΟΙΜΟΥ ΦΑΓΗΤΟΥ», «με την κάρτα»), else null.
+- `photo`: the box around the offer's PRODUCT PHOTO as fractions of the page, from the top-left corner: `[x0, y0, x1, y1]` with 0 ≤ x0 < x1 ≤ 1 and 0 ≤ y0 < y1 ≤ 1 (pages are about 1090 × 1680 px). The pack or product picture only — leave out the price box, the name text and badges as far as you can without cutting the pack. Several packs shown for one offer (two flavours) → one box around all of them. null when the offer has no photo.
 - `sure`: true only if you read the name, size and price without guessing; false otherwise. A unit-price line you could not fit into the fields above does not make an offer unsure — leave `perUnit` null instead.
 
 ## The page header

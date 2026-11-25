@@ -854,12 +854,32 @@ jobs:
             node -e "const j=JSON.parse(require('fs').readFileSync('dm-work/read-$k.json','utf8')); console.log('   read-$k:', (j.offers||[]).length, 'offers,', (j.headers||[]).length, 'headers')"
           done
           ls dm-work/read-*.json | paste -sd, > dm-work/inputs.txt
+      - name: Photo crops on numbered contact sheets
+        id: sheets
+        if: steps.fetch.outputs.new == '1'
+        # Greek labels on the sheets need a font with Greek letters.
+        run: |
+          sudo apt-get install -y -qq fonts-dejavu-core > /dev/null
+          IN="$(cat dm-work/inputs.txt)" OUT=dm-work MODE=sheets node src/scripts/discountmarkt-leaflet.mjs
+      - name: Claude checks every photo shows its product
+        if: steps.fetch.outputs.new == '1'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SHEETS: ${{ steps.sheets.outputs.sheets }}
+        run: |
+          files=""
+          for n in $(seq 1 "${SHEETS:-0}"); do files="$files dm-work/photo-sheet-$n.jpg"; done
+          if [ -z "$files" ]; then echo '[]' > dm-work/photo-reject.json; exit 0; fi
+          claude -p "You are checking product photos for a Greek supermarket offers site. Read these contact sheets with the Read tool, one at a time:$files. Each tile has a NUMBER and a product NAME under a photo cut out of a leaflet page. For every tile decide whether the photo shows the product named under it (brand, pack, product type). A little of a neighbour, a price tag or a badge is fine. Reject only when the main thing in the photo is a different product, the photo is mostly empty, or the product is cut off beyond recognition. Write the rejected numbers as one JSON array of integers with the Write tool to dm-work/photo-reject.json (write [] if none). Do nothing else." \
+            --model sonnet --allowedTools "Read,Write" --permission-mode acceptEdits --max-turns 20
+          node -e "const r=JSON.parse(require('fs').readFileSync('dm-work/photo-reject.json','utf8')); console.log('   rejected photos:', JSON.stringify(r))"
       - name: Check and import the offers
         if: steps.fetch.outputs.new == '1'
         run: IN="$(cat dm-work/inputs.txt)" node src/scripts/discountmarkt-leaflet.mjs
         env:
           MODE: import
           META: dm-work/meta.json
+          PHOTO_REJECT: dm-work/photo-reject.json
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
