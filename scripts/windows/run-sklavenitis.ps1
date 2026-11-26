@@ -10,11 +10,11 @@
 #     (weekly until 2026-11-23; daily so regular prices are never a week old)
 # Registration: scripts\windows\register-sklavenitis-tasks.ps1 (run once).
 #
-# Behavior on a 403 night: the adapter fails fast, this wrapper exits non-zero,
-# Task Scheduler records the failure and retries per its RestartCount; the
-# admin health tab alarms via EXPECTED_FEEDS (48h window) if no healthy run
-# lands two nights straight. When Akamai rotates the block off, the next
-# scheduled run self-heals with no manual action.
+# Behavior on a 403 night: the adapter fails fast and this wrapper retries up
+# to 4 times, an hour apart (see the loop below); then it exits non-zero, Task
+# Scheduler records the failure, and the admin health tab alarms via
+# EXPECTED_FEEDS (48h window) if no healthy run lands two nights straight.
+# Moving off this PC entirely = a paid Greek proxy (GitHub issue #3).
 #
 # Logs: <repo>\logs\sklavenitis\YYYYMMDD-HHmm-<job>.log (pruned after 45 days).
 
@@ -43,15 +43,34 @@ function Invoke-Step([string]$Label, [string]$CommandLine) {
   return $code
 }
 
-$exit = 0
-if ($Job -eq 'offers') {
-  # Adapter loads .env/.env.local itself (dotenv); mirrors offer images inline.
-  $exit = Invoke-Step 'offers adapter' "`"$Node`" src\scripts\adapters\sklavenitis.mjs"
-} else {
-  $exit = Invoke-Step 'full catalog' "`"$Node`" src\scripts\sklavenitis-catalog.mjs"
-  # Weekly catalog-image mirror rides along; worst exit code wins.
+function Invoke-Job {
+  if ($Job -eq 'offers') {
+    # Adapter loads .env/.env.local itself (dotenv); mirrors offer images inline.
+    return (Invoke-Step 'offers adapter' "`"$Node`" src\scripts\adapters\sklavenitis.mjs")
+  }
+  $code = Invoke-Step 'full catalog' "`"$Node`" src\scripts\sklavenitis-catalog.mjs"
+  # Catalog-image mirror rides along; worst exit code wins.
   $mirror = Invoke-Step 'catalog image mirror' "set CHAIN=sklavenitis&& `"$Node`" src\scripts\mirror-catalog.mjs"
-  if ($mirror -ne 0 -and $exit -eq 0) { $exit = $mirror }
+  if ($mirror -ne 0 -and $code -eq 0) { $code = $mirror }
+  return $code
+}
+
+# Retry inside the wrapper (2026-11-27). Task Scheduler's RestartCount only
+# covers a task that fails to START, not a script that exits non-zero, so a
+# 403 (this PC not on a Greek connection, e.g. a VPN; 11-26 09:09) used to
+# wait a whole day. Now: up to 4 attempts, 60 min apart, inside the task's
+# 6 h ExecutionTimeLimit (offers ~10 min, catalog ~25 min per attempt).
+$MaxAttempts = 4
+$RetryMinutes = 60
+$exit = 0
+for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+  Add-Content -Path $log -Value ("== {0} - attempt {1} of {2} ==" -f (Get-Date -Format 'u'), $attempt, $MaxAttempts)
+  $exit = Invoke-Job
+  if ($exit -eq 0) { break }
+  if ($attempt -lt $MaxAttempts) {
+    Add-Content -Path $log -Value ("== {0} - failed (exit {1}), next attempt in {2} min ==" -f (Get-Date -Format 'u'), $exit, $RetryMinutes)
+    Start-Sleep -Seconds ($RetryMinutes * 60)
+  }
 }
 
 # Prune logs older than 45 days so the folder cannot grow unbounded.
