@@ -51,7 +51,7 @@ async function run() {
       validFrom: startOf(offer.validFrom),
       validUntil: endOf(offer.validUntil),
       description: offer.label,
-      offerType: offer.originalPrice ? 'strikethrough' : 'mono',
+      offerType: offer.kind === 'points' ? 'points' : offer.originalPrice ? 'strikethrough' : 'mono',
     });
   }
   console.log(`   ${items.length} ${FEED} offers today (${today}) from ${products.length}/${total} products${partial ? ' — PARTIAL walk' : ''}`);

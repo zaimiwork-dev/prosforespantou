@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { galaxiasPrice, ruleKind, ruleActive } from './galaxias-promos.mjs';
+import { galaxiasPrice, ruleKind, ruleActive, pointsLabel } from './galaxias-promos.mjs';
 
 const TODAY = '2026-11-23';
 const rule = (o: Record<string, unknown>) => ({ from: '2026-11-11', to: '2026-11-24', stores: 'All Stores', is_silent: false, qty: 1, tags: [], ...o });
@@ -51,8 +51,20 @@ describe('galaxiasPrice', () => {
     expect(two.offer).toMatchObject({ price: 0.88, label: '-10% με αγορά 2 τεμ.' });
   });
 
-  it('ignores points, vouchers, ended and one-store rules', () => {
-    expect(galaxiasPrice(1.72, [rule({ promoType: 'bravo_bonus', action_name: 'fixed', actions: { amount: 0.36 } })], TODAY).offer).toBeNull();
+  it('card points (Bravo Bonus) are a labelled points offer at the regular price, silent or not', () => {
+    const r = galaxiasPrice(5.49, [rule({ promoType: 'bravo_bonus', action_name: 'fixed', actions: { amount: '0.3' }, requiredPoints: 10, is_silent: true, tags: ['BRAVO_BONUS'] })], TODAY);
+    expect(r.offer).toMatchObject({ price: 5.49, originalPrice: null, label: '−0,30€ με 10 πόντους', kind: 'points' });
+    expect(pointsLabel(rule({ promoType: 'extra_bonus', yieldPoints: 50 }))).toBe('+50 πόντοι Extra Bonus');
+    // A real price cut on the same product wins over points.
+    const both = galaxiasPrice(3, [
+      rule({ action_name: 'percent', actions: { amount: 20 } }),
+      rule({ promoType: 'bravo_bonus', action_name: 'fixed', actions: { amount: 0.3 }, requiredPoints: 10 }),
+    ], TODAY);
+    expect(both.offer).toMatchObject({ price: 2.4, kind: 'discount' });
+  });
+
+  it('ignores ended and one-store rules', () => {
+    expect(galaxiasPrice(1.72, [rule({ promoType: 'bravo_bonus', action_name: 'fixed', actions: { amount: 0.36 }, requiredPoints: 12, to: '2026-11-20' })], TODAY).offer).toBeNull();
     expect(galaxiasPrice(3, [rule({ action_name: 'percent', actions: { amount: 20 }, to: '2026-11-20' })], TODAY).offer).toBeNull();
     expect(galaxiasPrice(3, [rule({ action_name: 'percent', actions: { amount: 20 }, stores: 'Λάρισα' })], TODAY).offer).toBeNull();
   });

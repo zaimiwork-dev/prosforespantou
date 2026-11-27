@@ -7,7 +7,8 @@
 // galaxias.shop's main bundle, read 2026-11-23). This file ports that logic so
 // we show exactly what their site shows:
 //   - a rule whose name contains «ΔΩΡΟΕΠΙΤΑΓΗ»          → gift voucher (skipped)
-//   - promoType 'bravo_bonus' / 'extra_bonus' / yield_points → loyalty points (skipped for now)
+//   - promoType 'bravo_bonus' / 'extra_bonus' / yield_points → loyalty points
+//     (since 11-27: a labelled points offer at the regular price, like AB Plus)
 //   - action cheapest|expensive|free_offer, qty > 1, or an «N+M» tag
 //                                                       → «offer»: a label, the price does not change
 //   - action percent|fixed|final_price                  → «unit discount»: changes the price
@@ -136,5 +137,28 @@ export function galaxiasPrice(regular, rules, today) {
     // «1+1», «-10% με αγορά 2 τεμ.»: the price of ONE item, the deal as the sticker.
     return { shelf: reg, offer: { price: reg, originalPrice: null, label: offerLabel(offers[0]), kind: 'multibuy', ...meta(offers) } };
   }
+  // Card points («Κάρτα Bonus», 2026-11-27 — same labelled treatment as AB
+  // Plus): the shop's frontend shows them whether silent or not, so only the
+  // dates and «All Stores» count. The price stays the regular one.
+  const points = (rules ?? []).filter((r) => ruleActive(r, today) && ['bravoBonus', 'extraBonus'].includes(ruleKind(r)));
+  if (points.length > 0) {
+    return { shelf: reg, offer: { price: reg, originalPrice: null, label: pointsLabel(points[0]), kind: 'points', ...meta(points) } };
+  }
   return { shelf: reg, offer: null };
+}
+
+const euro = (v) => `${v.toFixed(2).replace('.', ',')}€`;
+
+// The sticker, from the rule's own numbers and short enough for a card (≤ 24):
+//   Bravo Bonus  — a € amount for card points: «−0,30€ με 10 πόντους»
+//   Extra Bonus  — extra card points:          «+50 πόντοι Extra Bonus»
+export function pointsLabel(rule) {
+  const amount = num(rule.actions?.amount);
+  if (ruleKind(rule) === 'bravoBonus') {
+    const req = num(rule.requiredPoints);
+    if (amount > 0 && req > 0) return `−${euro(amount)} με ${req} πόντους`;
+    return amount > 0 ? `Bravo Bonus −${euro(amount)}` : 'Bravo Bonus';
+  }
+  const yld = num(rule.yieldPoints);
+  return yld > 0 ? `+${yld} πόντοι Extra Bonus` : 'Extra Bonus πόντοι';
 }

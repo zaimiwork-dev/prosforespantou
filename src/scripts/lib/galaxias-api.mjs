@@ -12,7 +12,7 @@ const FIELDS = [
   'sku name url_key unit_measurement cost_per_unit',
   'categories{ name level }',
   'image{ url }',
-  'catalog_rules{ action_name actions{ amount } from name promoType qty is_silent stores to tags }',
+  'catalog_rules{ action_name actions{ amount } from name promoType qty requiredPoints yieldPoints is_silent stores to tags }',
   'price_range{ minimum_price{ regular_price{ value } } }',
 ].join(' ');
 
